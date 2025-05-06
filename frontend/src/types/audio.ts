@@ -20,15 +20,16 @@ export interface Layer {
   cooldownMs: number;  // Cooldown in cycles
   volume: number;      // Layer-specific volume (0-1)
   loopLengthMs: number; // Length of a cycle in milliseconds
+  weight: number;      // How much this layer contributes to the total environment weight
 }
 
 /**
  * Represents layer-specific overrides for a preset
  */
 export interface LayerPresetOverrides {
-  layerId: string;
   chance?: number;     // Optional override for chance (0-1)
   volume?: number;     // Optional override for volume (0-1)
+  weight?: number;     // Optional override for layer weight
 }
 
 /**
@@ -38,7 +39,7 @@ export interface EnvironmentPreset {
   id: string;
   name: string;        // e.g., "High Tension", "Peaceful", "Combat"
   environmentId: string; // Reference to parent environment
-  layerOverrides: LayerPresetOverrides[]; // Overrides for specific layers
+  layerOverrides: Record<string, LayerPresetOverrides>; // Map of layer ID to overrides
 }
 
 /**
@@ -52,6 +53,7 @@ export interface Environment {
   soundboard: SoundFile[];   // Environment-specific soundboard entries
   presets: EnvironmentPreset[]; // Available presets for this environment
   defaultPresetId?: string;  // Default preset to use when environment is first loaded
+  maxWeight: number;         // Maximum total weight allowed for active layers
 }
 
 /**
@@ -70,6 +72,7 @@ export interface ActiveEnvironment {
   environment: Environment;
   activeLayerIds: string[];  // IDs of layers currently playing
   activePresetId?: string;   // Currently active preset, if any
+  currentWeight: number;     // Current total weight of active layers
 }
 
 /**
@@ -103,9 +106,9 @@ export function isSoundFile(obj: any): obj is SoundFile {
 export function isLayerPresetOverrides(obj: any): obj is LayerPresetOverrides {
   return (
     typeof obj === 'object' &&
-    typeof obj.layerId === 'string' &&
     (obj.chance === undefined || (typeof obj.chance === 'number' && obj.chance >= 0 && obj.chance <= 1)) &&
-    (obj.volume === undefined || (typeof obj.volume === 'number' && obj.volume >= 0 && obj.volume <= 1))
+    (obj.volume === undefined || (typeof obj.volume === 'number' && obj.volume >= 0 && obj.volume <= 1)) &&
+    (obj.weight === undefined || typeof obj.weight === 'number')
   );
 }
 
@@ -118,8 +121,8 @@ export function isEnvironmentPreset(obj: any): obj is EnvironmentPreset {
     typeof obj.id === 'string' &&
     typeof obj.name === 'string' &&
     typeof obj.environmentId === 'string' &&
-    Array.isArray(obj.layerOverrides) &&
-    obj.layerOverrides.every(isLayerPresetOverrides)
+    typeof obj.layerOverrides === 'object' &&
+    Object.keys(obj.layerOverrides).every(key => isLayerPresetOverrides(obj.layerOverrides[key]))
   );
 }
 
@@ -135,7 +138,8 @@ export function isLayer(obj: any): obj is Layer {
     typeof obj.chance === 'number' &&
     typeof obj.cooldownMs === 'number' &&
     typeof obj.volume === 'number' &&
-    typeof obj.loopLengthMs === 'number'
+    typeof obj.loopLengthMs === 'number' &&
+    typeof obj.weight === 'number'
   );
 }
 
@@ -154,7 +158,8 @@ export function isEnvironment(obj: any): obj is Environment {
     obj.soundboard.every(isSoundFile) &&
     Array.isArray(obj.presets) &&
     obj.presets.every(isEnvironmentPreset) &&
-    (obj.defaultPresetId === undefined || typeof obj.defaultPresetId === 'string')
+    (obj.defaultPresetId === undefined || typeof obj.defaultPresetId === 'string') &&
+    typeof obj.maxWeight === 'number'
   );
 }
 
@@ -167,7 +172,8 @@ export function isActiveEnvironment(obj: any): obj is ActiveEnvironment {
     isEnvironment(obj.environment) &&
     Array.isArray(obj.activeLayerIds) &&
     obj.activeLayerIds.every((id: any) => typeof id === 'string') &&
-    (obj.activePresetId === undefined || typeof obj.activePresetId === 'string')
+    (obj.activePresetId === undefined || typeof obj.activePresetId === 'string') &&
+    typeof obj.currentWeight === 'number'
   );
 }
 
@@ -196,16 +202,33 @@ export function isAppState(obj: any): obj is AppState {
 export function getEffectiveLayerSettings(
   layer: Layer,
   preset?: EnvironmentPreset
-): { chance: number; volume: number } {
+): { chance: number; volume: number; weight: number } {
   if (!preset) {
-    return { chance: layer.chance, volume: layer.volume };
+    return { 
+      chance: layer.chance, 
+      volume: layer.volume,
+      weight: layer.weight 
+    };
   }
 
-  const override = preset.layerOverrides.find(o => o.layerId === layer.id);
+  const override = preset.layerOverrides[layer.id];
   return {
     chance: override?.chance ?? layer.chance,
-    volume: override?.volume ?? layer.volume
+    volume: override?.volume ?? layer.volume,
+    weight: override?.weight ?? layer.weight
   };
+}
+
+/**
+ * Helper function to check if adding a layer would exceed the environment's max weight
+ */
+export function canAddLayer(
+  activeEnvironment: ActiveEnvironment,
+  layer: Layer,
+  preset?: EnvironmentPreset
+): boolean {
+  const { weight } = getEffectiveLayerSettings(layer, preset);
+  return activeEnvironment.currentWeight + weight <= activeEnvironment.environment.maxWeight;
 }
 
 /**

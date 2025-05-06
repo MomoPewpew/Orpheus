@@ -1,0 +1,122 @@
+.app-layout {
+  display: flex;
+  height: 100vh;
+  background: #18181b;
+  color: #f3f4f6;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.sidebar {
+  width: 260px;
+  background: #23232b;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.08);
+}
+
+.sidebar-header {
+  margin-bottom: 32px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sidebar-nav button {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: #2d2d39;
+  border: none;
+  border-radius: 6px;
+  color: #f3f4f6;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebar-nav button:hover {
+  background: #3b3b4d;
+  transform: translateY(-1px);
+}
+
+.sidebar-nav button:active {
+  transform: translateY(0px);
+}
+
+.sidebar-search {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #2d2d39;
+  background: #23232b;
+  color: #f3f4f6;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.sidebar-search:focus {
+  outline: none;
+  border-color: #3b3b4d;
+}
+
+.environment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+}
+
+.environment-list button {
+  text-align: left;
+  padding: 12px;
+  background: transparent;
+  border: 1px solid #2d2d39;
+  border-radius: 6px;
+}
+
+.environment-list button:hover {
+  background: #2d2d39;
+  transform: none;
+}
+
+.environment-list button.active {
+  background: #3b3b4d;
+  border-color: #4c4c64;
+}
+
+.main-content {
+  flex: 1;
+  padding: 40px;
+  background: #18181b;
+  overflow-y: auto;
+}
+
+.welcome-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: #9ca3af;
+}
+
+.welcome-screen h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  color: #f3f4f6;
+}
+
+.welcome-screen p {
+  font-size: 1.1rem;
+} 
