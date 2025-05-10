@@ -1,4 +1,5 @@
-import { AppConfig, AudioFile } from '../types/config';
+import { AppConfig } from '../types/config';
+import { SoundFile } from '../types/audio';
 
 const API_BASE = '/api';
 
@@ -37,7 +38,7 @@ export async function loadConfig(): Promise<AppConfig> {
 }
 
 // Audio file operations will be handled by the Python backend
-export async function uploadAudioFile(file: File): Promise<AudioFile> {
+export async function uploadAudioFile(file: File): Promise<SoundFile> {
   try {
     const formData = new FormData();
     formData.append('file', file);

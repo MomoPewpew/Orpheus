@@ -10,15 +10,23 @@ export interface SoundFile {
 }
 
 /**
+ * Represents a sound within a layer, with layer-specific settings
+ */
+export interface LayerSound {
+  fileId: string;    // Reference to a SoundFile
+  weight: number;    // Weight for random selection within the layer
+  volume: number;    // Sound-specific volume adjustment
+}
+
+/**
  * Represents a layer in an environment (e.g., background music, ambient sounds)
  */
 export interface Layer {
   id: string;
   name: string;
-  soundFile: SoundFile;
+  sounds: LayerSound[];  // List of possible sounds for this layer
   chance: number;      // Probability of playing (0-1)
   cooldownMs: number;  // Cooldown in cycles
-  volume: number;      // Layer-specific volume (0-1)
   loopLengthMs: number; // Length of a cycle in milliseconds
   weight: number;      // How much this layer contributes to the total environment weight
 }
@@ -101,6 +109,18 @@ export function isSoundFile(obj: any): obj is SoundFile {
 }
 
 /**
+ * Type guard to check if an object is a valid LayerSound
+ */
+export function isLayerSound(obj: any): obj is LayerSound {
+  return (
+    typeof obj === 'object' &&
+    typeof obj.fileId === 'string' &&
+    typeof obj.weight === 'number' &&
+    typeof obj.volume === 'number'
+  );
+}
+
+/**
  * Type guard to check if an object is a valid LayerPresetOverrides
  */
 export function isLayerPresetOverrides(obj: any): obj is LayerPresetOverrides {
@@ -134,10 +154,10 @@ export function isLayer(obj: any): obj is Layer {
     typeof obj === 'object' &&
     typeof obj.id === 'string' &&
     typeof obj.name === 'string' &&
-    isSoundFile(obj.soundFile) &&
+    Array.isArray(obj.sounds) &&
+    obj.sounds.every(isLayerSound) &&
     typeof obj.chance === 'number' &&
     typeof obj.cooldownMs === 'number' &&
-    typeof obj.volume === 'number' &&
     typeof obj.loopLengthMs === 'number' &&
     typeof obj.weight === 'number'
   );
@@ -202,20 +222,23 @@ export function isAppState(obj: any): obj is AppState {
 export function getEffectiveLayerSettings(
   layer: Layer,
   preset?: EnvironmentPreset
-): { chance: number; volume: number; weight: number } {
+): { chance: number; weight: number; sounds: LayerSound[] } {
   if (!preset) {
     return { 
-      chance: layer.chance, 
-      volume: layer.volume,
-      weight: layer.weight 
+      chance: layer.chance,
+      weight: layer.weight,
+      sounds: layer.sounds
     };
   }
 
   const override = preset.layerOverrides[layer.id];
   return {
     chance: override?.chance ?? layer.chance,
-    volume: override?.volume ?? layer.volume,
-    weight: override?.weight ?? layer.weight
+    weight: override?.weight ?? layer.weight,
+    sounds: layer.sounds.map(sound => ({
+      ...sound,
+      volume: override?.volume !== undefined ? sound.volume * override.volume : sound.volume
+    }))
   };
 }
 
@@ -264,4 +287,34 @@ export const deserializeAppState = (json: string): AppState | null => {
   } catch {
     return null;
   }
-}; 
+};
+
+/**
+ * Helper function to get the effective volume for a layer (average of all sound volumes)
+ */
+export function getLayerVolume(layer: Layer): number {
+    if (layer.sounds.length === 0) return 1;
+    return layer.sounds.reduce((sum, sound) => sum + sound.volume, 0) / layer.sounds.length;
+}
+
+/**
+ * Helper function to set the volume for all sounds in a layer
+ */
+export function setLayerVolume(layer: Layer, volume: number): Layer {
+    return {
+        ...layer,
+        sounds: layer.sounds.map(sound => ({
+            ...sound,
+            volume
+        }))
+    };
+}
+
+/**
+ * Helper function to get the primary sound name for a layer (first sound or placeholder)
+ */
+export function getLayerSoundName(layer: Layer, soundFiles: SoundFile[]): string {
+    if (layer.sounds.length === 0) return "No sound selected";
+    const primarySound = soundFiles.find(sf => sf.id === layer.sounds[0].fileId);
+    return primarySound?.name || "Unknown sound";
+} 

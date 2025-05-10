@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { EnvironmentPreset, Layer } from '../../types/audio';
+import { EnvironmentPreset, Layer, getLayerVolume } from '../../types/audio';
 
 interface PresetManagerProps {
   presets: EnvironmentPreset[];
@@ -140,7 +140,7 @@ const PresetManager: React.FC<PresetManagerProps> = ({
                       min="0"
                       max="1"
                       step="0.01"
-                      value={override?.volume ?? layer.volume}
+                      value={override?.volume ?? getLayerVolume(layer)}
                       onChange={(e) => {
                         const preset = presets.find((p) => p.id === activePresetId);
                         if (preset) {

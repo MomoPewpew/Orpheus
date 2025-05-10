@@ -10,15 +10,18 @@ import {
   Slider,
   Stack,
   Drawer,
+  IconButton,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import { Environment, Layer, EnvironmentPreset } from '../types/audio';
+import { Environment, Layer, EnvironmentPreset, SoundFile, setLayerVolume, getLayerVolume } from '../types/audio';
 import { generateId } from '../utils/ids';
+import { LayerControls } from './layers/LayerControls';
 
 interface MainContentProps {
-  environment?: Environment | null;
+  environment: Environment | null;
   showConfig: boolean;
   showSoundboard: boolean;
+  soundFiles: SoundFile[];
   onEnvironmentUpdate: (environment: Environment) => void;
   onLayerAdd: () => void;
   onLayerUpdate: (layer: Layer) => void;
@@ -32,6 +35,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   environment,
   showConfig,
   showSoundboard,
+  soundFiles,
   onEnvironmentUpdate,
   onLayerAdd,
   onLayerUpdate,
@@ -57,20 +61,23 @@ export const MainContent: React.FC<MainContentProps> = ({
   };
 
   const handleMaxWeightChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!environment) return;
     const newMaxWeight = parseFloat(event.target.value);
-    if (!isNaN(newMaxWeight) && newMaxWeight >= 0) {
-      onEnvironmentUpdate({
-        ...environment,
-        maxWeight: newMaxWeight
-      });
-    }
+    onEnvironmentUpdate({
+      ...environment,
+      maxWeight: newMaxWeight
+    });
   };
 
-  const handleLayerPropertyChange = (layer: Layer, property: keyof Layer, value: number) => {
-    onLayerUpdate({
-      ...layer,
-      [property]: value
-    });
+  const handleLayerPropertyChange = (layer: Layer, property: keyof Layer | 'volume', value: number) => {
+    if (property === 'volume') {
+      onLayerUpdate(setLayerVolume(layer, value));
+    } else if (property in layer) {
+      onLayerUpdate({
+        ...layer,
+        [property]: value
+      });
+    }
   };
 
   const handleAddPreset = () => {
@@ -100,16 +107,20 @@ export const MainContent: React.FC<MainContentProps> = ({
           pb: 2
         }}>
           <TextField
-            label="Maximum Weight"
             type="number"
             value={environment.maxWeight}
-            onChange={handleMaxWeightChange}
+            onChange={(e) => {
+              const value = parseFloat(e.target.value);
+              if (!isNaN(value) && value >= 0) {
+                onEnvironmentUpdate({
+                  ...environment,
+                  maxWeight: value
+                });
+              }
+            }}
             size="small"
             sx={{ width: 150 }}
-            inputProps={{
-              min: 0,
-              step: 0.1
-            }}
+            inputProps={{ min: 0, step: 0.1 }}
           />
           {/* Add other environment-specific configs here */}
         </Box>
@@ -171,84 +182,12 @@ export const MainContent: React.FC<MainContentProps> = ({
           </Box>
 
           {environment.layers.map((layer) => (
-            <Paper 
-              key={layer.id} 
-              elevation={0}
-              sx={{ 
-                p: 2,
-                border: '1px solid rgba(0, 0, 0, 0.12)',
-                borderRadius: 1,
-                display: 'grid',
-                gridTemplateColumns: '2fr repeat(3, 1fr)',
-                gap: 2,
-                alignItems: 'center',
-              }}
-            >
-              <Typography variant="body2">{layer.name}</Typography>
-              <Box>
-                <Slider
-                  size="small"
-                  value={layer.chance}
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  onChange={(_, value) => handleLayerPropertyChange(layer, 'chance', value as number)}
-                  valueLabelDisplay="auto"
-                  valueLabelFormat={(value) => value.toFixed(1)}
-                  sx={{
-                    '& .MuiSlider-thumb': {
-                      width: 14,
-                      height: 14,
-                    },
-                    '& .MuiSlider-rail': {
-                      opacity: 0.3,
-                    },
-                  }}
-                />
-              </Box>
-              <Box>
-                <Slider
-                  size="small"
-                  value={layer.volume}
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  onChange={(_, value) => handleLayerPropertyChange(layer, 'volume', value as number)}
-                  valueLabelDisplay="auto"
-                  valueLabelFormat={(value) => value.toFixed(1)}
-                  sx={{
-                    '& .MuiSlider-thumb': {
-                      width: 14,
-                      height: 14,
-                    },
-                    '& .MuiSlider-rail': {
-                      opacity: 0.3,
-                    },
-                  }}
-                />
-              </Box>
-              <Box>
-                <Slider
-                  size="small"
-                  value={layer.weight}
-                  min={0}
-                  max={environment.maxWeight}
-                  step={0.1}
-                  onChange={(_, value) => handleLayerPropertyChange(layer, 'weight', value as number)}
-                  valueLabelDisplay="auto"
-                  valueLabelFormat={(value) => value.toFixed(1)}
-                  sx={{
-                    '& .MuiSlider-thumb': {
-                      width: 14,
-                      height: 14,
-                    },
-                    '& .MuiSlider-rail': {
-                      opacity: 0.3,
-                    },
-                  }}
-                />
-              </Box>
-            </Paper>
+            <LayerControls
+              key={layer.id}
+              layer={layer}
+              soundFiles={soundFiles}
+              onLayerChange={(updatedLayer) => onLayerUpdate(updatedLayer)}
+            />
           ))}
           
           <Button

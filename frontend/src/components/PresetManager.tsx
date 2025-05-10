@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import { EnvironmentPreset, LayerPresetOverrides, Environment } from '../types/audio';
+import { EnvironmentPreset, LayerPresetOverrides, Environment, getLayerVolume } from '../types/audio';
 import { generateId } from '../utils/ids';
 
 interface PresetManagerProps {
@@ -112,7 +112,7 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
               <InputLabel>Volume</InputLabel>
               <Input
                 type="number"
-                value={override.volume ?? layer.volume}
+                value={override.volume ?? getLayerVolume(layer)}
                 onChange={(e) => handleLayerOverrideChange(layer.id, 'volume', parseFloat(e.target.value))}
                 inputProps={{ min: 0, max: 1, step: 0.1 }}
               />

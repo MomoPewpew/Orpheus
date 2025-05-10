@@ -1,4 +1,30 @@
 {
-  "environments": [],
-  "files": []
+  "environments": [
+    {
+      "id": "mailit71-rhj6t0",
+      "layers": [
+        {
+          "chance": 1,
+          "cooldownMs": 0,
+          "id": "mailj0oh-wsx4s3",
+          "loopLengthMs": 0,
+          "name": "New Layer",
+          "sounds": [
+            {
+              "fileId": "mailj0oh-hb66rr",
+              "volume": 0.8,
+              "weight": 1
+            }
+          ],
+          "weight": 1
+        }
+      ],
+      "maxWeight": 2,
+      "name": "New Environment",
+      "presets": [],
+      "soundboard": []
+    }
+  ],
+  "files": [],
+  "playState": "STOPPED"
 }

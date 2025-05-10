@@ -1,54 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Environment, EnvironmentPreset, Layer } from './types/audio';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Environment, EnvironmentPreset, Layer, LayerSound, SoundFile } from './types/audio';
 import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import { generateId } from './utils/ids';
-import { AppConfig, AudioFile, soundFileToAudioFile } from './types/config';
-import { saveConfig, loadConfig } from './services/configService';
-
-// Create a sample environment for testing
-const sampleEnvironment: Environment = {
-  id: '1',
-  name: 'Test Environment',
-  layers: [
-    {
-      id: 'layer1',
-      name: 'Background Music',
-      soundFile: {
-        id: 'sound1',
-        name: 'Background Track',
-        path: '/sounds/background.mp3',
-        volume: 1,
-        lengthMs: 60000
-      },
-      chance: 1,
-      cooldownMs: 0,
-      volume: 0.8,
-      loopLengthMs: 60000,
-      weight: 1
-    },
-    {
-      id: 'layer2',
-      name: 'Ambient Effects',
-      soundFile: {
-        id: 'sound2',
-        name: 'Ambient Track',
-        path: '/sounds/ambient.mp3',
-        volume: 1,
-        lengthMs: 30000
-      },
-      chance: 0.5,
-      cooldownMs: 5000,
-      volume: 0.6,
-      loopLengthMs: 30000,
-      weight: 0.5
-    }
-  ],
-  soundboard: [],
-  presets: [],
-  maxWeight: 2
-};
+import { saveWorkspace, loadWorkspace } from './services/workspaceService';
+import debounce from 'lodash/debounce';
 
 const theme = createTheme({
   // You can customize your theme here
@@ -56,44 +13,57 @@ const theme = createTheme({
 
 const App: React.FC = () => {
   const [environments, setEnvironments] = useState<Environment[]>([]);
-  const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
+  const [soundFiles, setSoundFiles] = useState<SoundFile[]>([]);
   const [activeEnvironment, setActiveEnvironment] = useState<Environment | null>(null);
   const [showConfig, setShowConfig] = useState(false);
   const [showSoundboard, setShowSoundboard] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [masterVolume, setMasterVolume] = useState(1);
 
-  // Load initial config
+  // Create a debounced save function
+  const debouncedSave = useCallback(
+    debounce((state: { environments: Environment[]; files: SoundFile[]; masterVolume: number }) => {
+      console.debug('Saving workspace state:', state);
+      saveWorkspace(state).catch((error) => {
+        console.error('Failed to save workspace:', error);
+      });
+    }, 1000),
+    [] // Empty dependency array since we don't want to recreate the debounced function
+  );
+
+  // Load initial workspace
   useEffect(() => {
-    loadConfig()
-      .then((config) => {
-        setEnvironments(config.environments);
-        setAudioFiles(config.files);
-        if (config.environments.length > 0) {
-          setActiveEnvironment(config.environments[0]);
+    loadWorkspace()
+      .then((workspace) => {
+        console.debug('Loaded workspace:', workspace);
+        setEnvironments(workspace.environments);
+        setSoundFiles(workspace.files);
+        setMasterVolume(workspace.masterVolume);
+        // Set first environment as active if we have any
+        if (workspace.environments.length > 0) {
+          setActiveEnvironment(workspace.environments[0]);
         }
       })
       .catch((error) => {
-        console.error('Failed to load config:', error);
-        // You might want to show an error message to the user here
+        console.error('Failed to load workspace:', error);
       })
       .finally(() => {
         setIsLoading(false);
       });
   }, []);
 
-  // Save config whenever relevant state changes
+  // Save workspace whenever relevant state changes
   useEffect(() => {
     if (!isLoading) {
-      const config: AppConfig = {
+      const state = {
         environments,
-        files: audioFiles
+        files: soundFiles,
+        masterVolume
       };
-      saveConfig(config).catch((error) => {
-        console.error('Failed to save config:', error);
-        // You might want to show an error message to the user here
-      });
+      console.debug('State changed, triggering save:', state);
+      debouncedSave(state);
     }
-  }, [environments, audioFiles, isLoading]);
+  }, [environments, soundFiles, masterVolume, isLoading, debouncedSave]);
 
   const handleNewEnvironment = () => {
     const newEnvironment: Environment = {
@@ -136,22 +106,18 @@ const App: React.FC = () => {
     const newLayer: Layer = {
       id: generateId(),
       name: 'New Layer',
-      soundFile: {
-        id: generateId(),
-        name: 'New Sound',
-        path: '',
-        volume: 1,
-        lengthMs: 0
-      },
+      sounds: [
+        {
+          fileId: generateId(),
+          weight: 1,
+          volume: 0.8
+        }
+      ],
       chance: 1,
       cooldownMs: 0,
-      volume: 0.8,
       loopLengthMs: 0,
-      weight: 0
+      weight: 1
     };
-
-    // Add the sound file to our audio files list
-    setAudioFiles(prev => [...prev, soundFileToAudioFile(newLayer.soundFile)]);
 
     const updatedEnvironment = {
       ...activeEnvironment,
@@ -228,6 +194,7 @@ const App: React.FC = () => {
             environment={activeEnvironment}
             showConfig={showConfig}
             showSoundboard={showSoundboard}
+            soundFiles={soundFiles}
             onEnvironmentUpdate={handleEnvironmentUpdate}
             onLayerAdd={handleLayerAdd}
             onLayerUpdate={handleLayerUpdate}

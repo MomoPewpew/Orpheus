@@ -18,7 +18,8 @@ WORKDIR /app
 RUN mkdir -p /app/audio-processing/static \
     /app/audio-processing/data/audio \
     /app/discord-bot \
-    /app/frontend
+    /app/frontend && \
+    chmod -R 777 /app/audio-processing/data  # Ensure directory is writable
 
 # Create and activate virtual environment
 RUN python3.11 -m venv /app/venv
@@ -36,7 +37,8 @@ RUN . /app/venv/bin/activate && \
 # Copy frontend package files and install dependencies
 COPY frontend/package*.json /app/frontend/
 WORKDIR /app/frontend
-RUN npm install
+RUN npm install && \
+    npm install --save-dev @types/lodash
 ENV PATH /app/frontend/node_modules/.bin:$PATH
 
 # Copy application code
@@ -47,16 +49,19 @@ COPY discord-bot/ /app/discord-bot/
 # Create startup script
 RUN echo '#!/bin/bash\n\
 source /app/venv/bin/activate\n\
+echo "Checking data directory permissions..."\n\
+ls -la /app/audio-processing/data\n\
+echo "Current working directory: $(pwd)"\n\
 echo "Starting Discord bot..."\n\
 cd /app/discord-bot && PYTHONPATH=/app/discord-bot python -m src.bot.__main__ > discord.log 2>&1 & \n\
 echo "Starting frontend development server..."\n\
 cd /app/frontend && npm start & \n\
-echo "Starting FastAPI server in development mode..."\n\
-cd /app/audio-processing && exec uvicorn main:app --host 0.0.0.0 --port 8000 --reload\n' > /app/start.sh && \
+echo "Starting Flask server in development mode..."\n\
+cd /app/audio-processing && FLASK_ENV=development FLASK_DEBUG=1 python -m flask run --host=0.0.0.0 --port=5000\n' > /app/start.sh && \
     chmod +x /app/start.sh
 
 # Expose ports
-EXPOSE 8000 3000
+EXPOSE 5000 3000
 
 # Run all services
 CMD ["/app/start.sh"] 
