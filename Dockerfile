@@ -1,62 +1,62 @@
-# Use Node.js as base image since we need it for the frontend build
-FROM node:18-slim AS frontend-builder
+# Use Node.js as base image since we need it for the frontend
+FROM node:18-slim
 
-# Set working directory for frontend
-WORKDIR /frontend-build
-
-# Copy package files first to leverage cache
-COPY frontend/package*.json ./
-
-# Install frontend dependencies
-RUN npm install
-
-# Copy frontend source and build
-COPY frontend/ ./
-RUN npm run build
-
-# Start fresh with Python image for the final stage
-FROM python:3.11-slim AS final
-
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies
+# Install Python and other dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3-pip \
     procps \
     psmisc && \
     rm -rf /var/lib/apt/lists/*
 
+# Set working directory
+WORKDIR /app
+
 # Create necessary directories
 RUN mkdir -p /app/audio-processing/static \
     /app/audio-processing/data/audio \
-    /app/discord-bot
+    /app/discord-bot \
+    /app/frontend
 
-# Copy backend code first
+# Create and activate virtual environment
+RUN python3.11 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+
+# Copy backend requirements first
 COPY audio-processing/requirements.txt /app/audio-processing/
 COPY discord-bot/requirements.txt /app/discord-bot/
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r /app/audio-processing/requirements.txt && \
+# Install Python dependencies in virtual environment
+RUN . /app/venv/bin/activate && \
+    pip install --no-cache-dir -r /app/audio-processing/requirements.txt && \
     pip install --no-cache-dir -r /app/discord-bot/requirements.txt
 
+# Copy frontend package files and install dependencies
+COPY frontend/package*.json /app/frontend/
+WORKDIR /app/frontend
+RUN npm install
+ENV PATH /app/frontend/node_modules/.bin:$PATH
+
 # Copy application code
+WORKDIR /app
 COPY audio-processing/ /app/audio-processing/
 COPY discord-bot/ /app/discord-bot/
 
-# Copy frontend build from builder stage
-COPY --from=frontend-builder /frontend-build/build/. /app/audio-processing/static/
-
-# Create startup script with error handling and logging
+# Create startup script
 RUN echo '#!/bin/bash\n\
+source /app/venv/bin/activate\n\
 echo "Starting Discord bot..."\n\
 cd /app/discord-bot && PYTHONPATH=/app/discord-bot python -m src.bot.__main__ > discord.log 2>&1 & \n\
+echo "Starting frontend development server..."\n\
+cd /app/frontend && npm start & \n\
 echo "Starting FastAPI server in development mode..."\n\
 cd /app/audio-processing && exec uvicorn main:app --host 0.0.0.0 --port 8000 --reload\n' > /app/start.sh && \
     chmod +x /app/start.sh
 
-# Expose port
-EXPOSE 8000
+# Expose ports
+EXPOSE 8000 3000
 
-# Run both services
+# Run all services
 CMD ["/app/start.sh"] 

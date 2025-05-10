@@ -6,10 +6,12 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+      - "3000:3000"  # Frontend dev server port
     volumes:
       # Development volumes for hot reloading
       - ./audio-processing:/app/audio-processing
       - ./discord-bot:/app/discord-bot
+      - ./frontend:/app/frontend:cached
       # Persist data
       - ./audio-processing/data:/app/audio-processing/data
       # Don't override the static files from the frontend build
@@ -18,6 +20,12 @@ services:
       - NODE_ENV=development
       - PYTHONUNBUFFERED=1  # Better Python logging
       - DISCORD_TOKEN=${DISCORD_TOKEN}  # Pass through from host environment
+      - CHOKIDAR_USEPOLLING=true  # Enable file watching
+      - WATCHPACK_POLLING=true    # Enable webpack polling
+      - WDS_SOCKET_PORT=3000      # WebSocket port for hot reload
+      - REACT_APP_API_URL=http://localhost:8000  # API URL for frontend
     env_file:
       - .env  # Alternative: load from .env file
+    stdin_open: true  # Required for react-scripts start
+    tty: true        # Required for react-scripts start
     restart: unless-stopped 
