@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Environment, EnvironmentPreset, Layer } from './types/audio';
-import { Box, CssBaseline, ThemeProvider, createTheme, Grid } from '@mui/material';
+import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import { generateId } from './utils/ids';
+import { AppConfig, AudioFile, soundFileToAudioFile } from './types/config';
+import { saveConfig, loadConfig } from './services/configService';
 
 // Create a sample environment for testing
 const sampleEnvironment: Environment = {
@@ -53,10 +55,45 @@ const theme = createTheme({
 });
 
 const App: React.FC = () => {
-  const [environments, setEnvironments] = useState<Environment[]>([sampleEnvironment]);
-  const [activeEnvironment, setActiveEnvironment] = useState<Environment | null>(sampleEnvironment);
+  const [environments, setEnvironments] = useState<Environment[]>([]);
+  const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
+  const [activeEnvironment, setActiveEnvironment] = useState<Environment | null>(null);
   const [showConfig, setShowConfig] = useState(false);
   const [showSoundboard, setShowSoundboard] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load initial config
+  useEffect(() => {
+    loadConfig()
+      .then((config) => {
+        setEnvironments(config.environments);
+        setAudioFiles(config.files);
+        if (config.environments.length > 0) {
+          setActiveEnvironment(config.environments[0]);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load config:', error);
+        // You might want to show an error message to the user here
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, []);
+
+  // Save config whenever relevant state changes
+  useEffect(() => {
+    if (!isLoading) {
+      const config: AppConfig = {
+        environments,
+        files: audioFiles
+      };
+      saveConfig(config).catch((error) => {
+        console.error('Failed to save config:', error);
+        // You might want to show an error message to the user here
+      });
+    }
+  }, [environments, audioFiles, isLoading]);
 
   const handleNewEnvironment = () => {
     const newEnvironment: Environment = {
@@ -113,6 +150,9 @@ const App: React.FC = () => {
       weight: 0
     };
 
+    // Add the sound file to our audio files list
+    setAudioFiles(prev => [...prev, soundFileToAudioFile(newLayer.soundFile)]);
+
     const updatedEnvironment = {
       ...activeEnvironment,
       layers: [...activeEnvironment.layers, newLayer]
@@ -166,6 +206,10 @@ const App: React.FC = () => {
     // This might involve applying the preset's overrides to the layers
     console.log('Selected preset:', presetId);
   };
+
+  if (isLoading) {
+    return <div>Loading...</div>; // You might want to show a proper loading spinner
+  }
 
   return (
     <ThemeProvider theme={theme}>

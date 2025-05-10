@@ -1,0 +1,30 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies
+**/node_modules
+**/__pycache__
+**/*.pyc
+
+# Environment
+.env
+.env.local
+.env.*.local
+venv/
+env/
+
+# Build outputs
+**/dist
+**/build
+**/coverage
+
+# Development files
+**/.vscode
+**/.idea
+**/*.log
+**/npm-debug.log*
+
+# Data directories (will be created in container)
+**/data/
+**/audio-processing/data/ 

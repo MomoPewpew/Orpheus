@@ -1,50 +1,23 @@
+# Development configuration
 services:
-  discord-bot:
-    image: orpheus-discord-bot
+  app:
     build:
-      context: ./discord-bot
+      context: .
       dockerfile: Dockerfile
-    volumes:
-      - ./discord-bot:/app
-    env_file:
-      - .env
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    depends_on:
-      - backend
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    volumes:
-      - ./backend:/app
     ports:
       - "8000:8000"
-    env_file:
-      - .env
-
-  audio-player:
-    build:
-      context: ./audio-player
-      dockerfile: Dockerfile
     volumes:
-      - ./audio-player:/app
-      - /app/node_modules
-    ports:
-      - "3001:3000"
+      # Development volumes for hot reloading
+      - ./audio-processing:/app/audio-processing
+      - ./discord-bot:/app/discord-bot
+      # Persist data
+      - ./audio-processing/data:/app/audio-processing/data
+      # Don't override the static files from the frontend build
+      - /app/audio-processing/static
+    environment:
+      - NODE_ENV=development
+      - PYTHONUNBUFFERED=1  # Better Python logging
+      - DISCORD_TOKEN=${DISCORD_TOKEN}  # Pass through from host environment
     env_file:
-      - .env
-    depends_on:
-      - backend 
+      - .env  # Alternative: load from .env file
+    restart: unless-stopped 
