@@ -14,7 +14,16 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SpeakerIcon from '@mui/icons-material/Speaker';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { Environment, SoundFile } from '../types/audio';
+import { 
+  Droppable, 
+  Draggable, 
+  DroppableProvided, 
+  DroppableStateSnapshot,
+  DraggableProvided,
+  DraggableStateSnapshot 
+} from '@hello-pangea/dnd';
 import ConfigOverlay from './overlays/ConfigOverlay';
 
 interface SidebarProps {
@@ -134,45 +143,80 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         </Box>
 
-        <Box sx={{ 
-          flexGrow: 1, 
-          overflow: 'auto',
-          px: 2,
-          pb: 2,
-        }}>
-          <List sx={{ width: '100%' }}>
-            {filteredEnvironments.map((env) => (
-              <ListItem key={env.id} disablePadding>
-                <ListItemButton
-                  selected={env.id === activeEnvironment?.id}
-                  onClick={() => onEnvironmentSelect(env)}
-                  sx={{
-                    borderRadius: 1,
-                    mb: 0.5,
-                    '&.Mui-selected': {
-                      bgcolor: '#e3f2fd',
-                      '&:hover': {
-                        bgcolor: '#e3f2fd',
-                      },
-                    },
-                  }}
-                >
-                  <ListItemText 
-                    primary={env.name}
-                    secondary={`${env.layers.length} layers`}
-                    primaryTypographyProps={{
-                      fontSize: '0.9rem',
-                      noWrap: true,
-                    }}
-                    secondaryTypographyProps={{
-                      fontSize: '0.8rem',
-                      noWrap: true,
-                    }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
+        <Box 
+          sx={{ 
+            flexGrow: 1, 
+            overflow: 'auto',
+            px: 2,
+            pb: 2,
+            position: 'relative',
+            height: '100%'
+          }}
+        >
+          <Droppable droppableId="environments" type="environment">
+            {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
+              <List
+                disablePadding
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                sx={{ 
+                  minHeight: 50,
+                  backgroundColor: snapshot.isDraggingOver ? 'action.hover' : 'transparent',
+                  transition: 'background-color 0.2s ease'
+                }}
+              >
+                {filteredEnvironments.map((env, index) => (
+                  <Draggable 
+                    key={env.id} 
+                    draggableId={env.id} 
+                    index={index}
+                  >
+                    {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
+                      <ListItem
+                        component="div"
+                        disablePadding
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        sx={{
+                          backgroundColor: snapshot.isDragging ? 'action.hover' : 'transparent',
+                          transition: 'background-color 0.2s ease'
+                        }}
+                      >
+                        <ListItemButton
+                          selected={env.id === activeEnvironment?.id}
+                          onClick={() => onEnvironmentSelect(env)}
+                          sx={{ pr: 1 }}
+                        >
+                          <ListItemText 
+                            primary={env.name}
+                            secondary={`${env.layers.length} layers`}
+                            primaryTypographyProps={{
+                              fontSize: '0.9rem',
+                              noWrap: true,
+                            }}
+                            secondaryTypographyProps={{
+                              fontSize: '0.8rem',
+                              noWrap: true,
+                            }}
+                          />
+                          <Box {...provided.dragHandleProps}>
+                            <DragIndicatorIcon 
+                              sx={{ 
+                                color: 'text.secondary',
+                                opacity: 0.5,
+                                cursor: 'grab',
+                              }} 
+                            />
+                          </Box>
+                        </ListItemButton>
+                      </ListItem>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </List>
+            )}
+          </Droppable>
         </Box>
       </Drawer>
 

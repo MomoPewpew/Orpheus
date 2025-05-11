@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Environment, EnvironmentPreset, Layer, LayerSound, SoundFile } from './types/audio';
 import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import ConfigOverlay from './components/overlays/ConfigOverlay';
@@ -182,6 +183,29 @@ const App: React.FC = () => {
     setMasterVolume(validVolume);
   };
 
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const { source, destination, type } = result;
+
+    if (type === 'environment') {
+      const reorderedEnvironments = Array.from(environments);
+      const [removed] = reorderedEnvironments.splice(source.index, 1);
+      reorderedEnvironments.splice(destination.index, 0, removed);
+      setEnvironments(reorderedEnvironments);
+    } else if (type === 'layer' && activeEnvironment) {
+      const reorderedLayers = Array.from(activeEnvironment.layers);
+      const [removed] = reorderedLayers.splice(source.index, 1);
+      reorderedLayers.splice(destination.index, 0, removed);
+      
+      const updatedEnvironment = {
+        ...activeEnvironment,
+        layers: reorderedLayers
+      };
+      handleEnvironmentUpdate(updatedEnvironment);
+    }
+  };
+
   if (isLoading) {
     return <div>Loading...</div>; // You might want to show a proper loading spinner
   }
@@ -189,34 +213,51 @@ const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex', height: '100vh' }}>
-        <Sidebar
-          environments={environments}
-          activeEnvironment={activeEnvironment}
-          onNewEnvironment={handleNewEnvironment}
-          onToggleConfig={handleToggleConfig}
-          onToggleSoundboard={handleToggleSoundboard}
-          onEnvironmentSelect={handleEnvironmentSelect}
-          masterVolume={masterVolume}
-          onMasterVolumeChange={handleMasterVolumeChange}
-          soundFiles={soundFiles}
-          onSoundFilesChange={setSoundFiles}
-        />
-        <Box component="main" sx={{ flexGrow: 1, height: '100vh', overflow: 'auto' }}>
-          <MainContent
-            environment={activeEnvironment}
-            showSoundboard={showSoundboard}
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            height: '100vh',
+            position: 'relative', // Add this to ensure proper stacking context
+            overflow: 'hidden' // Prevent any potential scrolling issues
+          }}
+        >
+          <Sidebar
+            environments={environments}
+            activeEnvironment={activeEnvironment}
+            onNewEnvironment={handleNewEnvironment}
+            onToggleConfig={handleToggleConfig}
+            onToggleSoundboard={handleToggleSoundboard}
+            onEnvironmentSelect={handleEnvironmentSelect}
+            masterVolume={masterVolume}
+            onMasterVolumeChange={handleMasterVolumeChange}
             soundFiles={soundFiles}
-            onEnvironmentUpdate={handleEnvironmentUpdate}
-            onEnvironmentRemove={handleEnvironmentRemove}
-            onLayerAdd={handleLayerAdd}
-            onLayerUpdate={handleLayerUpdate}
-            onPresetCreate={handlePresetCreate}
-            onPresetSelect={handlePresetSelect}
             onSoundFilesChange={setSoundFiles}
           />
+          <Box 
+            component="main" 
+            sx={{ 
+              flexGrow: 1, 
+              height: '100vh', 
+              overflow: 'auto',
+              position: 'relative' // Add this to ensure proper stacking context
+            }}
+          >
+            <MainContent
+              environment={activeEnvironment}
+              showSoundboard={showSoundboard}
+              soundFiles={soundFiles}
+              onEnvironmentUpdate={handleEnvironmentUpdate}
+              onEnvironmentRemove={handleEnvironmentRemove}
+              onLayerAdd={handleLayerAdd}
+              onLayerUpdate={handleLayerUpdate}
+              onPresetCreate={handlePresetCreate}
+              onPresetSelect={handlePresetSelect}
+              onSoundFilesChange={setSoundFiles}
+            />
+          </Box>
         </Box>
-      </Box>
+      </DragDropContext>
     </ThemeProvider>
   );
 };

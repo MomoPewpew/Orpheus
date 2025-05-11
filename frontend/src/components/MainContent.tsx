@@ -22,6 +22,14 @@ import { Environment, Layer, EnvironmentPreset, SoundFile, setLayerVolume, getLa
 import { generateId } from '../utils/ids';
 import { LayerControls } from './layers/LayerControls';
 import AddLayerDialog from './AddLayerDialog';
+import { 
+  Droppable, 
+  Draggable, 
+  DroppableProvided, 
+  DroppableStateSnapshot,
+  DraggableProvided,
+  DraggableStateSnapshot 
+} from '@hello-pangea/dnd';
 
 interface MainContentProps {
   environment: Environment | null;
@@ -225,31 +233,68 @@ export const MainContent: React.FC<MainContentProps> = ({
         </Box>
 
         {/* Layer List */}
-        <Stack spacing={1}>
-          {environment.layers.map((layer) => (
-            <LayerControls
-              key={layer.id}
-              layer={layer}
-              soundFiles={soundFiles}
-              onLayerUpdate={(updatedLayer: Layer) => onLayerUpdate(updatedLayer)}
-              onLayerEdit={(layer: Layer) => {
-                // TODO: Implement layer editing
-                console.log('Edit layer:', layer);
-              }}
-              onLayerRemove={(layerId: string) => {
-                const updatedLayers = environment.layers.filter(l => l.id !== layerId);
-                onEnvironmentUpdate({
-                  ...environment,
-                  layers: updatedLayers
-                });
-              }}
-            />
-          ))}
-          
+        <Box sx={{ mb: 3, position: 'relative', minHeight: 100 }}>
+          <Droppable droppableId="layers" type="layer">
+            {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
+              <Stack
+                spacing={1}
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                sx={{ 
+                  minHeight: 50,
+                  backgroundColor: snapshot.isDraggingOver ? 'action.hover' : 'transparent',
+                  transition: 'background-color 0.2s ease',
+                  p: 1
+                }}
+              >
+                {environment.layers.map((layer, index) => (
+                  <Draggable 
+                    key={layer.id} 
+                    draggableId={layer.id} 
+                    index={index}
+                  >
+                    {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
+                      <Box
+                        component="div"
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        sx={{
+                          opacity: snapshot.isDragging ? 0.8 : 1,
+                          transition: 'opacity 0.2s ease',
+                          backgroundColor: snapshot.isDragging ? 'action.hover' : 'transparent'
+                        }}
+                      >
+                        <LayerControls
+                          layer={layer}
+                          soundFiles={soundFiles}
+                          onLayerUpdate={onLayerUpdate}
+                          onLayerEdit={(layer: Layer) => {
+                            // TODO: Implement layer editing
+                            console.log('Edit layer:', layer);
+                          }}
+                          onLayerRemove={(layerId: string) => {
+                            const updatedLayers = environment.layers.filter(l => l.id !== layerId);
+                            onEnvironmentUpdate({
+                              ...environment,
+                              layers: updatedLayers
+                            });
+                          }}
+                          dragHandleProps={provided.dragHandleProps}
+                        />
+                      </Box>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </Stack>
+            )}
+          </Droppable>
+
           <Button
             startIcon={<AddIcon />}
             onClick={() => setShowAddLayer(true)}
             sx={{
+              mt: 2,
               alignSelf: 'flex-start',
               color: '#1976d2',
               '&:hover': {
@@ -259,7 +304,7 @@ export const MainContent: React.FC<MainContentProps> = ({
           >
             ADD LAYER
           </Button>
-        </Stack>
+        </Box>
       </Box>
 
       {/* Soundboard Drawer */}
