@@ -6,14 +6,14 @@
         {
           "chance": 1,
           "cooldownMs": 0,
-          "id": "majou62d-h26as0",
+          "id": "majmj4yn-6i7cpb",
           "loopLengthMs": 0,
-          "name": "Mii Channel",
+          "name": "Mii Channel - Plaza Theme (HQ)",
           "sounds": [
             {
-              "fileId": "54cf34f8-2d5f-4240-8543-95a974a1e9e8",
+              "fileId": "cdceaf9c-6290-4855-b0b4-e59540d31ea1",
               "frequency": 1,
-              "volume": 0.86
+              "volume": 0.42
             }
           ],
           "volume": 1,
@@ -22,10 +22,15 @@
         {
           "chance": 1,
           "cooldownMs": 0,
-          "id": "majmj4yn-6i7cpb",
+          "id": "majou62d-h26as0",
           "loopLengthMs": 0,
-          "name": "Mii Channel - Plaza Theme (HQ)",
+          "name": "Mii Channel",
           "sounds": [
+            {
+              "fileId": "54cf34f8-2d5f-4240-8543-95a974a1e9e8",
+              "frequency": 1,
+              "volume": 0.78
+            },
             {
               "fileId": "cdceaf9c-6290-4855-b0b4-e59540d31ea1",
               "frequency": 1,
@@ -37,7 +42,7 @@
         }
       ],
       "maxWeight": 2,
-      "name": "New Environment",
+      "name": "Test Environment",
       "presets": [],
       "soundboard": []
     },

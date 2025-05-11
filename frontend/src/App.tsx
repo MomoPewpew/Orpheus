@@ -8,7 +8,6 @@ import ConfigOverlay from './components/overlays/ConfigOverlay';
 import { generateId } from './utils/ids';
 import { saveWorkspace, loadWorkspace } from './services/workspaceService';
 import { listFiles } from './services/fileService';
-import debounce from 'lodash/debounce';
 
 const theme = createTheme({
   // You can customize your theme here
@@ -22,20 +21,6 @@ const App: React.FC = () => {
   const [showSoundboard, setShowSoundboard] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [masterVolume, setMasterVolume] = useState<number>(1);
-
-  // Create a debounced save function
-  const debouncedSave = useCallback(
-    debounce((state: { environments: Environment[]; files: SoundFile[]; masterVolume: number }) => {
-      console.debug('Debounced save triggered with state:', {
-        ...state,
-        masterVolume: state.masterVolume
-      });
-      saveWorkspace(state).catch((error) => {
-        console.error('Failed to save workspace:', error);
-      });
-    }, 1000),
-    []
-  );
 
   // Load initial workspace and sound files
   useEffect(() => {
@@ -68,23 +53,21 @@ const App: React.FC = () => {
       });
   }, []);
 
-  // Save workspace whenever relevant state changes
+  // Save state whenever it changes
   useEffect(() => {
-    if (!isLoading) {
-      const state = {
-        environments,
-        files: soundFiles,
-        masterVolume: Number(masterVolume)
-      };
-      console.debug('State change detected:', {
-        masterVolume,
-        type: typeof masterVolume,
-        stateVolume: state.masterVolume,
-        stateVolumeType: typeof state.masterVolume
-      });
-      debouncedSave(state);
-    }
-  }, [environments, soundFiles, masterVolume, isLoading, debouncedSave]);
+    if (isLoading) return;
+
+    const state = {
+      environments,
+      files: soundFiles,
+      masterVolume
+    };
+
+    console.debug('Saving state:', state);
+    saveWorkspace(state).catch((error) => {
+      console.error('Failed to save workspace:', error);
+    });
+  }, [environments, soundFiles, masterVolume, isLoading]);
 
   const handleNewEnvironment = () => {
     const newEnvironment: Environment = {
