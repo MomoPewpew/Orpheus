@@ -128,7 +128,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   };
 
   return (
-    <Box sx={{ p: 3, height: '100%', position: 'relative' }}>
+    <Box sx={{ p: 3, height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
       {/* Background Image */}
       {environment.backgroundImage && (
         <Box
@@ -166,68 +166,69 @@ export const MainContent: React.FC<MainContentProps> = ({
       )}
 
       {/* Content */}
-      <Box sx={{ position: 'relative', zIndex: 1 }}>
-        {/* Environment Banner */}
-        <Paper 
-          elevation={0}
-          sx={{ 
-            mb: 3, 
-            bgcolor: 'transparent',
-            borderBottom: '1px solid rgba(0, 0, 0, 0.12)'
-          }}
-        >
-          <Box sx={{ textAlign: 'center', mb: 2 }}>
-            <Typography variant="h4" sx={{ fontWeight: 500 }}>{environment.name}</Typography>
-          </Box>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            px: 2,
-            pb: 2
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Maximum Weight:
-              </Typography>
-              <TextField
-                type="number"
-                value={environment?.maxWeight}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value);
-                  if (!isNaN(value) && value >= 0 && environment) {
-                    onEnvironmentUpdate({
-                      ...environment,
-                      maxWeight: value
-                    });
-                  }
-                }}
-                size="small"
-                sx={{ width: 100 }}
-                inputProps={{ min: 0, step: 0.1 }}
-              />
+      <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Fixed Header Section */}
+        <Box sx={{ flexShrink: 0 }}>
+          {/* Environment Banner */}
+          <Paper 
+            elevation={0}
+            sx={{ 
+              mb: 3, 
+              bgcolor: 'transparent',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.12)'
+            }}
+          >
+            <Box sx={{ textAlign: 'center', mb: 2 }}>
+              <Typography variant="h4" sx={{ fontWeight: 500 }}>{environment.name}</Typography>
             </Box>
-            <Box>
-              <IconButton onClick={() => setShowEnvironmentConfig(true)}>
-                <Settings />
-              </IconButton>
-              <IconButton 
-                onClick={() => setIsConfirmRemoveOpen(true)} 
-                sx={{ 
-                  color: 'text.secondary',
-                  '&:hover': {
-                    color: 'error.main'
-                  }
-                }}
-              >
-                <Delete />
-              </IconButton>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 2,
+              pb: 2
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Maximum Weight:
+                </Typography>
+                <TextField
+                  type="number"
+                  value={environment?.maxWeight}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    if (!isNaN(value) && value >= 0 && environment) {
+                      onEnvironmentUpdate({
+                        ...environment,
+                        maxWeight: value
+                      });
+                    }
+                  }}
+                  size="small"
+                  sx={{ width: 100 }}
+                  inputProps={{ min: 0, step: 0.1 }}
+                />
+              </Box>
+              <Box>
+                <IconButton onClick={() => setShowEnvironmentConfig(true)}>
+                  <Settings />
+                </IconButton>
+                <IconButton 
+                  onClick={() => setIsConfirmRemoveOpen(true)} 
+                  sx={{ 
+                    color: 'text.secondary',
+                    '&:hover': {
+                      color: 'error.main'
+                    }
+                  }}
+                >
+                  <Delete />
+                </IconButton>
+              </Box>
             </Box>
-          </Box>
-        </Paper>
+          </Paper>
 
-        {/* Layer Management */}
-        <Box>
+          {/* Presets Section */}
           <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Tabs 
               value={selectedPresetIndex}
@@ -264,80 +265,84 @@ export const MainContent: React.FC<MainContentProps> = ({
               ADD PRESET
             </Button>
           </Box>
+        </Box>
 
-          {/* Layer List */}
-          <Box sx={{ mb: 3, position: 'relative', minHeight: 100 }}>
-            <Droppable droppableId="layers" type="layer">
-              {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
-                <Stack
-                  spacing={1}
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  sx={{ 
-                    minHeight: 50,
-                    backgroundColor: snapshot.isDraggingOver ? 'action.hover' : 'transparent',
-                    transition: 'background-color 0.2s ease',
-                    p: 1
-                  }}
-                >
-                  {environment.layers.map((layer, index) => (
-                    <Draggable 
-                      key={layer.id} 
-                      draggableId={layer.id} 
-                      index={index}
-                    >
-                      {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
-                        <Box
-                          component="div"
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          sx={{
-                            opacity: snapshot.isDragging ? 0.8 : 1,
-                            transition: 'opacity 0.2s ease',
-                            backgroundColor: snapshot.isDragging ? 'action.hover' : 'transparent'
+        {/* Scrollable Layer List */}
+        <Box sx={{ 
+          flexGrow: 1, 
+          overflow: 'auto',
+          position: 'relative',
+          minHeight: 100
+        }}>
+          <Droppable droppableId="layers" type="layer">
+            {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
+              <Stack
+                spacing={1}
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                sx={{ 
+                  minHeight: 50,
+                  backgroundColor: snapshot.isDraggingOver ? 'action.hover' : 'transparent',
+                  transition: 'background-color 0.2s ease',
+                  p: 1
+                }}
+              >
+                {environment.layers.map((layer, index) => (
+                  <Draggable 
+                    key={layer.id} 
+                    draggableId={layer.id} 
+                    index={index}
+                  >
+                    {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
+                      <Box
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        sx={{
+                          opacity: snapshot.isDragging ? 0.8 : 1,
+                          transition: 'opacity 0.2s ease',
+                          backgroundColor: snapshot.isDragging ? 'action.hover' : 'transparent'
+                        }}
+                      >
+                        <LayerControls
+                          layer={layer}
+                          soundFiles={soundFiles}
+                          onLayerUpdate={onLayerUpdate}
+                          onLayerEdit={(layer: Layer) => {
+                            // TODO: Implement layer editing
+                            console.log('Edit layer:', layer);
                           }}
-                        >
-                          <LayerControls
-                            layer={layer}
-                            soundFiles={soundFiles}
-                            onLayerUpdate={onLayerUpdate}
-                            onLayerEdit={(layer: Layer) => {
-                              // TODO: Implement layer editing
-                              console.log('Edit layer:', layer);
-                            }}
-                            onLayerRemove={(layerId: string) => {
-                              const updatedLayers = environment.layers.filter(l => l.id !== layerId);
-                              onEnvironmentUpdate({
-                                ...environment,
-                                layers: updatedLayers
-                              });
-                            }}
-                            dragHandleProps={provided.dragHandleProps}
-                          />
-                        </Box>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </Stack>
-              )}
-            </Droppable>
+                          onLayerRemove={(layerId: string) => {
+                            const updatedLayers = environment.layers.filter(l => l.id !== layerId);
+                            onEnvironmentUpdate({
+                              ...environment,
+                              layers: updatedLayers
+                            });
+                          }}
+                          dragHandleProps={provided.dragHandleProps}
+                        />
+                      </Box>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </Stack>
+            )}
+          </Droppable>
 
-            <Button
-              startIcon={<AddIcon />}
-              onClick={() => setShowAddLayer(true)}
-              sx={{
-                mt: 2,
-                alignSelf: 'flex-start',
-                color: '#1976d2',
-                '&:hover': {
-                  bgcolor: 'rgba(25, 118, 210, 0.04)',
-                },
-              }}
-            >
-              ADD LAYER
-            </Button>
-          </Box>
+          <Button
+            startIcon={<AddIcon />}
+            onClick={() => setShowAddLayer(true)}
+            sx={{
+              mt: 2,
+              alignSelf: 'flex-start',
+              color: '#1976d2',
+              '&:hover': {
+                bgcolor: 'rgba(25, 118, 210, 0.04)',
+              },
+            }}
+          >
+            ADD LAYER
+          </Button>
         </Box>
 
         {/* Soundboard Drawer */}
