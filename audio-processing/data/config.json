@@ -2,10 +2,12 @@
   "environments": [
     {
       "id": "majjgqzv-yaej32",
-      "name": "New Environment",
       "layers": [
         {
+          "chance": 1,
+          "cooldownMs": 0,
           "id": "majjgv34-0xkoqu",
+          "loopLengthMs": 0,
           "name": "Mii Channel Plaza Theme",
           "sounds": [
             {
@@ -14,16 +16,14 @@
               "volume": 0.8
             }
           ],
-          "chance": 1,
-          "cooldownMs": 0,
-          "loopLengthMs": 0,
-          "weight": 1,
-          "volume": 1
+          "volume": 1,
+          "weight": 1
         }
       ],
-      "soundboard": [],
+      "maxWeight": 2,
+      "name": "New Environment",
       "presets": [],
-      "maxWeight": 2
+      "soundboard": []
     }
   ],
   "playState": "STOPPED",
