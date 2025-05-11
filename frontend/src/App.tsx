@@ -105,6 +105,11 @@ const App: React.FC = () => {
     setActiveEnvironment(updatedEnvironment);
   };
 
+  const handleEnvironmentRemove = (environmentId: string) => {
+    setEnvironments(prevEnvironments => prevEnvironments.filter(env => env.id !== environmentId));
+    setActiveEnvironment(null);
+  };
+
   const handleLayerAdd = () => {
     if (!activeEnvironment) return;
 
@@ -196,6 +201,7 @@ const App: React.FC = () => {
             showSoundboard={showSoundboard}
             soundFiles={soundFiles}
             onEnvironmentUpdate={handleEnvironmentUpdate}
+            onEnvironmentRemove={handleEnvironmentRemove}
             onLayerAdd={handleLayerAdd}
             onLayerUpdate={handleLayerUpdate}
             onPresetCreate={handlePresetCreate}

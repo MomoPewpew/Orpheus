@@ -11,8 +11,13 @@ import {
   Stack,
   Drawer,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import { Edit, Delete } from '@mui/icons-material';
 import { Environment, Layer, EnvironmentPreset, SoundFile, setLayerVolume, getLayerVolume } from '../types/audio';
 import { generateId } from '../utils/ids';
 import { LayerControls } from './layers/LayerControls';
@@ -24,6 +29,7 @@ interface MainContentProps {
   showSoundboard: boolean;
   soundFiles: SoundFile[];
   onEnvironmentUpdate: (environment: Environment) => void;
+  onEnvironmentRemove?: (environmentId: string) => void;
   onLayerAdd: () => void;
   onLayerUpdate: (layer: Layer) => void;
   onPresetCreate: (name: string, basePresetId?: string) => void;
@@ -38,6 +44,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   showSoundboard,
   soundFiles,
   onEnvironmentUpdate,
+  onEnvironmentRemove,
   onLayerAdd,
   onLayerUpdate,
   onPresetCreate,
@@ -45,6 +52,9 @@ export const MainContent: React.FC<MainContentProps> = ({
 }) => {
   const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
   const [showAddLayer, setShowAddLayer] = useState(false);
+  const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [newEnvironmentName, setNewEnvironmentName] = useState('');
 
   if (!environment) {
     return (
@@ -97,6 +107,15 @@ export const MainContent: React.FC<MainContentProps> = ({
     onEnvironmentUpdate(updatedEnvironment);
   };
 
+  const handleRename = () => {
+    if (!environment || !newEnvironmentName.trim()) return;
+    onEnvironmentUpdate({
+      ...environment,
+      name: newEnvironmentName.trim()
+    });
+    setIsRenameOpen(false);
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Environment Banner */}
@@ -109,32 +128,56 @@ export const MainContent: React.FC<MainContentProps> = ({
         }}
       >
         <Box sx={{ textAlign: 'center', mb: 2 }}>
-          <Typography variant="h4" sx={{ fontWeight: 500 }}>{environment.name}</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 500 }}>{environment?.name}</Typography>
         </Box>
         <Box sx={{ 
           display: 'flex', 
-          alignItems: 'center', 
-          gap: 3,
+          alignItems: 'center',
+          justifyContent: 'space-between',
           px: 2,
           pb: 2
         }}>
-          <TextField
-            type="number"
-            value={environment.maxWeight}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value);
-              if (!isNaN(value) && value >= 0) {
-                onEnvironmentUpdate({
-                  ...environment,
-                  maxWeight: value
-                });
-              }
-            }}
-            size="small"
-            sx={{ width: 150 }}
-            inputProps={{ min: 0, step: 0.1 }}
-          />
-          {/* Add other environment-specific configs here */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Maximum Weight:
+            </Typography>
+            <TextField
+              type="number"
+              value={environment?.maxWeight}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && value >= 0 && environment) {
+                  onEnvironmentUpdate({
+                    ...environment,
+                    maxWeight: value
+                  });
+                }
+              }}
+              size="small"
+              sx={{ width: 100 }}
+              inputProps={{ min: 0, step: 0.1 }}
+            />
+          </Box>
+          <Box>
+            <IconButton 
+              onClick={() => {
+                if (!environment) return;
+                setNewEnvironmentName(environment.name);
+                setIsRenameOpen(true);
+              }} 
+              size="small" 
+              sx={{ mr: 1 }}
+            >
+              <Edit fontSize="small" />
+            </IconButton>
+            <IconButton 
+              onClick={() => setIsConfirmRemoveOpen(true)} 
+              size="small"
+              disabled={!onEnvironmentRemove}
+            >
+              <Delete fontSize="small" />
+            </IconButton>
+          </Box>
         </Box>
       </Paper>
 
@@ -263,6 +306,67 @@ export const MainContent: React.FC<MainContentProps> = ({
         onAdd={handleAddLayer}
         soundFiles={soundFiles}
       />
+
+      {/* Environment Rename Dialog */}
+      <Dialog 
+        open={isRenameOpen} 
+        onClose={() => setIsRenameOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Rename Environment</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Environment Name"
+            fullWidth
+            value={newEnvironmentName}
+            onChange={(e) => setNewEnvironmentName(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleRename();
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsRenameOpen(false)}>Cancel</Button>
+          <Button onClick={handleRename} variant="contained" disabled={!newEnvironmentName.trim()}>
+            Rename
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Environment Remove Confirmation Dialog */}
+      <Dialog
+        open={isConfirmRemoveOpen}
+        onClose={() => setIsConfirmRemoveOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Remove Environment</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to remove "{environment?.name}"? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsConfirmRemoveOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={() => {
+              if (environment && onEnvironmentRemove) {
+                onEnvironmentRemove(environment.id);
+                setIsConfirmRemoveOpen(false);
+              }
+            }} 
+            color="error"
+            variant="contained"
+          >
+            Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -1,29 +1,29 @@
 {
   "environments": [
     {
-      "id": "majhcnlc-m052sy",
+      "id": "majjgqzv-yaej32",
+      "name": "New Environment",
       "layers": [
         {
-          "chance": 1,
-          "cooldownMs": 0,
-          "id": "majicu74-yxkbt4",
-          "loopLengthMs": 0,
+          "id": "majjgv34-0xkoqu",
           "name": "Mii Channel Plaza Theme",
           "sounds": [
             {
               "fileId": "1723f7df-96c8-4b32-83ee-92e4abe4a84b",
-              "frequency": 0.2,
+              "frequency": 1,
               "volume": 0.8
             }
           ],
-          "volume": 1,
-          "weight": 1
+          "chance": 1,
+          "cooldownMs": 0,
+          "loopLengthMs": 0,
+          "weight": 1,
+          "volume": 1
         }
       ],
-      "maxWeight": 2,
-      "name": "New Environment",
+      "soundboard": [],
       "presets": [],
-      "soundboard": []
+      "maxWeight": 2
     }
   ],
   "playState": "STOPPED",
