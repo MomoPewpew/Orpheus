@@ -8,6 +8,15 @@ export interface WorkspaceState {
   environments: Environment[];
   files: SoundFile[];
   masterVolume: number;
+  soundboard: string[];
+}
+
+interface BackendState {
+  environments: Environment[];
+  files: SoundFile[];
+  masterVolume: number;
+  soundboard: string[];
+  playState: PlayState;
 }
 
 /**
@@ -15,14 +24,15 @@ export interface WorkspaceState {
  */
 export async function saveWorkspace(state: WorkspaceState): Promise<void> {
   try {
-    // Ensure masterVolume is a valid number and convert to a string for consistency
-    const masterVolume = Number(state.masterVolume).toString();
-
     // Convert workspace state to match backend format
-    const backendState = {
-      environments: state.environments || [],
+    const backendState: BackendState = {
+      environments: state.environments.map((env: Environment) => ({
+        ...env,
+        soundboard: env.soundboard || [] // Ensure soundboard exists
+      })) || [],
       files: state.files || [],
-      masterVolume: parseFloat(masterVolume),
+      masterVolume: state.masterVolume,
+      soundboard: state.soundboard || [], // Global soundboard
       playState: PlayState.Stopped
     };
 
@@ -42,8 +52,6 @@ export async function saveWorkspace(state: WorkspaceState): Promise<void> {
       console.error('Server response:', responseText);
       throw new Error(`Failed to save workspace: ${response.statusText}`);
     }
-
-    const result = JSON.parse(responseText);
   } catch (error) {
     console.error('Error saving workspace:', error);
     throw error;
@@ -66,11 +74,16 @@ export async function loadWorkspace(): Promise<WorkspaceState> {
       throw new Error(`Failed to load workspace: ${response.statusText}`);
     }
 
-    const data = JSON.parse(responseText);
+    const data = JSON.parse(responseText) as BackendState;
     console.debug('Workspace data parsed:', data);
     
     // Ensure masterVolume is a valid number
-    const masterVolume = parseFloat(data.masterVolume) || 1;
+    const masterVolume = typeof data.masterVolume === 'number' 
+      ? data.masterVolume 
+      : typeof data.masterVolume === 'string' 
+        ? parseFloat(data.masterVolume) 
+        : 1;
+
     console.debug('Processing loaded masterVolume:', {
       rawValue: data.masterVolume,
       processedValue: masterVolume,
@@ -78,10 +91,17 @@ export async function loadWorkspace(): Promise<WorkspaceState> {
       dataKeys: Object.keys(data)
     });
 
+    // Ensure environments have soundboard property
+    const environments = (data.environments || []).map((env: Environment) => ({
+      ...env,
+      soundboard: env.soundboard || [] // Add soundboard if missing
+    }));
+
     return {
-      environments: data.environments || [],
+      environments,
       files: data.files || [],
-      masterVolume
+      masterVolume,
+      soundboard: data.soundboard || [] // Global soundboard
     };
   } catch (error) {
     console.error('Error loading workspace:', error);

@@ -82,10 +82,15 @@ def count_file_usage(file_id: str, config: dict) -> int:
                 if sound.get("fileId") == file_id:
                     usage_count += 1
         
-        # Check soundboard
-        for sound in env.get("soundboard", []):
-            if sound.get("fileId") == file_id:
+        # Check soundboard - these are direct string IDs
+        for sound_id in env.get("soundboard", []):
+            if isinstance(sound_id, str) and sound_id == file_id:
                 usage_count += 1
+    
+    # Check global soundboard if it exists
+    for sound_id in config.get("soundboard", []):
+        if isinstance(sound_id, str) and sound_id == file_id:
+            usage_count += 1
     
     return usage_count
 

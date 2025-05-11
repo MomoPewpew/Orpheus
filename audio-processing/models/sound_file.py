@@ -5,6 +5,9 @@ from typing import Optional
 import librosa
 import soundfile as sf
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class SoundFile:
@@ -61,11 +64,23 @@ class SoundFile:
     @classmethod
     def from_dict(cls, data: dict) -> 'SoundFile':
         """Create instance from dictionary."""
-        return cls(
-            id=data["id"],
-            name=data["name"],
-            path=data["path"],
-            peak_volume=data["peak_volume"],
-            duration_ms=data["duration_ms"],
-            original_filename=data["original_filename"]
-        ) 
+        try:
+            return cls(
+                id=data.get("id", str(uuid.uuid4())),
+                name=data.get("name", "Unknown"),
+                path=data.get("path", ""),
+                peak_volume=float(data.get("peak_volume", 1.0)),
+                duration_ms=int(data.get("duration_ms", 0)),
+                original_filename=data.get("original_filename", data.get("name", "Unknown"))
+            )
+        except Exception as e:
+            logger.error(f"Error creating SoundFile from dict: {data} - {str(e)}")
+            # Return a placeholder sound file
+            return cls(
+                id=str(uuid.uuid4()),
+                name="Error Loading Sound",
+                path="",
+                peak_volume=1.0,
+                duration_ms=0,
+                original_filename="Error Loading Sound"
+            ) 

@@ -23,7 +23,8 @@ def load_workspace() -> dict:
                 "files": [],
                 "environments": [],
                 "playState": "STOPPED",
-                "masterVolume": 1
+                "masterVolume": 1,
+                "soundboard": []
             }
         with open(CONFIG_FILE, 'r') as f:
             config = json.load(f)
@@ -31,14 +32,16 @@ def load_workspace() -> dict:
             return {
                 "environments": config.get("environments", []),
                 "playState": config.get("playState", "STOPPED"),
-                "masterVolume": config.get("masterVolume", 1)
+                "masterVolume": config.get("masterVolume", 1),
+                "soundboard": config.get("soundboard", [])
             }
     except Exception as e:
         logger.error(f"Error loading config: {e}")
         return {
             "environments": [],
             "playState": "STOPPED",
-            "masterVolume": 1
+            "masterVolume": 1,
+            "soundboard": []
         }
 
 def save_workspace(workspace: dict):
@@ -55,6 +58,7 @@ def save_workspace(workspace: dict):
         current_config["environments"] = workspace.get("environments", [])
         current_config["playState"] = workspace.get("playState", "STOPPED")
         current_config["masterVolume"] = workspace.get("masterVolume", 1)
+        current_config["soundboard"] = workspace.get("soundboard", [])
         
         # Ensure files array exists
         if "files" not in current_config:

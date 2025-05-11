@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [showSoundboard, setShowSoundboard] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [masterVolume, setMasterVolume] = useState<number>(1);
+  const [globalSoundboard, setGlobalSoundboard] = useState<string[]>([]);
 
   // Load initial workspace and sound files
   useEffect(() => {
@@ -33,6 +34,7 @@ const App: React.FC = () => {
         console.debug('Loaded sound files:', files);
         setEnvironments(workspace.environments);
         setSoundFiles(files);
+        setGlobalSoundboard(workspace.soundboard || []);
         if (typeof workspace.masterVolume === 'number') {
           setMasterVolume(workspace.masterVolume);
         }
@@ -46,6 +48,7 @@ const App: React.FC = () => {
         // Set default values when loading fails
         setEnvironments([]);
         setSoundFiles([]);
+        setGlobalSoundboard([]);
         setMasterVolume(1);
       })
       .finally(() => {
@@ -60,6 +63,7 @@ const App: React.FC = () => {
     const state = {
       environments,
       files: soundFiles,
+      soundboard: globalSoundboard,
       masterVolume
     };
 
@@ -67,7 +71,7 @@ const App: React.FC = () => {
     saveWorkspace(state).catch((error) => {
       console.error('Failed to save workspace:', error);
     });
-  }, [environments, soundFiles, masterVolume, isLoading]);
+  }, [environments, soundFiles, globalSoundboard, masterVolume, isLoading]);
 
   const handleNewEnvironment = () => {
     const newEnvironment: Environment = {
@@ -230,6 +234,7 @@ const App: React.FC = () => {
               environment={activeEnvironment}
               showSoundboard={showSoundboard}
               soundFiles={soundFiles}
+              globalSoundboard={globalSoundboard}
               onEnvironmentUpdate={handleEnvironmentUpdate}
               onEnvironmentRemove={handleEnvironmentRemove}
               onLayerAdd={handleLayerAdd}
@@ -237,6 +242,8 @@ const App: React.FC = () => {
               onPresetCreate={handlePresetCreate}
               onPresetSelect={handlePresetSelect}
               onSoundFilesChange={setSoundFiles}
+              onGlobalSoundboardChange={setGlobalSoundboard}
+              onToggleSoundboard={() => setShowSoundboard(!showSoundboard)}
             />
           </Box>
         </Box>

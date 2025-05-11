@@ -59,12 +59,11 @@ export interface EnvironmentPreset {
 export interface Environment {
   id: string;
   name: string;
-  backgroundImage?: string;  // Optional URL/path to background image
+  maxWeight: number;
   layers: Layer[];
-  soundboard: SoundFile[];   // Environment-specific soundboard entries
-  presets: EnvironmentPreset[]; // Available presets for this environment
-  defaultPresetId?: string;  // Default preset to use when environment is first loaded
-  maxWeight: number;         // Maximum total weight allowed for active layers
+  presets: EnvironmentPreset[];
+  backgroundImage?: string;
+  soundboard: string[]; // List of sound IDs for quick playback
 }
 
 /**
@@ -92,7 +91,7 @@ export interface ActiveEnvironment {
 export interface AppState {
   environments: Environment[];
   masterVolume: number;      // Global volume multiplier (0-1)
-  globalSoundboard: SoundFile[]; // Sound effects available in all environments
+  soundboard: string[];      // Global sound IDs available in all environments
   playState: PlayState;      // Current play state of the application
   activeEnvironment?: ActiveEnvironment; // Currently active environment and its state
 }
@@ -181,10 +180,9 @@ export function isEnvironment(obj: any): obj is Environment {
     Array.isArray(obj.layers) &&
     obj.layers.every(isLayer) &&
     Array.isArray(obj.soundboard) &&
-    obj.soundboard.every(isSoundFile) &&
+    obj.soundboard.every((id: any) => typeof id === 'string') &&
     Array.isArray(obj.presets) &&
     obj.presets.every(isEnvironmentPreset) &&
-    (obj.defaultPresetId === undefined || typeof obj.defaultPresetId === 'string') &&
     typeof obj.maxWeight === 'number'
   );
 }
@@ -214,8 +212,8 @@ export function isAppState(obj: any): obj is AppState {
     typeof obj.masterVolume === 'number' &&
     obj.masterVolume >= 0 &&
     obj.masterVolume <= 1 &&
-    Array.isArray(obj.globalSoundboard) &&
-    obj.globalSoundboard.every(isSoundFile) &&
+    Array.isArray(obj.soundboard) &&
+    obj.soundboard.every((id: any) => typeof id === 'string') &&
     typeof obj.playState === 'string' &&
     Object.values(PlayState).includes(obj.playState) &&
     (obj.activeEnvironment === undefined || isActiveEnvironment(obj.activeEnvironment))

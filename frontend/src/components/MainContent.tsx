@@ -31,11 +31,13 @@ import {
   DraggableStateSnapshot 
 } from '@hello-pangea/dnd';
 import EnvironmentConfigOverlay from './overlays/EnvironmentConfigOverlay';
+import SoundboardOverlay from './overlays/SoundboardOverlay';
 
 interface MainContentProps {
   environment: Environment | null;
   showSoundboard: boolean;
   soundFiles: SoundFile[];
+  globalSoundboard: string[];
   onEnvironmentUpdate: (environment: Environment) => void;
   onEnvironmentRemove: (environmentId: string) => void;
   onLayerAdd: (layer: Layer) => void;
@@ -43,6 +45,8 @@ interface MainContentProps {
   onPresetCreate: (preset: EnvironmentPreset) => void;
   onPresetSelect: (presetId: string | undefined) => void;
   onSoundFilesChange: (files: SoundFile[]) => void;
+  onGlobalSoundboardChange: (soundIds: string[]) => void;
+  onToggleSoundboard: () => void;
 }
 
 const DRAWER_WIDTH = 300;
@@ -51,6 +55,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   environment,
   showSoundboard,
   soundFiles,
+  globalSoundboard,
   onEnvironmentUpdate,
   onEnvironmentRemove,
   onLayerAdd,
@@ -58,6 +63,8 @@ export const MainContent: React.FC<MainContentProps> = ({
   onPresetCreate,
   onPresetSelect,
   onSoundFilesChange,
+  onGlobalSoundboardChange,
+  onToggleSoundboard,
 }) => {
   const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
   const [showAddLayer, setShowAddLayer] = useState(false);
@@ -345,25 +352,17 @@ export const MainContent: React.FC<MainContentProps> = ({
           </Button>
         </Box>
 
-        {/* Soundboard Drawer */}
+        {/* Replace Soundboard Drawer with Overlay */}
         {showSoundboard && (
-          <Drawer
-            anchor="right"
-            variant="permanent"
-            sx={{
-              width: DRAWER_WIDTH,
-              flexShrink: 0,
-              '& .MuiDrawer-paper': {
-                width: DRAWER_WIDTH,
-                boxSizing: 'border-box',
-                p: 2,
-                position: 'absolute'
-              },
-            }}
-          >
-            <Typography variant="h6" sx={{ mb: 2 }}>Soundboard</Typography>
-            {/* Add soundboard content here */}
-          </Drawer>
+          <SoundboardOverlay
+            environment={environment}
+            onClose={onToggleSoundboard}
+            soundFiles={soundFiles}
+            globalSoundboard={globalSoundboard}
+            onSoundFilesChange={onSoundFilesChange}
+            onEnvironmentUpdate={onEnvironmentUpdate}
+            onGlobalSoundboardChange={onGlobalSoundboardChange}
+          />
         )}
 
         {showAddLayer && (

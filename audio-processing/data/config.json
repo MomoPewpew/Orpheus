@@ -104,7 +104,9 @@
       "maxWeight": 2,
       "name": "New Environment",
       "presets": [],
-      "soundboard": []
+      "soundboard": [
+        "54cf34f8-2d5f-4240-8543-95a974a1e9e8"
+      ]
     },
     {
       "id": "majwt5dp-xkd5f3",
@@ -134,5 +136,8 @@
       "duration_ms": 124551,
       "original_filename": "Mii_Channel_-_Plaza_Theme_HQ"
     }
+  ],
+  "soundboard": [
+    "cdceaf9c-6290-4855-b0b4-e59540d31ea1"
   ]
 }
