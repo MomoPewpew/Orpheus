@@ -16,6 +16,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { Environment, Layer, EnvironmentPreset, SoundFile, setLayerVolume, getLayerVolume } from '../types/audio';
 import { generateId } from '../utils/ids';
 import { LayerControls } from './layers/LayerControls';
+import AddLayerDialog from './AddLayerDialog';
 
 interface MainContentProps {
   environment: Environment | null;
@@ -43,6 +44,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   onPresetSelect,
 }) => {
   const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
+  const [showAddLayer, setShowAddLayer] = useState(false);
 
   if (!environment) {
     return (
@@ -83,6 +85,16 @@ export const MainContent: React.FC<MainContentProps> = ({
   const handleAddPreset = () => {
     const basePreset = environment.presets[selectedPresetIndex];
     onPresetCreate('New Preset', basePreset?.id);
+  };
+
+  const handleAddLayer = (layer: Layer) => {
+    if (!environment) return;
+    
+    const updatedEnvironment = {
+      ...environment,
+      layers: [...environment.layers, layer]
+    };
+    onEnvironmentUpdate(updatedEnvironment);
   };
 
   return (
@@ -192,7 +204,7 @@ export const MainContent: React.FC<MainContentProps> = ({
           
           <Button
             startIcon={<AddIcon />}
-            onClick={onLayerAdd}
+            onClick={() => setShowAddLayer(true)}
             sx={{
               alignSelf: 'flex-start',
               color: '#1976d2',
@@ -247,6 +259,12 @@ export const MainContent: React.FC<MainContentProps> = ({
           {/* Add soundboard content here */}
         </Drawer>
       )}
+
+      <AddLayerDialog
+        open={showAddLayer}
+        onClose={() => setShowAddLayer(false)}
+        onAdd={handleAddLayer}
+      />
     </Box>
   );
 };

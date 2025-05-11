@@ -11,7 +11,10 @@ services:
       # Development volumes for hot reloading
       - ./audio-processing:/app/audio-processing
       - ./discord-bot:/app/discord-bot
-      - ./frontend:/app/frontend:cached
+      - ./frontend/src:/app/frontend/src:cached
+      - ./frontend/public:/app/frontend/public:cached
+      # Exclude node_modules from volume mount
+      - /app/frontend/node_modules
       # Persist data
       - ./audio-processing/data:/app/audio-processing/data
       # Don't override the static files from the frontend build

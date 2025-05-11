@@ -34,12 +34,25 @@ RUN . /app/venv/bin/activate && \
     pip install --no-cache-dir -r /app/audio-processing/requirements.txt && \
     pip install --no-cache-dir -r /app/discord-bot/requirements.txt
 
-# Copy frontend package files and install dependencies
-COPY frontend/package*.json /app/frontend/
+# Set up frontend
 WORKDIR /app/frontend
-RUN npm install && \
-    npm install --save-dev @types/lodash
-ENV PATH /app/frontend/node_modules/.bin:$PATH
+
+# Copy frontend package files
+COPY frontend/package*.json ./
+
+# Increase memory limit for Node.js
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
+# Install dependencies in a separate layer
+RUN npm install --legacy-peer-deps && \
+    npm install --save-dev @types/lodash && \
+    npm install --save lodash
+
+# Copy frontend source code
+COPY frontend/ ./
+
+# Build the frontend in development mode
+RUN npm run build
 
 # Copy application code
 WORKDIR /app
@@ -55,7 +68,7 @@ echo "Current working directory: $(pwd)"\n\
 echo "Starting Discord bot..."\n\
 cd /app/discord-bot && PYTHONPATH=/app/discord-bot python -m src.bot.__main__ > discord.log 2>&1 & \n\
 echo "Starting frontend development server..."\n\
-cd /app/frontend && npm start & \n\
+cd /app/frontend && NODE_OPTIONS="--max-old-space-size=4096" npm start & \n\
 echo "Starting Flask server in development mode..."\n\
 cd /app/audio-processing && FLASK_ENV=development FLASK_DEBUG=1 python -m flask run --host=0.0.0.0 --port=5000\n' > /app/start.sh && \
     chmod +x /app/start.sh

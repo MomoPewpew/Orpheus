@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_cors import CORS
 from routes.workspace import workspace_bp
+from routes.files import files_bp
 import os
 import logging
 
@@ -17,6 +18,8 @@ CORS(app)  # Enable CORS for all routes
 # Register blueprints
 logger.info("Registering workspace blueprint with /api prefix")
 app.register_blueprint(workspace_bp, url_prefix='/api')
+logger.info("Registering files blueprint with /api prefix")
+app.register_blueprint(files_bp, url_prefix='/api')
 
 @app.route('/health')
 def health_check():

@@ -313,8 +313,9 @@ export function setLayerVolume(layer: Layer, volume: number): Layer {
 /**
  * Helper function to get the primary sound name for a layer (first sound or placeholder)
  */
-export function getLayerSoundName(layer: Layer, soundFiles: SoundFile[]): string {
+export function getLayerSoundName(layer: Layer, soundFiles?: SoundFile[]): string {
     if (layer.sounds.length === 0) return "No sound selected";
+    if (!soundFiles || soundFiles.length === 0) return "Loading sounds...";
     const primarySound = soundFiles.find(sf => sf.id === layer.sounds[0].fileId);
     return primarySound?.name || "Unknown sound";
 } 
