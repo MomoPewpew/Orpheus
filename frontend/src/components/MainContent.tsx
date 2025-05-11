@@ -28,11 +28,12 @@ interface MainContentProps {
   showSoundboard: boolean;
   soundFiles: SoundFile[];
   onEnvironmentUpdate: (environment: Environment) => void;
-  onEnvironmentRemove?: (environmentId: string) => void;
-  onLayerAdd: () => void;
+  onEnvironmentRemove: (environmentId: string) => void;
+  onLayerAdd: (layer: Layer) => void;
   onLayerUpdate: (layer: Layer) => void;
-  onPresetCreate: (name: string, basePresetId?: string) => void;
-  onPresetSelect: (presetId: string) => void;
+  onPresetCreate: (preset: EnvironmentPreset) => void;
+  onPresetSelect: (presetId: string | undefined) => void;
+  onSoundFilesChange: (files: SoundFile[]) => void;
 }
 
 const DRAWER_WIDTH = 300;
@@ -47,6 +48,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   onLayerUpdate,
   onPresetCreate,
   onPresetSelect,
+  onSoundFilesChange,
 }) => {
   const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
   const [showAddLayer, setShowAddLayer] = useState(false);
@@ -92,7 +94,11 @@ export const MainContent: React.FC<MainContentProps> = ({
 
   const handleAddPreset = () => {
     const basePreset = environment.presets[selectedPresetIndex];
-    onPresetCreate('New Preset', basePreset?.id);
+    onPresetCreate({
+      ...basePreset,
+      id: generateId(),
+      name: 'New Preset'
+    });
   };
 
   const handleAddLayer = (layer: Layer) => {
@@ -280,8 +286,9 @@ export const MainContent: React.FC<MainContentProps> = ({
       <AddLayerDialog
         open={showAddLayer}
         onClose={() => setShowAddLayer(false)}
-        onAdd={handleAddLayer}
+        onAdd={onLayerAdd}
         soundFiles={soundFiles}
+        onSoundFilesChange={onSoundFilesChange}
       />
 
       {/* Environment Rename Dialog */}

@@ -24,6 +24,7 @@ interface AddLayerDialogProps {
   onClose: () => void;
   onAdd: (layer: Layer) => void;
   soundFiles: SoundFile[];
+  onSoundFilesChange?: (soundFiles: SoundFile[]) => void;
 }
 
 interface TabPanelProps {
@@ -52,6 +53,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
   onClose,
   onAdd,
   soundFiles = [],
+  onSoundFilesChange,
 }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [layerName, setLayerName] = useState('');
@@ -122,6 +124,11 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
         weight: 1,
         volume: 1
       };
+
+      // Add the new file to the soundFiles list
+      const updatedSoundFiles = [...soundFiles, uploadedFile];
+      onSoundFilesChange?.(updatedSoundFiles);
+
       onAdd(newLayer);
       resetAndClose();
     } catch (error) {

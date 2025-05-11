@@ -125,23 +125,12 @@ const App: React.FC = () => {
     setActiveEnvironment(null);
   };
 
-  const handleLayerAdd = () => {
+  const handleLayerAdd = (layer: Layer) => {
     if (!activeEnvironment) return;
-
-    const newLayer: Layer = {
-      id: generateId(),
-      name: 'New Layer',
-      sounds: [],
-      chance: 1,
-      cooldownMs: 0,
-      loopLengthMs: 0,
-      weight: 1,
-      volume: 1
-    };
 
     const updatedEnvironment = {
       ...activeEnvironment,
-      layers: [...activeEnvironment.layers, newLayer]
+      layers: [...activeEnvironment.layers, layer]
     };
 
     handleEnvironmentUpdate(updatedEnvironment);
@@ -160,37 +149,26 @@ const App: React.FC = () => {
     handleEnvironmentUpdate(updatedEnvironment);
   };
 
-  const handlePresetCreate = (name: string, basePresetId?: string) => {
+  const handlePresetCreate = (preset: EnvironmentPreset) => {
     if (!activeEnvironment) return;
-
-    let layerOverrides = {};
-    
-    if (basePresetId) {
-      const basePreset = activeEnvironment.presets.find(p => p.id === basePresetId);
-      if (basePreset) {
-        layerOverrides = { ...basePreset.layerOverrides };
-      }
-    }
-
-    const newPreset: EnvironmentPreset = {
-      id: generateId(),
-      name,
-      environmentId: activeEnvironment.id,
-      layerOverrides
-    };
 
     const updatedEnvironment = {
       ...activeEnvironment,
-      presets: [...activeEnvironment.presets, newPreset]
+      presets: [...activeEnvironment.presets, preset]
     };
 
     handleEnvironmentUpdate(updatedEnvironment);
   };
 
-  const handlePresetSelect = (presetId: string) => {
-    // TODO: Implement preset selection logic
-    // This might involve applying the preset's overrides to the layers
-    console.log('Selected preset:', presetId);
+  const handlePresetSelect = (presetId: string | undefined) => {
+    if (!activeEnvironment) return;
+
+    const updatedEnvironment = {
+      ...activeEnvironment,
+      defaultPresetId: presetId
+    };
+
+    handleEnvironmentUpdate(updatedEnvironment);
   };
 
   const handleMasterVolumeChange = (volume: number) => {
@@ -235,6 +213,7 @@ const App: React.FC = () => {
             onLayerUpdate={handleLayerUpdate}
             onPresetCreate={handlePresetCreate}
             onPresetSelect={handlePresetSelect}
+            onSoundFilesChange={setSoundFiles}
           />
         </Box>
       </Box>
