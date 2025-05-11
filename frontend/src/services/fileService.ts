@@ -55,4 +55,14 @@ export const listFiles = async (searchQuery?: string): Promise<SoundFile[]> => {
  */
 export const getFileUrl = (fileId: string): string => {
   return `${API_FILES}/${fileId}`;
+};
+
+export const deleteFile = async (fileId: string): Promise<void> => {
+  const response = await fetch(`${API_FILES}/${fileId}`, {
+    method: 'DELETE'
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete file');
+  }
 }; 

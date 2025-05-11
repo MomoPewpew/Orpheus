@@ -25,7 +25,6 @@ import AddLayerDialog from './AddLayerDialog';
 
 interface MainContentProps {
   environment: Environment | null;
-  showConfig: boolean;
   showSoundboard: boolean;
   soundFiles: SoundFile[];
   onEnvironmentUpdate: (environment: Environment) => void;
@@ -40,7 +39,6 @@ const DRAWER_WIDTH = 300;
 
 export const MainContent: React.FC<MainContentProps> = ({
   environment,
-  showConfig,
   showSoundboard,
   soundFiles,
   onEnvironmentUpdate,
@@ -257,27 +255,6 @@ export const MainContent: React.FC<MainContentProps> = ({
           </Button>
         </Stack>
       </Box>
-
-      {/* Config Drawer */}
-      {showConfig && (
-        <Drawer
-          anchor="right"
-          variant="permanent"
-          sx={{
-            width: DRAWER_WIDTH,
-            flexShrink: 0,
-            '& .MuiDrawer-paper': {
-              width: DRAWER_WIDTH,
-              boxSizing: 'border-box',
-              p: 2,
-              position: 'absolute'
-            },
-          }}
-        >
-          <Typography variant="h6" sx={{ mb: 2 }}>Global Configuration</Typography>
-          {/* Add global config controls here */}
-        </Drawer>
-      )}
 
       {/* Soundboard Drawer */}
       {showSoundboard && (

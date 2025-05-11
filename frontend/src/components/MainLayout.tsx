@@ -33,6 +33,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   onToggleConfig,
   onToggleSoundboard,
   onEnvironmentSelect,
+  masterVolume,
+  onMasterVolumeChange,
+  onSoundAdd,
+  onSoundRemove,
   ...props
 }) => {
   return (
@@ -44,6 +48,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({
         onToggleConfig={onToggleConfig}
         onToggleSoundboard={onToggleSoundboard}
         onEnvironmentSelect={onEnvironmentSelect}
+        masterVolume={masterVolume}
+        onMasterVolumeChange={onMasterVolumeChange}
+        soundFiles={props.soundboard}
+        onSoundFilesChange={(files) => {
+          // When files change, we need to:
+          // 1. Remove files that are no longer in the list
+          const removedFiles = props.soundboard.filter(
+            oldFile => !files.find(newFile => newFile.id === oldFile.id)
+          );
+          removedFiles.forEach(file => onSoundRemove(file.id));
+
+          // 2. Add new files
+          const newFiles = files.filter(
+            newFile => !props.soundboard.find(oldFile => oldFile.id === newFile.id)
+          );
+          newFiles.forEach(file => onSoundAdd(file));
+        }}
       />
       <main className="main-content">
         {activeEnvironment ? (

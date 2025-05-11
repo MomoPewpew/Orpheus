@@ -1,40 +1,6 @@
 {
-  "environments": [
-    {
-      "id": "majjgqzv-yaej32",
-      "layers": [
-        {
-          "chance": 1,
-          "cooldownMs": 0,
-          "id": "majjgv34-0xkoqu",
-          "loopLengthMs": 0,
-          "name": "Mii Channel Plaza Theme",
-          "sounds": [
-            {
-              "fileId": "1723f7df-96c8-4b32-83ee-92e4abe4a84b",
-              "frequency": 1,
-              "volume": 0.8
-            }
-          ],
-          "volume": 1,
-          "weight": 1
-        }
-      ],
-      "maxWeight": 2,
-      "name": "New Environment",
-      "presets": [],
-      "soundboard": []
-    }
-  ],
+  "environments": [],
   "playState": "STOPPED",
-  "files": [
-    {
-      "id": "1723f7df-96c8-4b32-83ee-92e4abe4a84b",
-      "name": "Mii Channel Plaza Theme",
-      "path": "/app/audio-processing/data/audio/1723f7df-96c8-4b32-83ee-92e4abe4a84b.mp3",
-      "peak_volume": 0.9068580865859985,
-      "duration_ms": 124551,
-      "original_filename": "Mii_Channel_-_Plaza_Theme_HQ"
-    }
-  ]
+  "masterVolume": 1,
+  "files": []
 }

@@ -3,6 +3,7 @@ import { Environment, EnvironmentPreset, Layer, LayerSound, SoundFile } from './
 import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
+import ConfigOverlay from './components/overlays/ConfigOverlay';
 import { generateId } from './utils/ids';
 import { saveWorkspace, loadWorkspace } from './services/workspaceService';
 import { listFiles } from './services/fileService';
@@ -19,17 +20,20 @@ const App: React.FC = () => {
   const [showConfig, setShowConfig] = useState(false);
   const [showSoundboard, setShowSoundboard] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [masterVolume, setMasterVolume] = useState(1);
+  const [masterVolume, setMasterVolume] = useState<number>(1);
 
   // Create a debounced save function
   const debouncedSave = useCallback(
     debounce((state: { environments: Environment[]; files: SoundFile[]; masterVolume: number }) => {
-      console.debug('Saving workspace state:', state);
+      console.debug('Debounced save triggered with state:', {
+        ...state,
+        masterVolume: state.masterVolume
+      });
       saveWorkspace(state).catch((error) => {
         console.error('Failed to save workspace:', error);
       });
     }, 1000),
-    [] // Empty dependency array since we don't want to recreate the debounced function
+    []
   );
 
   // Load initial workspace and sound files
@@ -43,7 +47,9 @@ const App: React.FC = () => {
         console.debug('Loaded sound files:', files);
         setEnvironments(workspace.environments);
         setSoundFiles(files);
-        setMasterVolume(workspace.masterVolume);
+        if (typeof workspace.masterVolume === 'number') {
+          setMasterVolume(workspace.masterVolume);
+        }
         // Set first environment as active if we have any
         if (workspace.environments.length > 0) {
           setActiveEnvironment(workspace.environments[0]);
@@ -51,6 +57,10 @@ const App: React.FC = () => {
       })
       .catch((error) => {
         console.error('Failed to load workspace or files:', error);
+        // Set default values when loading fails
+        setEnvironments([]);
+        setSoundFiles([]);
+        setMasterVolume(1);
       })
       .finally(() => {
         setIsLoading(false);
@@ -63,9 +73,14 @@ const App: React.FC = () => {
       const state = {
         environments,
         files: soundFiles,
-        masterVolume
+        masterVolume: Number(masterVolume)
       };
-      console.debug('State changed, triggering save:', state);
+      console.debug('State change detected:', {
+        masterVolume,
+        type: typeof masterVolume,
+        stateVolume: state.masterVolume,
+        stateVolumeType: typeof state.masterVolume
+      });
       debouncedSave(state);
     }
   }, [environments, soundFiles, masterVolume, isLoading, debouncedSave]);
@@ -178,6 +193,17 @@ const App: React.FC = () => {
     console.log('Selected preset:', presetId);
   };
 
+  const handleMasterVolumeChange = (volume: number) => {
+    console.debug('Master volume change requested:', {
+      newVolume: volume,
+      currentVolume: masterVolume,
+      type: typeof volume
+    });
+    // Ensure volume is a valid number between 0 and 1
+    const validVolume = Math.max(0, Math.min(1, Number(volume)));
+    setMasterVolume(validVolume);
+  };
+
   if (isLoading) {
     return <div>Loading...</div>; // You might want to show a proper loading spinner
   }
@@ -193,11 +219,14 @@ const App: React.FC = () => {
           onToggleConfig={handleToggleConfig}
           onToggleSoundboard={handleToggleSoundboard}
           onEnvironmentSelect={handleEnvironmentSelect}
+          masterVolume={masterVolume}
+          onMasterVolumeChange={handleMasterVolumeChange}
+          soundFiles={soundFiles}
+          onSoundFilesChange={setSoundFiles}
         />
         <Box component="main" sx={{ flexGrow: 1, height: '100vh', overflow: 'auto' }}>
           <MainContent
             environment={activeEnvironment}
-            showConfig={showConfig}
             showSoundboard={showSoundboard}
             soundFiles={soundFiles}
             onEnvironmentUpdate={handleEnvironmentUpdate}

@@ -71,12 +71,31 @@ def get_sound_files() -> List[SoundFile]:
         logger.error(f"Error getting sound files: {e}")
         return []
 
+def count_file_usage(file_id: str, config: dict) -> int:
+    """Count how many times a file is used in environments (layers and soundboards)."""
+    usage_count = 0
+    
+    for env in config.get("environments", []):
+        # Check layers
+        for layer in env.get("layers", []):
+            for sound in layer.get("sounds", []):
+                if sound.get("fileId") == file_id:
+                    usage_count += 1
+        
+        # Check soundboard
+        for sound in env.get("soundboard", []):
+            if sound.get("fileId") == file_id:
+                usage_count += 1
+    
+    return usage_count
+
 @files_bp.route('/files', methods=['GET'])
 def list_files():
     """List all audio files with optional search."""
     try:
         ensure_directories()  # Ensure directories exist on each request
         search_query = request.args.get('search', '').lower()
+        config = load_config()
         sound_files = get_sound_files()
         
         if search_query:
@@ -85,7 +104,14 @@ def list_files():
                 if search_query in sf.name.lower() or search_query in sf.original_filename.lower()
             ]
         
-        return jsonify([sf.to_dict() for sf in sound_files])
+        # Add usage count to each file
+        result = []
+        for sf in sound_files:
+            file_dict = sf.to_dict()
+            file_dict["usageCount"] = count_file_usage(sf.id, config)
+            result.append(file_dict)
+        
+        return jsonify(result)
     except Exception as e:
         logger.error(f"Error listing files: {e}")
         return jsonify({"error": str(e)}), 500
@@ -106,6 +132,46 @@ def get_file(file_id):
         return jsonify({"error": "File not found in config"}), 404
     except Exception as e:
         logger.error(f"Error getting file: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@files_bp.route('/files/<file_id>', methods=['DELETE'])
+def delete_file(file_id):
+    """Delete a specific audio file by ID."""
+    try:
+        ensure_directories()  # Ensure directories exist on each request
+        config = load_config()
+        
+        # Check if file is in use
+        usage_count = count_file_usage(file_id, config)
+        if usage_count > 0:
+            return jsonify({
+                "error": f"Cannot delete file that is in use ({usage_count} uses)"
+            }), 400
+        
+        # Find the file in config
+        file_data = None
+        remaining_files = []
+        for f in config.get("files", []):
+            if f["id"] == file_id:
+                file_data = f
+            else:
+                remaining_files.append(f)
+                
+        if not file_data:
+            return jsonify({"error": "File not found"}), 404
+            
+        # Delete the actual file
+        file_path = Path(file_data["path"])
+        if file_path.exists():
+            os.remove(file_path)
+            
+        # Update config without the deleted file
+        config["files"] = remaining_files
+        save_config(config)
+        
+        return jsonify({"status": "success"})
+    except Exception as e:
+        logger.error(f"Error deleting file: {e}")
         return jsonify({"error": str(e)}), 500
 
 @files_bp.route('/files', methods=['POST'])

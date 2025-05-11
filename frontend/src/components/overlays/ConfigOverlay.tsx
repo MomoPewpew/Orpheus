@@ -1,76 +1,155 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  IconButton,
+  Slider,
+  Button,
+  Stack,
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import { SoundFile } from '../../types/audio';
+import FileManagerDialog from '../dialogs/FileManagerDialog';
+import { deleteFile, listFiles } from '../../services/fileService';
 
 interface ConfigOverlayProps {
   masterVolume: number;
   onMasterVolumeChange: (volume: number) => void;
   onClose: () => void;
+  soundFiles: SoundFile[];
+  onSoundFilesChange: (files: SoundFile[]) => void;
 }
 
 const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
   masterVolume,
   onMasterVolumeChange,
   onClose,
+  soundFiles,
+  onSoundFilesChange,
 }) => {
+  const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
+  const [localSoundFiles, setLocalSoundFiles] = useState(soundFiles);
+
+  const refreshFiles = async () => {
+    try {
+      const files = await listFiles();
+      onSoundFilesChange(files);
+    } catch (error) {
+      console.error('Failed to refresh sound files:', error);
+    }
+  };
+
+  // Keep local state in sync with props
+  useEffect(() => {
+    setLocalSoundFiles(soundFiles);
+  }, [soundFiles]);
+
+  // Initial load and refresh when overlay becomes visible
+  useEffect(() => {
+    refreshFiles();
+  }, []); // Run on mount
+
+  // Refresh sound files when the file manager is opened
+  useEffect(() => {
+    if (isFileManagerOpen) {
+      refreshFiles();
+    }
+  }, [isFileManagerOpen]);
+
+  const handleDeleteFile = async (fileId: string) => {
+    try {
+      await deleteFile(fileId);
+      await refreshFiles(); // Use the shared refresh function
+    } catch (error) {
+      console.error('Failed to delete file:', error);
+      // TODO: Show error notification
+    }
+  };
+
+  const handleOpenFileManager = () => {
+    setIsFileManagerOpen(true);
+  };
+
+  const handleCloseFileManager = () => {
+    setIsFileManagerOpen(false);
+    refreshFiles(); // Refresh when closing the manager
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Configuration</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            ×
-          </button>
-        </div>
+    <Box
+      sx={{
+        position: 'fixed',
+        inset: 0,
+        bgcolor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: (theme) => theme.zIndex.drawer + 1,
+      }}
+    >
+      <Box
+        sx={{
+          bgcolor: 'background.paper',
+          borderRadius: 1,
+          boxShadow: 24,
+          p: 3,
+          maxWidth: 'sm',
+          width: '100%',
+        }}
+      >
+        <Stack spacing={3}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h5" component="h2">
+              Configuration
+            </Typography>
+            <IconButton onClick={onClose} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
 
-        <div className="space-y-6">
           {/* Master Volume */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <Box>
+            <Typography gutterBottom>
               Master Volume ({Math.round(masterVolume * 100)}%)
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
+            </Typography>
+            <Slider
               value={masterVolume}
-              onChange={(e) => onMasterVolumeChange(parseFloat(e.target.value))}
-              className="w-full"
+              onChange={(_, value) => onMasterVolumeChange(value as number)}
+              min={0}
+              max={1}
+              step={0.01}
+              aria-label="Master Volume"
+              valueLabelDisplay="auto"
+              valueLabelFormat={(value) => `${Math.round(value * 100)}%`}
             />
-          </div>
+          </Box>
 
-          {/* Audio Device Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Audio Output Device
-            </label>
-            <select className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="default">Default Device</option>
-              {/* Device list will be populated dynamically */}
-            </select>
-          </div>
-
-          {/* Additional settings can be added here */}
-        </div>
-
-        <div className="mt-6 flex justify-end space-x-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+          {/* File Management */}
+          <Button
+            variant="outlined"
+            onClick={handleOpenFileManager}
+            sx={{ justifyContent: 'space-between' }}
           >
-            Cancel
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
+            <span>Manage Sound Files</span>
+            <Typography variant="caption" color="text.secondary">
+              ({localSoundFiles.length} files)
+            </Typography>
+          </Button>
+
+          {/* Actions */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+            <Button onClick={onClose}>Close</Button>
+          </Box>
+        </Stack>
+      </Box>
+
+      <FileManagerDialog
+        open={isFileManagerOpen}
+        onClose={handleCloseFileManager}
+        soundFiles={localSoundFiles}
+        onDeleteFile={handleDeleteFile}
+      />
+    </Box>
   );
 };
 

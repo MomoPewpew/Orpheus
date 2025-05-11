@@ -8,6 +8,7 @@ export interface SoundFile {
   peak_volume: number;
   duration_ms: number;
   original_filename?: string;
+  usageCount: number;
 }
 
 /**
@@ -107,7 +108,8 @@ export function isSoundFile(obj: any): obj is SoundFile {
     typeof obj.path === 'string' &&
     typeof obj.peak_volume === 'number' &&
     typeof obj.duration_ms === 'number' &&
-    (obj.original_filename === undefined || typeof obj.original_filename === 'string')
+    (obj.original_filename === undefined || typeof obj.original_filename === 'string') &&
+    typeof obj.usageCount === 'number'
   );
 }
 

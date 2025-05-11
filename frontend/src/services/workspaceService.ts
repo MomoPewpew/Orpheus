@@ -15,33 +15,35 @@ export interface WorkspaceState {
  */
 export async function saveWorkspace(state: WorkspaceState): Promise<void> {
   try {
+    // Ensure masterVolume is a valid number and convert to a string for consistency
+    const masterVolume = Number(state.masterVolume).toString();
+
     // Convert workspace state to match backend format
     const backendState = {
-      environments: state.environments,
-      files: state.files,
-      masterVolume: state.masterVolume,
+      environments: state.environments || [],
+      files: state.files || [],
+      masterVolume: parseFloat(masterVolume),
       playState: PlayState.Stopped
     };
 
-    console.debug('Saving workspace state to:', API_WORKSPACE);
-    console.debug('Workspace state:', backendState);
+    const requestBody = JSON.stringify(backendState);
 
     const response = await fetch(API_WORKSPACE, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(backendState),
+      body: requestBody,
     });
 
+    const responseText = await response.text();
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Server response:', errorText);
+      console.error('Server response:', responseText);
       throw new Error(`Failed to save workspace: ${response.statusText}`);
     }
 
-    const result = await response.json();
-    console.debug('Save response:', result);
+    const result = JSON.parse(responseText);
   } catch (error) {
     console.error('Error saving workspace:', error);
     throw error;
@@ -56,19 +58,30 @@ export async function loadWorkspace(): Promise<WorkspaceState> {
     console.debug('Loading workspace state from:', API_WORKSPACE);
     const response = await fetch(API_WORKSPACE);
     
+    const responseText = await response.text();
+    console.debug('Raw response from server:', responseText);
+    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Server response:', errorText);
+      console.error('Server response:', responseText);
       throw new Error(`Failed to load workspace: ${response.statusText}`);
     }
 
-    const data = await response.json();
-    console.debug('Loaded workspace state:', data);
+    const data = JSON.parse(responseText);
+    console.debug('Workspace data parsed:', data);
     
+    // Ensure masterVolume is a valid number
+    const masterVolume = parseFloat(data.masterVolume) || 1;
+    console.debug('Processing loaded masterVolume:', {
+      rawValue: data.masterVolume,
+      processedValue: masterVolume,
+      type: typeof masterVolume,
+      dataKeys: Object.keys(data)
+    });
+
     return {
-      environments: data.environments,
-      files: data.files,
-      masterVolume: data.masterVolume
+      environments: data.environments || [],
+      files: data.files || [],
+      masterVolume
     };
   } catch (error) {
     console.error('Error loading workspace:', error);
