@@ -179,13 +179,65 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         {...provided.draggableProps}
                         sx={{
                           backgroundColor: snapshot.isDragging ? 'action.hover' : 'transparent',
-                          transition: 'background-color 0.2s ease'
+                          transition: 'background-color 0.2s ease',
+                          position: 'relative',
+                          overflow: 'hidden'
                         }}
                       >
+                        {/* Background Image */}
+                        {env.backgroundImage && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              zIndex: 0,
+                              opacity: 0.15,
+                              overflow: 'hidden',
+                              '&::before': {
+                                content: '""',
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                backdropFilter: 'blur(1px)',
+                              }
+                            }}
+                          >
+                            <Box
+                              component="img"
+                              src={env.backgroundImage}
+                              alt=""
+                              sx={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                objectPosition: 'center',
+                                transform: 'scale(1.1)', // Slight zoom for a more dynamic look
+                                transition: 'transform 0.3s ease',
+                                '.MuiListItemButton-root:hover &': {
+                                  transform: 'scale(1.15)', // Zoom in slightly on hover
+                                }
+                              }}
+                            />
+                          </Box>
+                        )}
+
                         <ListItemButton
                           selected={env.id === activeEnvironment?.id}
                           onClick={() => onEnvironmentSelect(env)}
-                          sx={{ pr: 1 }}
+                          sx={{ 
+                            pr: 1,
+                            position: 'relative',
+                            zIndex: 1,
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                            }
+                          }}
                         >
                           <ListItemText 
                             primary={env.name}
