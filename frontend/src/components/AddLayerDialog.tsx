@@ -25,6 +25,7 @@ interface AddLayerDialogProps {
   onAdd: (layer: Layer) => void;
   soundFiles: SoundFile[];
   onSoundFilesChange?: (soundFiles: SoundFile[]) => void;
+  mode?: 'layer' | 'sound';
 }
 
 interface TabPanelProps {
@@ -54,6 +55,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
   onAdd,
   soundFiles = [],
   onSoundFilesChange,
+  mode = 'layer'
 }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [layerName, setLayerName] = useState('');
@@ -65,26 +67,40 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
+    // Clear selected file when switching tabs
+    setSelectedFile(null);
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      // Set layer name to file name without extension
-      setLayerName(file.name.split('.').slice(0, -1).join('.'));
+      // Only set name to file name if the current name is empty
+      if (!layerName) {
+        setLayerName(file.name.split('.').slice(0, -1).join('.'));
+      }
     }
   };
 
   const handleExistingFileSelect = (file: SoundFile) => {
     setShowFileBrowser(false);
+    setSelectedFile(file as any); // To reuse the file selection state
+    // Only set name to file name if the current name is empty
+    if (!layerName) {
+      setLayerName(file.name);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (!selectedFile) return;
+
     // Create layer with existing file
     const newLayer: Layer = {
       id: generateId(),
-      name: layerName || file.name,
+      name: mode === 'layer' ? (layerName || selectedFile.name) : selectedFile.name,
       sounds: [
         {
-          fileId: file.id,
+          fileId: (selectedFile as any).id || selectedFile.name,
           frequency: 1,
           volume: 0.8
         }
@@ -110,7 +126,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
       // Create new layer with uploaded file
       const newLayer: Layer = {
         id: generateId(),
-        name: layerName || uploadedFile.name.split('.').slice(0, -1).join('.'),
+        name: mode === 'layer' ? (layerName || uploadedFile.name.split('.').slice(0, -1).join('.')) : uploadedFile.name,
         sounds: [
           {
             fileId: uploadedFile.id,
@@ -150,17 +166,28 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
   return (
     <>
       <Dialog open={open} onClose={resetAndClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Add New Layer</DialogTitle>
+        <DialogTitle>
+          {mode === 'layer' ? 'Add New Layer' : 'Add Sound'}
+        </DialogTitle>
         <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Layer Name"
-            fullWidth
-            value={layerName}
-            onChange={(e) => setLayerName(e.target.value)}
-          />
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 2 }}>
+          {/* Show name textbox at top in both modes when in upload tab */}
+          {(mode === 'layer' || activeTab === 0) && (
+            <TextField
+              autoFocus
+              margin="dense"
+              label={mode === 'layer' ? 'Layer Name' : 'Sound Name'}
+              fullWidth
+              value={layerName}
+              onChange={(e) => setLayerName(e.target.value)}
+              sx={{ mb: 2 }}
+              helperText={
+                mode === 'layer' 
+                  ? (activeTab === 0 ? "This name will be used for both the layer and the sound" : undefined)
+                  : "Leave empty to use file name"
+              }
+            />
+          )}
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
             <Tabs value={activeTab} onChange={handleTabChange}>
               <Tab label="Upload New File" />
               <Tab label="Select Existing File" />
@@ -219,18 +246,31 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
                 <AudioFileIcon sx={{ width: 40, height: 40 }} />
               </IconButton>
               <Typography>Browse existing audio files</Typography>
+              {selectedFile && (
+                <Typography variant="body2" color="primary">
+                  Selected: {selectedFile.name}
+                </Typography>
+              )}
             </Box>
           </TabPanel>
         </DialogContent>
         <DialogActions>
           <Button onClick={resetAndClose}>Cancel</Button>
-          {activeTab === 0 && (
+          {activeTab === 0 ? (
             <Button
               onClick={handleUpload}
               disabled={!selectedFile || uploading}
               variant="contained"
             >
-              {uploading ? <CircularProgress size={24} /> : 'Upload & Add Layer'}
+              {uploading ? <CircularProgress size={24} /> : (mode === 'layer' ? 'Upload & Add Layer' : 'Upload & Add Sound')}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleConfirm}
+              disabled={!selectedFile}
+              variant="contained"
+            >
+              {mode === 'layer' ? 'Add Layer' : 'Add Sound'}
             </Button>
           )}
         </DialogActions>

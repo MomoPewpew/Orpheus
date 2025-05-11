@@ -95,6 +95,43 @@
               "fileId": "54cf34f8-2d5f-4240-8543-95a974a1e9e8",
               "frequency": 1,
               "volume": 0.8
+            },
+            {
+              "fileId": "aab580f7-7b29-467b-b188-b5346c484ee0",
+              "frequency": 1,
+              "volume": 0.8
+            }
+          ],
+          "volume": 1,
+          "weight": 1
+        },
+        {
+          "chance": 1,
+          "cooldownMs": 0,
+          "id": "mak1gzg3-zidbvp",
+          "loopLengthMs": 0,
+          "name": "999",
+          "sounds": [
+            {
+              "fileId": "6c208808-eb7c-43b3-8d94-f54e2dd86609",
+              "frequency": 1,
+              "volume": 0.8
+            }
+          ],
+          "volume": 1,
+          "weight": 1
+        },
+        {
+          "chance": 1,
+          "cooldownMs": 0,
+          "id": "mak1hm6y-q1gpzs",
+          "loopLengthMs": 0,
+          "name": "Mii Channel - Plaza Theme (HQ)",
+          "sounds": [
+            {
+              "fileId": "54cf34f8-2d5f-4240-8543-95a974a1e9e8",
+              "frequency": 1,
+              "volume": 0.8
             }
           ],
           "volume": 1,
@@ -105,7 +142,11 @@
       "name": "New Environment",
       "presets": [],
       "soundboard": [
-        "54cf34f8-2d5f-4240-8543-95a974a1e9e8"
+        "54cf34f8-2d5f-4240-8543-95a974a1e9e8",
+        "cdceaf9c-6290-4855-b0b4-e59540d31ea1",
+        "9dc35f5b-fd5c-44ac-863d-fc420f37d4b2",
+        "aab580f7-7b29-467b-b188-b5346c484ee0",
+        "6c208808-eb7c-43b3-8d94-f54e2dd86609"
       ]
     },
     {
@@ -135,9 +176,43 @@
       "peak_volume": 0.9068580865859985,
       "duration_ms": 124551,
       "original_filename": "Mii_Channel_-_Plaza_Theme_HQ"
+    },
+    {
+      "id": "9dc35f5b-fd5c-44ac-863d-fc420f37d4b2",
+      "name": "123",
+      "path": "/app/audio-processing/data/audio/9dc35f5b-fd5c-44ac-863d-fc420f37d4b2.mp3",
+      "peak_volume": 0.9068580865859985,
+      "duration_ms": 124551,
+      "original_filename": "Mii_Channel_-_Plaza_Theme_HQ"
+    },
+    {
+      "id": "aab580f7-7b29-467b-b188-b5346c484ee0",
+      "name": "678",
+      "path": "/app/audio-processing/data/audio/aab580f7-7b29-467b-b188-b5346c484ee0.mp3",
+      "peak_volume": 0.9068580865859985,
+      "duration_ms": 124551,
+      "original_filename": "Mii_Channel_-_Plaza_Theme_HQ"
+    },
+    {
+      "id": "041ee27d-fb59-402d-832a-f0e7d0bf36e0",
+      "name": "Mii C",
+      "path": "/app/audio-processing/data/audio/041ee27d-fb59-402d-832a-f0e7d0bf36e0.mp3",
+      "peak_volume": 0.9068580865859985,
+      "duration_ms": 124551,
+      "original_filename": "Mii_Channel_-_Plaza_Theme_HQ"
+    },
+    {
+      "id": "6c208808-eb7c-43b3-8d94-f54e2dd86609",
+      "name": "999",
+      "path": "/app/audio-processing/data/audio/6c208808-eb7c-43b3-8d94-f54e2dd86609.mp3",
+      "peak_volume": 0.9068580865859985,
+      "duration_ms": 124551,
+      "original_filename": "Mii_Channel_-_Plaza_Theme_HQ"
     }
   ],
   "soundboard": [
-    "cdceaf9c-6290-4855-b0b4-e59540d31ea1"
+    "cdceaf9c-6290-4855-b0b4-e59540d31ea1",
+    "041ee27d-fb59-402d-832a-f0e7d0bf36e0",
+    "9dc35f5b-fd5c-44ac-863d-fc420f37d4b2"
   ]
 }

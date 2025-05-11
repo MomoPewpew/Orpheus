@@ -318,6 +318,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
         onClose={() => setIsAddingSoundOpen(false)}
         onAdd={handleAddSound}
         soundFiles={soundFiles}
+        mode="sound"
       />
     </Paper>
   );
