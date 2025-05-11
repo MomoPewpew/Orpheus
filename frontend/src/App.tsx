@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import { generateId } from './utils/ids';
 import { saveWorkspace, loadWorkspace } from './services/workspaceService';
+import { listFiles } from './services/fileService';
 import debounce from 'lodash/debounce';
 
 const theme = createTheme({
@@ -31,13 +32,17 @@ const App: React.FC = () => {
     [] // Empty dependency array since we don't want to recreate the debounced function
   );
 
-  // Load initial workspace
+  // Load initial workspace and sound files
   useEffect(() => {
-    loadWorkspace()
-      .then((workspace) => {
+    Promise.all([
+      loadWorkspace(),
+      listFiles()
+    ])
+      .then(([workspace, files]) => {
         console.debug('Loaded workspace:', workspace);
+        console.debug('Loaded sound files:', files);
         setEnvironments(workspace.environments);
-        setSoundFiles(workspace.files);
+        setSoundFiles(files);
         setMasterVolume(workspace.masterVolume);
         // Set first environment as active if we have any
         if (workspace.environments.length > 0) {
@@ -45,7 +50,7 @@ const App: React.FC = () => {
         }
       })
       .catch((error) => {
-        console.error('Failed to load workspace:', error);
+        console.error('Failed to load workspace or files:', error);
       })
       .finally(() => {
         setIsLoading(false);
@@ -106,17 +111,12 @@ const App: React.FC = () => {
     const newLayer: Layer = {
       id: generateId(),
       name: 'New Layer',
-      sounds: [
-        {
-          fileId: generateId(),
-          weight: 1,
-          volume: 0.8
-        }
-      ],
+      sounds: [],
       chance: 1,
       cooldownMs: 0,
       loopLengthMs: 0,
-      weight: 1
+      weight: 1,
+      volume: 1
     };
 
     const updatedEnvironment = {

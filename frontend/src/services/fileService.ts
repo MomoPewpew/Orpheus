@@ -1,21 +1,12 @@
 import { SoundFile } from '../types/audio';
 
-export interface AudioFile {
-  id: string;
-  name: string;
-  path: string;
-  peak_volume: number;
-  duration_ms: number;
-  original_filename: string;
-}
-
 const API_BASE = 'http://localhost:5000';
 const API_FILES = `${API_BASE}/api/files`;
 
 /**
  * Upload a new audio file
  */
-export const uploadFile = async (file: File, name?: string): Promise<AudioFile> => {
+export const uploadFile = async (file: File, name?: string): Promise<SoundFile> => {
   try {
     const formData = new FormData();
     formData.append('file', file);
@@ -42,7 +33,7 @@ export const uploadFile = async (file: File, name?: string): Promise<AudioFile> 
 /**
  * List all available audio files
  */
-export const listFiles = async (searchQuery?: string): Promise<AudioFile[]> => {
+export const listFiles = async (searchQuery?: string): Promise<SoundFile[]> => {
   try {
     const url = new URL(API_FILES);
     if (searchQuery) {

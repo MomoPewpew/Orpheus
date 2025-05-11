@@ -5,8 +5,9 @@ export interface SoundFile {
   id: string;
   name: string;
   path: string;
-  volume: number;
-  lengthMs: number;  // Length in milliseconds
+  peak_volume: number;
+  duration_ms: number;
+  original_filename?: string;
 }
 
 /**
@@ -14,7 +15,7 @@ export interface SoundFile {
  */
 export interface LayerSound {
   fileId: string;    // Reference to a SoundFile
-  weight: number;    // Weight for random selection within the layer
+  frequency: number; // Frequency of selection within the layer (was weight)
   volume: number;    // Sound-specific volume adjustment
 }
 
@@ -29,6 +30,7 @@ export interface Layer {
   cooldownMs: number;  // Cooldown in cycles
   loopLengthMs: number; // Length of a cycle in milliseconds
   weight: number;      // How much this layer contributes to the total environment weight
+  volume: number;      // Layer-level volume multiplier (0-1)
 }
 
 /**
@@ -103,8 +105,9 @@ export function isSoundFile(obj: any): obj is SoundFile {
     typeof obj.id === 'string' &&
     typeof obj.name === 'string' &&
     typeof obj.path === 'string' &&
-    typeof obj.volume === 'number' &&
-    typeof obj.lengthMs === 'number'
+    typeof obj.peak_volume === 'number' &&
+    typeof obj.duration_ms === 'number' &&
+    (obj.original_filename === undefined || typeof obj.original_filename === 'string')
   );
 }
 
@@ -115,7 +118,7 @@ export function isLayerSound(obj: any): obj is LayerSound {
   return (
     typeof obj === 'object' &&
     typeof obj.fileId === 'string' &&
-    typeof obj.weight === 'number' &&
+    typeof obj.frequency === 'number' &&
     typeof obj.volume === 'number'
   );
 }
@@ -159,7 +162,8 @@ export function isLayer(obj: any): obj is Layer {
     typeof obj.chance === 'number' &&
     typeof obj.cooldownMs === 'number' &&
     typeof obj.loopLengthMs === 'number' &&
-    typeof obj.weight === 'number'
+    typeof obj.weight === 'number' &&
+    typeof obj.volume === 'number'
   );
 }
 
@@ -227,7 +231,10 @@ export function getEffectiveLayerSettings(
     return { 
       chance: layer.chance,
       weight: layer.weight,
-      sounds: layer.sounds
+      sounds: layer.sounds.map(sound => ({
+        ...sound,
+        frequency: sound.frequency || 1 // Provide default if missing
+      }))
     };
   }
 
@@ -237,6 +244,7 @@ export function getEffectiveLayerSettings(
     weight: override?.weight ?? layer.weight,
     sounds: layer.sounds.map(sound => ({
       ...sound,
+      frequency: sound.frequency || 1, // Provide default if missing
       volume: override?.volume !== undefined ? sound.volume * override.volume : sound.volume
     }))
   };

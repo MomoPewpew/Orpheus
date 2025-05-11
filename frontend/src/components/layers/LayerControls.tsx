@@ -1,97 +1,253 @@
-import React from 'react';
-import { Layer, getLayerVolume, setLayerVolume, getLayerSoundName, SoundFile } from '../../types/audio';
+import React, { useState } from 'react';
+import {
+  Box,
+  IconButton,
+  MenuItem,
+  Select,
+  Slider,
+  Typography,
+  Paper,
+  Divider,
+} from '@mui/material';
+import { Edit, Delete, Add } from '@mui/icons-material';
+import { Layer, LayerSound, SoundFile, getLayerSoundName } from '../../types/audio';
+import AddLayerDialog from '../AddLayerDialog';
 
 interface LayerControlsProps {
   layer: Layer;
   soundFiles: SoundFile[];
-  onLayerChange: (updatedLayer: Layer) => void;
+  onLayerUpdate: (updatedLayer: Layer) => void;
+  onLayerEdit: (layer: Layer) => void;
+  onLayerRemove: (layerId: string) => void;
 }
 
 export const LayerControls: React.FC<LayerControlsProps> = ({
   layer,
-  soundFiles,
-  onLayerChange
+  soundFiles = [],
+  onLayerUpdate,
+  onLayerEdit,
+  onLayerRemove,
 }) => {
-  const handleChange = (property: keyof Layer | 'volume', value: number | string) => {
-    if (property === 'volume') {
-      onLayerChange(setLayerVolume(layer, value as number));
-    } else {
-      onLayerChange({
-        ...layer,
-        [property]: value
-      });
-    }
+  const sounds = layer.sounds || [];
+  const [selectedSoundIndex, setSelectedSoundIndex] = useState(0);
+  const [isAddingSoundOpen, setIsAddingSoundOpen] = useState(false);
+
+  // Debug logging
+  console.debug('LayerControls render:', {
+    layer,
+    soundFiles,
+    sounds,
+    selectedSoundIndex
+  });
+
+  const updateLayer = (updates: Partial<Layer>) => {
+    onLayerUpdate({ ...layer, ...updates });
   };
 
-  const currentVolume = getLayerVolume(layer);
-  const soundName = getLayerSoundName(layer, soundFiles);
+  const updateSound = (soundIndex: number, updates: Partial<LayerSound>) => {
+    const newSounds = [...sounds];
+    if (updates.frequency !== undefined) {
+      // When updating frequency, ensure we're not also setting weight
+      const { weight, ...cleanUpdates } = updates as any;
+      newSounds[soundIndex] = { ...newSounds[soundIndex], ...cleanUpdates };
+    } else {
+      newSounds[soundIndex] = { ...newSounds[soundIndex], ...updates };
+    }
+    updateLayer({ sounds: newSounds });
+  };
+
+  const handleAddSound = (newLayer: Layer) => {
+    // Extract the first sound from the new layer and add it to our layer
+    if (newLayer.sounds.length > 0) {
+      updateLayer({ 
+        sounds: [...sounds, newLayer.sounds[0]]
+      });
+      setSelectedSoundIndex(sounds.length);
+    }
+    setIsAddingSoundOpen(false);
+  };
+
+  const selectedSound = sounds[selectedSoundIndex] || {
+    fileId: '',
+    volume: 0.8,
+    frequency: 1
+  };
 
   return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Sound File
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={soundName}
-            readOnly
-            className="flex-1 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <button
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            onClick={() => {/* TODO: Implement sound file selection */}}
+    <Paper sx={{ mb: 2 }}>
+      {/* Header strip with layer name and buttons */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        bgcolor: 'background.default',
+        px: 2,
+        py: 0.5,
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Typography sx={{ 
+            fontStyle: 'italic',
+            fontSize: '0.9rem',
+            pl: 3,
+            mr: 1.5
+          }}>
+            {layer.name}
+          </Typography>
+        </Box>
+        <Box>
+          <IconButton onClick={() => onLayerEdit(layer)} size="small" sx={{ mr: 1 }}>
+            <Edit fontSize="small" />
+          </IconButton>
+          <IconButton onClick={() => onLayerRemove(layer.id)} size="small">
+            <Delete fontSize="small" />
+          </IconButton>
+        </Box>
+      </Box>
+
+      {/* Controls row */}
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', 
+        gap: 2, 
+        alignItems: 'center',
+        px: 2,
+        py: 1,
+      }}>
+        {/* Sound controls group */}
+        <Box sx={{
+          gridColumn: 'span 3',
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 1,
+          p: 1.5,
+          display: 'grid',
+          gridTemplateColumns: '2fr 1fr 1fr',
+          gap: 2,
+          alignItems: 'center'
+        }}>
+          {/* Sound selector */}
+          <Select
+            value={sounds.length === 0 ? 'add' : selectedSoundIndex}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === 'add') {
+                setIsAddingSoundOpen(true);
+              } else {
+                setSelectedSoundIndex(value as number);
+              }
+            }}
+            size="small"
+            fullWidth
           >
-            Select
-          </button>
-        </div>
-      </div>
+            {sounds.map((sound, index) => {
+              const soundFile = soundFiles.find(sf => sf.id === sound.fileId);
+              return (
+                <MenuItem key={index} value={index}>
+                  {soundFile?.name || 'Unknown Sound'}
+                </MenuItem>
+              );
+            })}
+            <Divider />
+            <MenuItem value="add" sx={{ color: 'primary.main' }}>
+              <Add fontSize="small" sx={{ mr: 1 }} />
+              {sounds.length === 0 ? 'Add First Sound' : 'Add Sound'}
+            </MenuItem>
+          </Select>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Chance ({Math.round(layer.chance * 100)}%)
-        </label>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={layer.chance}
-          onChange={(e) => handleChange('chance', parseFloat(e.target.value))}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-        />
-      </div>
+          {/* Sound volume slider */}
+          <Box>
+            <Typography variant="caption" sx={{ mb: 0.5, display: 'block', textAlign: 'center' }}>
+              Volume
+            </Typography>
+            <Slider
+              value={selectedSound.volume}
+              onChange={(_, value) => updateSound(selectedSoundIndex, { volume: value as number })}
+              min={0}
+              max={1}
+              step={0.01}
+              size="small"
+              aria-label="Selected Sound Volume"
+              id={`sound-volume-${selectedSoundIndex}`}
+              disabled={sounds.length === 0}
+            />
+          </Box>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Volume ({Math.round(currentVolume * 100)}%)
-        </label>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={currentVolume}
-          onChange={(e) => handleChange('volume', parseFloat(e.target.value))}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-        />
-      </div>
+          {/* Sound frequency slider */}
+          <Box>
+            <Typography variant="caption" sx={{ mb: 0.5, display: 'block', textAlign: 'center' }}>
+              Frequency
+            </Typography>
+            <Slider
+              value={selectedSound.frequency}
+              onChange={(_, value) => updateSound(selectedSoundIndex, { frequency: value as number })}
+              min={0}
+              max={1}
+              step={0.01}
+              size="small"
+              aria-label="Sound Frequency"
+              id={`sound-frequency-${selectedSoundIndex}`}
+              disabled={sounds.length === 0}
+            />
+          </Box>
+        </Box>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Weight ({layer.weight})
-        </label>
-        <input
-          type="range"
-          min="0"
-          max="10"
-          step="0.1"
-          value={layer.weight}
-          onChange={(e) => handleChange('weight', parseFloat(e.target.value))}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-        />
-      </div>
-    </div>
+        {/* Layer-level controls */}
+        <Box>
+          <Typography variant="caption" sx={{ mb: 0.5, display: 'block', textAlign: 'center' }}>
+            Chance
+          </Typography>
+          <Slider
+            value={layer.chance || 1}
+            onChange={(_, value) => updateLayer({ chance: value as number })}
+            min={0}
+            max={1}
+            step={0.01}
+            size="small"
+            aria-label="Layer Chance"
+            id={`layer-chance-${layer.id}`}
+          />
+        </Box>
+
+        <Box>
+          <Typography variant="caption" sx={{ mb: 0.5, display: 'block', textAlign: 'center' }}>
+            Volume
+          </Typography>
+          <Slider
+            value={layer.volume || 1}
+            onChange={(_, value) => updateLayer({ volume: value as number })}
+            min={0}
+            max={1}
+            step={0.01}
+            size="small"
+            aria-label="Layer Volume"
+            id={`layer-volume-${layer.id}`}
+          />
+        </Box>
+
+        <Box>
+          <Typography variant="caption" sx={{ mb: 0.5, display: 'block', textAlign: 'center' }}>
+            Weight
+          </Typography>
+          <Slider
+            value={layer.weight || 1}
+            onChange={(_, value) => updateLayer({ weight: value as number })}
+            min={0}
+            max={1}
+            step={0.01}
+            size="small"
+            aria-label="Layer Weight"
+            id={`layer-weight-${layer.id}`}
+          />
+        </Box>
+      </Box>
+
+      <AddLayerDialog
+        open={isAddingSoundOpen}
+        onClose={() => setIsAddingSoundOpen(false)}
+        onAdd={handleAddSound}
+        soundFiles={soundFiles}
+      />
+    </Paper>
   );
 }; 

@@ -179,26 +179,23 @@ export const MainContent: React.FC<MainContentProps> = ({
 
         {/* Layer List */}
         <Stack spacing={1}>
-          {/* Header row */}
-          <Box sx={{ 
-            display: 'grid', 
-            gridTemplateColumns: '2fr repeat(3, 1fr)',
-            gap: 2,
-            px: 2,
-            py: 1,
-          }}>
-            <Typography variant="caption" color="textSecondary">Layer Name</Typography>
-            <Typography variant="caption" color="textSecondary">Chance</Typography>
-            <Typography variant="caption" color="textSecondary">Volume</Typography>
-            <Typography variant="caption" color="textSecondary">Weight</Typography>
-          </Box>
-
           {environment.layers.map((layer) => (
             <LayerControls
               key={layer.id}
               layer={layer}
               soundFiles={soundFiles}
-              onLayerChange={(updatedLayer) => onLayerUpdate(updatedLayer)}
+              onLayerUpdate={(updatedLayer: Layer) => onLayerUpdate(updatedLayer)}
+              onLayerEdit={(layer: Layer) => {
+                // TODO: Implement layer editing
+                console.log('Edit layer:', layer);
+              }}
+              onLayerRemove={(layerId: string) => {
+                const updatedLayers = environment.layers.filter(l => l.id !== layerId);
+                onEnvironmentUpdate({
+                  ...environment,
+                  layers: updatedLayers
+                });
+              }}
             />
           ))}
           
@@ -264,6 +261,7 @@ export const MainContent: React.FC<MainContentProps> = ({
         open={showAddLayer}
         onClose={() => setShowAddLayer(false)}
         onAdd={handleAddLayer}
+        soundFiles={soundFiles}
       />
     </Box>
   );

@@ -14,8 +14,8 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { Upload, AudioFile as AudioFileIcon } from '@mui/icons-material';
-import { Layer } from '../types/audio';
-import { AudioFile, uploadFile } from '../services/fileService';
+import { Layer, SoundFile } from '../types/audio';
+import { uploadFile } from '../services/fileService';
 import { FileBrowserDialog } from './FileBrowserDialog';
 import { generateId } from '../utils/ids';
 
@@ -23,6 +23,7 @@ interface AddLayerDialogProps {
   open: boolean;
   onClose: () => void;
   onAdd: (layer: Layer) => void;
+  soundFiles: SoundFile[];
 }
 
 interface TabPanelProps {
@@ -50,6 +51,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
   open,
   onClose,
   onAdd,
+  soundFiles = [],
 }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [layerName, setLayerName] = useState('');
@@ -72,23 +74,24 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
     }
   };
 
-  const handleExistingFileSelect = (file: AudioFile) => {
+  const handleExistingFileSelect = (file: SoundFile) => {
     setShowFileBrowser(false);
     // Create layer with existing file
     const newLayer: Layer = {
       id: generateId(),
-      name: layerName || file.name.split('.').slice(0, -1).join('.'),
+      name: layerName || file.name,
       sounds: [
         {
           fileId: file.id,
-          weight: 1,
+          frequency: 1,
           volume: 0.8
         }
       ],
       chance: 1,
       cooldownMs: 0,
       loopLengthMs: 0,
-      weight: 1
+      weight: 1,
+      volume: 1
     };
     onAdd(newLayer);
     resetAndClose();
@@ -109,14 +112,15 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
         sounds: [
           {
             fileId: uploadedFile.id,
-            weight: 1,
+            frequency: 1,
             volume: 0.8
           }
         ],
         chance: 1,
         cooldownMs: 0,
         loopLengthMs: 0,
-        weight: 1
+        weight: 1,
+        volume: 1
       };
       onAdd(newLayer);
       resetAndClose();
@@ -229,6 +233,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
         open={showFileBrowser}
         onClose={() => setShowFileBrowser(false)}
         onSelect={handleExistingFileSelect}
+        soundFiles={soundFiles}
       />
     </>
   );
