@@ -54,6 +54,8 @@ export const PresetControls: React.FC<PresetControlsProps> = ({
   const [newPresetName, setNewPresetName] = useState('');
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [presetToRename, setPresetToRename] = useState<Preset | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [presetToDelete, setPresetToDelete] = useState<Preset | null>(null);
 
   const handleModeChange = (event: React.MouseEvent<HTMLElement>, newMode: Mode | null) => {
     if (newMode !== null) {
@@ -100,7 +102,8 @@ export const PresetControls: React.FC<PresetControlsProps> = ({
   const handlePresetClick = (preset: Preset) => {
     switch (mode) {
       case 'delete':
-        onPresetDelete(preset.id);
+        setPresetToDelete(preset);
+        setShowDeleteDialog(true);
         break;
       case 'rename':
         setPresetToRename(preset);
@@ -111,6 +114,14 @@ export const PresetControls: React.FC<PresetControlsProps> = ({
         onPresetSelect(preset.id);
         break;
     }
+  };
+
+  const handleDeleteConfirm = () => {
+    if (presetToDelete) {
+      onPresetDelete(presetToDelete.id);
+      setPresetToDelete(null);
+    }
+    setShowDeleteDialog(false);
   };
 
   return (
@@ -291,6 +302,30 @@ export const PresetControls: React.FC<PresetControlsProps> = ({
           <Button onClick={() => setShowRenameDialog(false)}>Cancel</Button>
           <Button onClick={handleRenamePreset} variant="contained" disabled={!newPresetName.trim()}>
             Rename
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={showDeleteDialog}
+        onClose={() => {
+          setShowDeleteDialog(false);
+          setPresetToDelete(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Delete Preset</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete preset "{presetToDelete?.name}"? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Delete
           </Button>
         </DialogActions>
       </Dialog>
