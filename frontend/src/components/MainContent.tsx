@@ -206,7 +206,15 @@ export const MainContent: React.FC<MainContentProps> = ({
   };
 
   return (
-    <Box sx={{ p: 3, height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ 
+      p: 3, 
+      height: '100%', 
+      position: 'relative', 
+      display: 'grid',
+      gridTemplateRows: 'auto 1fr',
+      gap: 3,
+      overflow: 'hidden'
+    }}>
       {/* Background Image */}
       {environment.backgroundImage && (
         <Box
@@ -244,14 +252,20 @@ export const MainContent: React.FC<MainContentProps> = ({
       )}
 
       {/* Content */}
-      <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Box sx={{ 
+        position: 'relative', 
+        zIndex: 1, 
+        display: 'grid',
+        gridTemplateRows: 'auto 1fr',
+        gap: 3,
+        overflow: 'hidden'
+      }}>
         {/* Fixed Header Section */}
-        <Box sx={{ flexShrink: 0 }}>
+        <Box sx={{ display: 'grid', gap: 3 }}>
           {/* Environment Banner */}
           <Paper 
             elevation={0}
             sx={{ 
-              mb: 3, 
               bgcolor: 'transparent',
               borderBottom: '1px solid rgba(0, 0, 0, 0.12)'
             }}
@@ -321,7 +335,7 @@ export const MainContent: React.FC<MainContentProps> = ({
           </Paper>
 
           {/* Preset Controls */}
-          <Paper sx={{ p: 2, mb: 3 }}>
+          <Paper sx={{ p: 2 }}>
             <PresetControls
               environment={environment}
               presets={environment.presets}
@@ -362,79 +376,78 @@ export const MainContent: React.FC<MainContentProps> = ({
             />
           </Paper>
 
-          <Divider sx={{ my: 2 }} />
+          <Divider />
         </Box>
 
-        {/* Scrollable Layer List */}
+        {/* Layer List with Droppable as scroll container */}
         <Box sx={{ 
-          flexGrow: 1, 
-          overflow: 'auto',
-          position: 'relative',
-          minHeight: 100
+          display: 'grid',
+          gridTemplateRows: '1fr',
+          overflow: 'hidden',
+          minHeight: 0 // This is crucial for grid items to respect overflow
         }}>
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="layers" type="layer">
-              {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
-                <Box
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
+          <Droppable droppableId="layers" type="layer">
+            {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
+              <Box
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                  p: 2,
+                  bgcolor: snapshot.isDraggingOver ? 'action.hover' : 'transparent',
+                  borderRadius: 1,
+                  overflow: 'auto',
+                  height: '100%', // Make it fill the available space
+                  minHeight: 0 // This is crucial for flex items to respect overflow
+                }}
+              >
+                {environment.layers.map((layer, index) => (
+                  <Draggable key={layer.id} draggableId={layer.id} index={index}>
+                    {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        style={{
+                          ...provided.draggableProps.style,
+                          opacity: snapshot.isDragging ? 0.5 : 1,
+                        }}
+                      >
+                        <LayerControls
+                          layer={layer}
+                          soundFiles={soundFiles}
+                          onLayerUpdate={onLayerUpdate}
+                          onLayerEdit={() => {}}
+                          onLayerRemove={() => {}}
+                          dragHandleProps={provided.dragHandleProps}
+                          activePreset={activePreset}
+                          defaultLayer={getDefaultLayer(layer)}
+                          onPresetUpdate={onPresetUpdate}
+                        />
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+                
+                <Button
+                  startIcon={<AddIcon />}
+                  onClick={() => setShowAddLayer(true)}
                   sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 2,
-                    flexGrow: 1,
-                    overflowY: 'auto',
-                    p: 2,
-                    bgcolor: snapshot.isDraggingOver ? 'action.hover' : 'transparent',
-                    borderRadius: 1,
+                    mt: 2,
+                    alignSelf: 'flex-start',
+                    color: '#1976d2',
+                    '&:hover': {
+                      bgcolor: 'rgba(25, 118, 210, 0.04)',
+                    },
                   }}
                 >
-                  {environment.layers.map((layer, index) => (
-                    <Draggable key={layer.id} draggableId={layer.id} index={index}>
-                      {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          style={{
-                            ...provided.draggableProps.style,
-                            opacity: snapshot.isDragging ? 0.5 : 1,
-                          }}
-                        >
-                          <LayerControls
-                            layer={layer}
-                            soundFiles={soundFiles}
-                            onLayerUpdate={onLayerUpdate}
-                            onLayerEdit={() => {}}
-                            onLayerRemove={() => {}}
-                            dragHandleProps={provided.dragHandleProps}
-                            activePreset={activePreset}
-                            defaultLayer={getDefaultLayer(layer)}
-                            onPresetUpdate={onPresetUpdate}
-                          />
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </Box>
-              )}
-            </Droppable>
-          </DragDropContext>
-
-          <Button
-            startIcon={<AddIcon />}
-            onClick={() => setShowAddLayer(true)}
-            sx={{
-              mt: 2,
-              alignSelf: 'flex-start',
-              color: '#1976d2',
-              '&:hover': {
-                bgcolor: 'rgba(25, 118, 210, 0.04)',
-              },
-            }}
-          >
-            ADD LAYER
-          </Button>
+                  ADD LAYER
+                </Button>
+              </Box>
+            )}
+          </Droppable>
         </Box>
 
         {/* Replace Soundboard Drawer with Overlay */}

@@ -289,21 +289,58 @@ const App: React.FC = () => {
 
     const { source, destination, type } = result;
 
-    if (type === 'environment') {
-      const reorderedEnvironments = Array.from(environments);
-      const [removed] = reorderedEnvironments.splice(source.index, 1);
-      reorderedEnvironments.splice(destination.index, 0, removed);
-      setEnvironments(reorderedEnvironments);
-    } else if (type === 'layer' && activeEnvironment) {
-      const reorderedLayers = Array.from(activeEnvironment.layers);
-      const [removed] = reorderedLayers.splice(source.index, 1);
-      reorderedLayers.splice(destination.index, 0, removed);
-      
-      const updatedEnvironment = {
+    // Handle layer reordering
+    if (type === 'layer' && activeEnvironment) {
+      const layers = Array.from(activeEnvironment.layers);
+      const [removed] = layers.splice(source.index, 1);
+      layers.splice(destination.index, 0, removed);
+      handleEnvironmentUpdate({
         ...activeEnvironment,
-        layers: reorderedLayers
-      };
-      handleEnvironmentUpdate(updatedEnvironment);
+        layers
+      });
+      return;
+    }
+
+    // Handle environment reordering
+    if (type === 'environment') {
+      const items = Array.from(environments);
+      const [reorderedItem] = items.splice(source.index, 1);
+      items.splice(destination.index, 0, reorderedItem);
+      setEnvironments(items);
+      return;
+    }
+
+    // Handle preset reordering
+    if (type === 'preset' && activeEnvironment) {
+      const presets = Array.from(activeEnvironment.presets);
+      const [reorderedItem] = presets.splice(source.index, 1);
+      presets.splice(destination.index, 0, reorderedItem);
+      handleEnvironmentUpdate({
+        ...activeEnvironment,
+        presets
+      });
+      return;
+    }
+
+    // Handle sound reordering
+    if (type === 'environment-sound' && activeEnvironment) {
+      const items = Array.from(activeEnvironment.soundboard);
+      const [reorderedItem] = items.splice(source.index, 1);
+      items.splice(destination.index, 0, reorderedItem);
+      handleEnvironmentUpdate({
+        ...activeEnvironment,
+        soundboard: items
+      });
+      return;
+    }
+
+    // Handle global sound reordering
+    if (type === 'global-sound') {
+      const items = Array.from(globalSoundboard);
+      const [reorderedItem] = items.splice(source.index, 1);
+      items.splice(destination.index, 0, reorderedItem);
+      setGlobalSoundboard(items);
+      return;
     }
   };
 
@@ -340,8 +377,8 @@ const App: React.FC = () => {
             sx={{ 
               flexGrow: 1, 
               height: '100vh', 
-              overflow: 'auto',
-              position: 'relative' // Add this to ensure proper stacking context
+              overflow: 'hidden',
+              position: 'relative'
             }}
           >
             {activeEnvironment ? (

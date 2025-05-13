@@ -640,31 +640,16 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             cursor: 'grabbing'
           }
         }}>
-          <DragIndicator 
-            sx={{ 
-              color: 'text.secondary',
-              opacity: 0.5,
-              fontSize: 20,
-            }} 
-          />
+          <DragIndicator sx={{ color: 'text.secondary', opacity: 0.5 }} />
         </Box>
-        <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'baseline', gap: 1 }}>
-          <Typography variant="subtitle1">
-            {layer.name}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {layer.loopLengthMs}ms
-          </Typography>
-        </Box>
-        <IconButton size="small" onClick={() => {
-          setNewLayerName(layer.name);
-          setNewLoopLength(layer.loopLengthMs);
-          setIsConfigureOpen(true);
-        }}>
-          <Settings fontSize="small" />
+        <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
+          {layer.name}
+        </Typography>
+        <IconButton onClick={() => onLayerEdit(layer)} size="small">
+          <Edit />
         </IconButton>
-        <IconButton size="small" onClick={() => setIsConfirmRemoveOpen(true)}>
-          <Delete fontSize="small" />
+        <IconButton onClick={() => onLayerRemove(layer.id)} size="small">
+          <Delete />
         </IconButton>
       </Box>
 
