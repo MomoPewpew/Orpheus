@@ -17,6 +17,7 @@ import {
   styled,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
 } from '@mui/material';
 import { Edit, Delete, Add, DragIndicator, Settings, Shuffle, Repeat, RadioButtonChecked } from '@mui/icons-material';
 import { Layer, LayerSound, SoundFile, getLayerSoundName, Preset, PresetLayer, PresetSound, LayerMode } from '../../types/audio';
@@ -52,6 +53,25 @@ const DualValueSlider = styled(Slider)(({ theme }) => ({
     opacity: 0.6,
     '&.MuiSlider-markActive': {
       opacity: 0.8,
+    },
+  },
+  // Disabled styles
+  '&.Mui-disabled': {
+    '& .MuiSlider-rail': {
+      backgroundColor: theme.palette.grey[300],
+    },
+    '& .MuiSlider-track': {
+      backgroundColor: theme.palette.grey[400],
+      opacity: 0.5,
+    },
+    '& .MuiSlider-thumb': {
+      border: `2px solid ${theme.palette.grey[400]}`,
+      '&:hover, &.Mui-focusVisible': {
+        boxShadow: 'none',
+      },
+    },
+    '& .MuiSlider-mark': {
+      backgroundColor: theme.palette.grey[400],
     },
   },
   // Preset override styles
@@ -142,7 +162,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
         // Handle layer-level properties (volume, weight, chance, cooldownCycles)
         if (presetLayer) {
           // Only use preset value if it's explicitly set
-          const value = presetLayer[property as keyof typeof presetLayer];
+          const value = presetLayer[property as keyof Pick<PresetLayer, 'volume' | 'weight' | 'chance' | 'cooldownCycles'>];
           if (value !== undefined) {
             return value as number;
           }
@@ -154,7 +174,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
     if (soundId) {
       const sound = layer.sounds.find(s => s.id === soundId);
       if (sound && (property === 'volume' || property === 'frequency')) {
-        return sound[property] ?? 1;
+        return sound[property as keyof Pick<LayerSound, 'volume' | 'frequency'>] ?? 1;
       }
       return 1;
     } else {
@@ -162,8 +182,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
         return 1; // Frequency is only valid for sounds, not layers
       }
       // Handle remaining layer properties
-      const layerProperty = property as keyof Pick<Layer, 'volume' | 'weight' | 'chance' | 'cooldownCycles'>;
-      return layer[layerProperty] ?? (property === 'cooldownCycles' ? 0 : 1);
+      return layer[property as keyof Pick<Layer, 'volume' | 'weight' | 'chance' | 'cooldownCycles'>] ?? (property === 'cooldownCycles' ? 0 : 1);
     }
   };
 
@@ -195,7 +214,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
 
   // Get numeric value for sliders (handles both number and LayerMode types)
   const getNumericValue = (property: 'volume' | 'weight' | 'chance' | 'frequency' | 'cooldownCycles' | 'mode', soundId?: string): number => {
-    const value = getEffectiveValue(property, soundId);
+    const value = getEffectiveValue(property as 'volume' | 'weight' | 'chance' | 'frequency' | 'cooldownCycles', soundId) as number;
     return typeof value === 'number' ? value : 1;
   };
 
@@ -888,26 +907,30 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             <Typography variant="caption" sx={{ mb: 0.5, display: 'block', textAlign: 'center' }}>
               Volume
             </Typography>
-            <DualValueSlider
-              value={getNumericValue('volume', selectedSound.id)}
-              onChange={(_, value) => handleSoundVolumeChange(selectedSound, value as number)}
-              min={0}
-              max={1}
-              step={0.01}
-              size="small"
-              aria-label="Selected Sound Volume"
-              className={hasPresetOverride('volume', selectedSound.id) ? 'preset-active' : ''}
-              marks={[{ 
-                value: getMarkValue('volume', selectedSound.id),
-                label: ''
-              }]}
-              disabled={sounds.length === 0 || sounds.length === 1}
-              sx={getDefaultValueStyle(
-                getDefaultValue('volume', selectedSound.id),
-                0,
-                1
-              )}
-            />
+            <Tooltip title={sounds.length <= 1 ? "At least two sounds are required to adjust individual sound volumes" : ""}>
+              <Box>  {/* Wrapper needed because Tooltip can't be applied directly to disabled elements */}
+                <DualValueSlider
+                  value={getNumericValue('volume', selectedSound.id)}
+                  onChange={(_, value) => handleSoundVolumeChange(selectedSound, value as number)}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  size="small"
+                  aria-label="Selected Sound Volume"
+                  className={hasPresetOverride('volume', selectedSound.id) ? 'preset-active' : ''}
+                  marks={[{ 
+                    value: getMarkValue('volume', selectedSound.id),
+                    label: ''
+                  }]}
+                  disabled={sounds.length === 0 || sounds.length === 1}
+                  sx={getDefaultValueStyle(
+                    getDefaultValue('volume', selectedSound.id),
+                    0,
+                    1
+                  )}
+                />
+              </Box>
+            </Tooltip>
           </Box>
 
           {/* Sound frequency slider */}
@@ -915,26 +938,36 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             <Typography variant="caption" sx={{ mb: 0.5, display: 'block', textAlign: 'center' }}>
               Frequency
             </Typography>
-            <DualValueSlider
-              value={getNumericValue('frequency', selectedSound.id)}
-              onChange={(_, value) => handleSoundFrequencyChange(selectedSound, value as number)}
-              min={0}
-              max={1}
-              step={0.01}
-              size="small"
-              aria-label="Sound Frequency"
-              className={hasPresetOverride('frequency', selectedSound.id) ? 'preset-active' : ''}
-              marks={[{ 
-                value: getMarkValue('frequency', selectedSound.id),
-                label: ''
-              }]}
-              disabled={sounds.length === 0 || sounds.length === 1 || (getEffectiveValue('mode') as LayerMode) === LayerMode.Single}
-              sx={getDefaultValueStyle(
-                getDefaultValue('frequency', selectedSound.id),
-                0,
-                1
-              )}
-            />
+            <Tooltip title={
+              sounds.length <= 1 
+                ? "At least two sounds are required to adjust frequencies" 
+                : (getEffectiveValue('mode') as LayerMode) === LayerMode.Single 
+                  ? "Frequency adjustment is not available in Single mode"
+                  : ""
+            }>
+              <Box>  {/* Wrapper needed because Tooltip can't be applied directly to disabled elements */}
+                <DualValueSlider
+                  value={getNumericValue('frequency', selectedSound.id)}
+                  onChange={(_, value) => handleSoundFrequencyChange(selectedSound, value as number)}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  size="small"
+                  aria-label="Sound Frequency"
+                  className={hasPresetOverride('frequency', selectedSound.id) ? 'preset-active' : ''}
+                  marks={[{ 
+                    value: getMarkValue('frequency', selectedSound.id),
+                    label: ''
+                  }]}
+                  disabled={sounds.length === 0 || sounds.length === 1 || (getEffectiveValue('mode') as LayerMode) === LayerMode.Single}
+                  sx={getDefaultValueStyle(
+                    getDefaultValue('frequency', selectedSound.id),
+                    0,
+                    1
+                  )}
+                />
+              </Box>
+            </Tooltip>
           </Box>
         </Box>
 

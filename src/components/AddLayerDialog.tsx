@@ -4,7 +4,7 @@ const newLayer: Layer = {
   sounds: [
     {
       fileId: soundFile.id,
-      volume: 0.8,
+      volume: 1,
       weight: 1
     }
   ],
@@ -21,7 +21,7 @@ const newLayer: Layer = {
   sounds: [
     {
       fileId: soundFile.id,
-      volume: 0.8,
+      volume: 1,
       weight: 1
     }
   ],
