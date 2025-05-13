@@ -100,6 +100,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
       name: mode === 'layer' ? (layerName || selectedFile.name) : selectedFile.name,
       sounds: [
         {
+          id: generateId(),
           fileId: (selectedFile as any).id || selectedFile.name,
           frequency: 1,
           volume: 0.8
@@ -129,6 +130,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
         name: mode === 'layer' ? (layerName || uploadedFile.name.split('.').slice(0, -1).join('.')) : uploadedFile.name,
         sounds: [
           {
+            id: generateId(),
             fileId: uploadedFile.id,
             frequency: 1,
             volume: 0.8

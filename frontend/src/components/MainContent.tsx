@@ -15,10 +15,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Divider,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { Edit, Delete, Settings } from '@mui/icons-material';
-import { Environment, Layer, EnvironmentPreset, SoundFile, setLayerVolume, getLayerVolume } from '../types/audio';
+import { Environment, Layer, Preset, SoundFile, setLayerVolume, getLayerVolume, LayerSound } from '../types/audio';
 import { generateId } from '../utils/ids';
 import { LayerControls } from './layers/LayerControls';
 import AddLayerDialog from './AddLayerDialog';
@@ -32,9 +33,10 @@ import {
 } from '@hello-pangea/dnd';
 import EnvironmentConfigOverlay from './overlays/EnvironmentConfigOverlay';
 import SoundboardOverlay from './overlays/SoundboardOverlay';
+import PresetControls from './PresetControls';
 
 interface MainContentProps {
-  environment: Environment | null;
+  environment: Environment;
   showSoundboard: boolean;
   soundFiles: SoundFile[];
   globalSoundboard: string[];
@@ -42,8 +44,11 @@ interface MainContentProps {
   onEnvironmentRemove: (environmentId: string) => void;
   onLayerAdd: (layer: Layer) => void;
   onLayerUpdate: (layer: Layer) => void;
-  onPresetCreate: (preset: EnvironmentPreset) => void;
+  onPresetCreate: (preset: Preset) => void;
   onPresetSelect: (presetId: string | undefined) => void;
+  onPresetUpdate: (preset: Preset) => void;
+  onPresetDelete: (presetId: string) => void;
+  onPresetsReorder: (presets: Preset[]) => void;
   onSoundFilesChange: (files: SoundFile[]) => void;
   onGlobalSoundboardChange: (soundIds: string[]) => void;
   onToggleSoundboard: () => void;
@@ -62,6 +67,9 @@ export const MainContent: React.FC<MainContentProps> = ({
   onLayerUpdate,
   onPresetCreate,
   onPresetSelect,
+  onPresetUpdate,
+  onPresetDelete,
+  onPresetsReorder,
   onSoundFilesChange,
   onGlobalSoundboardChange,
   onToggleSoundboard,
@@ -113,6 +121,45 @@ export const MainContent: React.FC<MainContentProps> = ({
         [property]: value
       });
     }
+  };
+
+  // Get the active preset if one is selected
+  const activePreset = environment.activePresetId 
+    ? environment.presets.find(p => p.id === environment.activePresetId)
+    : undefined;
+
+  // Get the default layer values (without preset overrides)
+  const getDefaultLayer = (layer: Layer): Layer => {
+    if (!activePreset) return layer;
+
+    // Start with a copy of the layer
+    const defaultLayer = { ...layer };
+
+    // Remove any preset overrides by resetting to defaults
+    if (activePreset && activePreset.layers) {
+      const presetLayer = activePreset.layers.find(l => l.id === layer.id);
+      if (presetLayer) {
+        // Reset layer-level properties to defaults if they're overridden
+        if (presetLayer.volume !== undefined) defaultLayer.volume = 1;
+        if (presetLayer.weight !== undefined) defaultLayer.weight = 1;
+        if (presetLayer.chance !== undefined) defaultLayer.chance = 1;
+
+        // Handle sound-specific properties
+        if (presetLayer.sounds) {
+          defaultLayer.sounds = layer.sounds.map(sound => {
+            const presetSound = presetLayer.sounds?.find(s => s.id === sound.id);
+            if (!presetSound) return sound;
+
+            const defaultSound = { ...sound };
+            if (presetSound.volume !== undefined) defaultSound.volume = 1;
+            if (presetSound.frequency !== undefined) defaultSound.frequency = 1;
+            return defaultSound;
+          });
+        }
+      }
+    }
+
+    return defaultLayer;
   };
 
   const handleAddPreset = () => {
@@ -235,6 +282,54 @@ export const MainContent: React.FC<MainContentProps> = ({
             </Box>
           </Paper>
 
+          {/* Preset Controls */}
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Presets</Typography>
+            <PresetControls
+              environment={environment}
+              presets={environment.presets}
+              activePresetId={environment.activePresetId}
+              onPresetAdd={onPresetCreate}
+              onPresetUpdate={(preset) => {
+                const updatedPresets = environment.presets.map(p => 
+                  p.id === preset.id ? preset : p
+                );
+                onEnvironmentUpdate({
+                  ...environment,
+                  presets: updatedPresets
+                });
+              }}
+              onPresetDelete={(presetId) => {
+                const updatedPresets = environment.presets.filter(p => p.id !== presetId);
+                onEnvironmentUpdate({
+                  ...environment,
+                  presets: updatedPresets,
+                  activePresetId: environment.activePresetId === presetId 
+                    ? undefined 
+                    : environment.activePresetId
+                });
+              }}
+              onPresetSelect={(presetId) => {
+                onEnvironmentUpdate({
+                  ...environment,
+                  activePresetId: presetId
+                });
+                onPresetSelect(presetId);
+              }}
+              onPresetsReorder={(presets) => {
+                onEnvironmentUpdate({
+                  ...environment,
+                  presets
+                });
+              }}
+            />
+          </Paper>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* Layers */}
+          <Typography variant="h6" sx={{ mb: 2 }}>Layers</Typography>
+
           {/* Presets Section */}
           <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Tabs 
@@ -283,56 +378,48 @@ export const MainContent: React.FC<MainContentProps> = ({
         }}>
           <Droppable droppableId="layers" type="layer">
             {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
-              <Stack
-                spacing={1}
+              <Box
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                sx={{ 
-                  minHeight: 50,
-                  backgroundColor: snapshot.isDraggingOver ? 'action.hover' : 'transparent',
-                  transition: 'background-color 0.2s ease',
-                  p: 1
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                  flexGrow: 1,
+                  overflowY: 'auto',
+                  p: 2,
+                  bgcolor: snapshot.isDraggingOver ? 'action.hover' : 'transparent',
+                  borderRadius: 1,
                 }}
               >
                 {environment.layers.map((layer, index) => (
-                  <Draggable 
-                    key={layer.id} 
-                    draggableId={layer.id} 
-                    index={index}
-                  >
+                  <Draggable key={layer.id} draggableId={layer.id} index={index}>
                     {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
-                      <Box
+                      <div
                         ref={provided.innerRef}
                         {...provided.draggableProps}
-                        sx={{
-                          opacity: snapshot.isDragging ? 0.8 : 1,
-                          transition: 'opacity 0.2s ease',
-                          backgroundColor: snapshot.isDragging ? 'action.hover' : 'transparent'
+                        style={{
+                          ...provided.draggableProps.style,
+                          opacity: snapshot.isDragging ? 0.5 : 1,
                         }}
                       >
                         <LayerControls
                           layer={layer}
                           soundFiles={soundFiles}
                           onLayerUpdate={onLayerUpdate}
-                          onLayerEdit={(layer: Layer) => {
-                            // TODO: Implement layer editing
-                            console.log('Edit layer:', layer);
-                          }}
-                          onLayerRemove={(layerId: string) => {
-                            const updatedLayers = environment.layers.filter(l => l.id !== layerId);
-                            onEnvironmentUpdate({
-                              ...environment,
-                              layers: updatedLayers
-                            });
-                          }}
+                          onLayerEdit={() => {}}
+                          onLayerRemove={() => {}}
                           dragHandleProps={provided.dragHandleProps}
+                          activePreset={activePreset}
+                          defaultLayer={getDefaultLayer(layer)}
+                          onPresetUpdate={onPresetUpdate}
                         />
-                      </Box>
+                      </div>
                     )}
                   </Draggable>
                 ))}
                 {provided.placeholder}
-              </Stack>
+              </Box>
             )}
           </Droppable>
 

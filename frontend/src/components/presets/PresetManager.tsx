@@ -1,171 +1,139 @@
-import React, { useState } from 'react';
-import { EnvironmentPreset, Layer, getLayerVolume } from '../../types/audio';
+import React, { useState, MouseEvent } from 'react';
+import { Layer, Preset, Environment } from '../../types/audio';
+import { generateId } from '../../utils/ids';
+import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 interface PresetManagerProps {
-  presets: EnvironmentPreset[];
-  activePresetId: string | null;
-  layers: Layer[];
-  onPresetSelect: (presetId: string) => void;
-  onPresetCreate: (name: string) => void;
+  presets: Preset[];
+  environment: Environment;
+  activePresetId?: string;
+  onPresetCreate: (preset: Preset) => void;
+  onPresetUpdate: (preset: Preset) => void;
   onPresetDelete: (presetId: string) => void;
-  onPresetUpdate: (preset: EnvironmentPreset) => void;
+  onPresetSelect: (presetId: string | undefined) => void;
 }
 
-const PresetManager: React.FC<PresetManagerProps> = ({
+export const PresetManager: React.FC<PresetManagerProps> = ({
   presets,
+  environment,
   activePresetId,
-  layers,
-  onPresetSelect,
   onPresetCreate,
-  onPresetDelete,
   onPresetUpdate,
-}) => {
+  onPresetDelete,
+  onPresetSelect,
+}: PresetManagerProps) => {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+  const [editingPreset, setEditingPreset] = useState<Preset | null>(null);
 
   const handleCreatePreset = () => {
-    if (newPresetName.trim()) {
-      onPresetCreate(newPresetName.trim());
-      setNewPresetName('');
-      setIsCreating(false);
-    }
+    if (!newPresetName.trim()) return;
+
+    const newPreset: Preset = {
+      id: generateId(),
+      name: newPresetName.trim(),
+      layers: [],
+      isDefault: false
+    };
+
+    onPresetCreate(newPreset);
+    setNewPresetName('');
+    setIsAddDialogOpen(false);
+  };
+
+  const handleUpdatePreset = () => {
+    if (!editingPreset || !editingPreset.name.trim()) return;
+    onPresetUpdate(editingPreset);
+    setEditingPreset(null);
+  };
+
+  const handleEditClick = (e: MouseEvent<SVGSVGElement>, preset: Preset) => {
+    e.stopPropagation();
+    setEditingPreset(preset);
   };
 
   return (
-    <div className="px-6 py-4">
-      <div className="flex items-center space-x-4">
-        {/* Preset Tabs */}
-        <div className="flex-1 flex space-x-2 overflow-x-auto pb-2">
-          {presets.map((preset) => (
-            <button
-              key={preset.id}
-              onClick={() => onPresetSelect(preset.id)}
-              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-                activePresetId === preset.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {preset.name}
-            </button>
-          ))}
-        </div>
+    <Box>
+      <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+        <Typography variant="h6">Presets</Typography>
+        <Button
+          size="small"
+          startIcon={<AddIcon />}
+          onClick={() => setIsAddDialogOpen(true)}
+        >
+          Add Preset
+        </Button>
+      </Stack>
 
-        {/* Create Preset Button */}
-        {!isCreating ? (
-          <button
-            onClick={() => setIsCreating(true)}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>New Preset</span>
-          </button>
-        ) : (
-          <div className="flex items-center space-x-2">
-            <input
-              type="text"
-              value={newPresetName}
-              onChange={(e) => setNewPresetName(e.target.value)}
-              placeholder="Preset name..."
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleCreatePreset();
-                } else if (e.key === 'Escape') {
-                  setIsCreating(false);
-                  setNewPresetName('');
-                }
-              }}
-            />
-            <button
-              onClick={handleCreatePreset}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Create
-            </button>
-            <button
-              onClick={() => {
-                setIsCreating(false);
-                setNewPresetName('');
-              }}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-      </div>
+      <Stack direction="row" spacing={1} flexWrap="wrap">
+        {presets.map(preset => (
+          <Chip
+            key={preset.id}
+            label={preset.name}
+            onClick={() => onPresetSelect(preset.id === activePresetId ? undefined : preset.id)}
+            onDelete={() => onPresetDelete(preset.id)}
+            color={preset.id === activePresetId ? "primary" : "default"}
+            deleteIcon={
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                <EditIcon
+                  onClick={(e) => handleEditClick(e, preset)}
+                  sx={{ cursor: 'pointer' }}
+                />
+                <DeleteIcon />
+              </Box>
+            }
+          />
+        ))}
+      </Stack>
 
-      {/* Layer Overrides */}
-      {activePresetId && (
-        <div className="mt-4 space-y-4">
-          {layers.map((layer) => {
-            const override = presets.find((p) => p.id === activePresetId)?.layerOverrides[layer.id];
-            return (
-              <div key={layer.id} className="flex items-center space-x-4">
-                <span className="w-48 text-sm font-medium text-gray-700">{layer.name}</span>
-                <div className="flex-1 flex items-center space-x-4">
-                  <div className="flex-1">
-                    <label className="block text-xs text-gray-500 mb-1">Chance</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={override?.chance ?? layer.chance}
-                      onChange={(e) => {
-                        const preset = presets.find((p) => p.id === activePresetId);
-                        if (preset) {
-                          onPresetUpdate({
-                            ...preset,
-                            layerOverrides: {
-                              ...preset.layerOverrides,
-                              [layer.id]: {
-                                ...preset.layerOverrides[layer.id],
-                                chance: parseFloat(e.target.value),
-                              },
-                            },
-                          });
-                        }
-                      }}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-xs text-gray-500 mb-1">Volume</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={override?.volume ?? getLayerVolume(layer)}
-                      onChange={(e) => {
-                        const preset = presets.find((p) => p.id === activePresetId);
-                        if (preset) {
-                          onPresetUpdate({
-                            ...preset,
-                            layerOverrides: {
-                              ...preset.layerOverrides,
-                              [layer.id]: {
-                                ...preset.layerOverrides[layer.id],
-                                volume: parseFloat(e.target.value),
-                              },
-                            },
-                          });
-                        }
-                      }}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+      {/* Add Preset Dialog */}
+      <Dialog open={isAddDialogOpen} onClose={() => setIsAddDialogOpen(false)}>
+        <DialogTitle>Add New Preset</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Preset Name"
+            fullWidth
+            value={newPresetName}
+            onChange={(e) => setNewPresetName(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleCreatePreset} disabled={!newPresetName.trim()}>
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Preset Dialog */}
+      <Dialog open={!!editingPreset} onClose={() => setEditingPreset(null)}>
+        <DialogTitle>Edit Preset</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Preset Name"
+            fullWidth
+            value={editingPreset?.name || ''}
+            onChange={(e) => editingPreset && setEditingPreset({
+              ...editingPreset,
+              name: e.target.value
+            })}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditingPreset(null)}>Cancel</Button>
+          <Button onClick={handleUpdatePreset} disabled={!editingPreset?.name.trim()}>
+            Update
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 

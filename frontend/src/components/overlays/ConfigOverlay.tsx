@@ -6,24 +6,33 @@ import {
   Slider,
   Button,
   Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { SoundFile } from '../../types/audio';
+import { SoundFile, Environment } from '../../types/audio';
 import FileManagerDialog from '../dialogs/FileManagerDialog';
 import { deleteFile, listFiles } from '../../services/fileService';
 
-interface ConfigOverlayProps {
+export interface ConfigOverlayProps {
+  open: boolean;
+  onClose: () => void;
+  environments: Environment[];
+  onEnvironmentUpdate: (environment: Environment) => void;
   masterVolume: number;
   onMasterVolumeChange: (volume: number) => void;
-  onClose: () => void;
   soundFiles: SoundFile[];
   onSoundFilesChange: (files: SoundFile[]) => void;
 }
 
 const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
+  open,
+  onClose,
+  environments,
+  onEnvironmentUpdate,
   masterVolume,
   onMasterVolumeChange,
-  onClose,
   soundFiles,
   onSoundFilesChange,
 }) => {
@@ -76,27 +85,14 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
   };
 
   return (
-    <Box
-      sx={{
-        position: 'fixed',
-        inset: 0,
-        bgcolor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: (theme) => theme.zIndex.drawer + 1,
-      }}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
     >
-      <Box
-        sx={{
-          bgcolor: 'background.paper',
-          borderRadius: 1,
-          boxShadow: 24,
-          p: 3,
-          maxWidth: 'sm',
-          width: '100%',
-        }}
-      >
+      <DialogTitle>Configuration</DialogTitle>
+      <DialogContent>
         <Stack spacing={3}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h5" component="h2">
@@ -141,7 +137,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
             <Button onClick={onClose}>Close</Button>
           </Box>
         </Stack>
-      </Box>
+      </DialogContent>
 
       <FileManagerDialog
         open={isFileManagerOpen}
@@ -149,7 +145,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
         soundFiles={localSoundFiles}
         onDeleteFile={handleDeleteFile}
       />
-    </Box>
+    </Dialog>
   );
 };
 

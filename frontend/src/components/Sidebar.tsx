@@ -28,11 +28,11 @@ import ConfigOverlay from './overlays/ConfigOverlay';
 
 interface SidebarProps {
   environments: Environment[];
-  activeEnvironment?: Environment | null;
+  activeEnvironment: Environment | null;
+  onEnvironmentSelect: (environment: Environment) => void;
   onNewEnvironment: () => void;
   onToggleConfig: () => void;
   onToggleSoundboard: () => void;
-  onEnvironmentSelect: (environment: Environment) => void;
   masterVolume: number;
   onMasterVolumeChange: (volume: number) => void;
   soundFiles: SoundFile[];
@@ -44,10 +44,10 @@ const DRAWER_WIDTH = 280;
 export const Sidebar: React.FC<SidebarProps> = ({
   environments,
   activeEnvironment,
+  onEnvironmentSelect,
   onNewEnvironment,
   onToggleConfig,
   onToggleSoundboard,
-  onEnvironmentSelect,
   masterVolume,
   onMasterVolumeChange,
   soundFiles,
@@ -62,6 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleToggleConfig = () => {
     setShowConfig(!showConfig);
+    onToggleConfig();
   };
 
   return (
@@ -274,9 +275,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {showConfig && (
         <ConfigOverlay
+          open={showConfig}
+          onClose={handleToggleConfig}
+          environments={environments}
+          onEnvironmentUpdate={(updatedEnvironment) => {
+            // Find and update the environment in the list
+            const updatedEnvironments = environments.map(env =>
+              env.id === updatedEnvironment.id ? updatedEnvironment : env
+            );
+            // Update the active environment if it was modified
+            if (activeEnvironment?.id === updatedEnvironment.id) {
+              onEnvironmentSelect(updatedEnvironment);
+            }
+          }}
           masterVolume={masterVolume}
           onMasterVolumeChange={onMasterVolumeChange}
-          onClose={handleToggleConfig}
           soundFiles={soundFiles}
           onSoundFilesChange={onSoundFilesChange}
         />

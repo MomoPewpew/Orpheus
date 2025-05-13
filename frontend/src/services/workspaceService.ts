@@ -1,4 +1,5 @@
 import { Environment, SoundFile, PlayState } from '../types/audio';
+import { generateId } from '../utils/ids';
 
 // Get the API URL from environment or use default
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -23,20 +24,37 @@ interface BackendState {
  * Saves the entire workspace state to the backend
  */
 export async function saveWorkspace(state: WorkspaceState): Promise<void> {
+  if (!state) {
+    console.warn('Attempted to save undefined workspace state');
+    return;
+  }
+
   try {
-    // Convert workspace state to match backend format
-    const backendState: BackendState = {
-      environments: state.environments.map((env: Environment) => ({
-        ...env,
-        soundboard: env.soundboard || [] // Ensure soundboard exists
-      })) || [],
+    // Create a clean state object with only the required properties
+    const cleanState = {
+      environments: state.environments || [],
       files: state.files || [],
-      masterVolume: state.masterVolume,
-      soundboard: state.soundboard || [], // Global soundboard
-      playState: PlayState.Stopped
+      masterVolume: typeof state.masterVolume === 'number' ? state.masterVolume : 1,
+      soundboard: state.soundboard || [],
+      playState: 'STOPPED' as const
     };
 
-    const requestBody = JSON.stringify(backendState);
+    // Convert to JSON string with no whitespace
+    const requestBody = JSON.stringify(cleanState);
+    
+    // Log the exact JSON being sent
+    console.debug('JSON being sent:', requestBody);
+    console.debug('JSON length:', requestBody.length);
+    console.debug('First 200 chars:', requestBody.substring(0, 200));
+    console.debug('Last 200 chars:', requestBody.substring(Math.max(0, requestBody.length - 200)));
+    
+    // Verify JSON is valid before sending
+    try {
+      JSON.parse(requestBody);
+    } catch (e) {
+      console.error('Invalid JSON generated:', e);
+      throw new Error('Generated invalid JSON');
+    }
 
     const response = await fetch(API_WORKSPACE, {
       method: 'POST',
@@ -47,13 +65,16 @@ export async function saveWorkspace(state: WorkspaceState): Promise<void> {
     });
 
     const responseText = await response.text();
-
+    console.debug('Raw server response:', responseText);
+    
     if (!response.ok) {
-      console.error('Server response:', responseText);
-      throw new Error(`Failed to save workspace: ${response.statusText}`);
+      throw new Error(`Server error (${response.status}): ${responseText}`);
     }
   } catch (error) {
-    console.error('Error saving workspace:', error);
+    console.error('Error saving workspace:', {
+      error,
+      message: error instanceof Error ? error.message : String(error)
+    });
     throw error;
   }
 }

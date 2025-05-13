@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@types/lodash": "^4.17.16",
+    "@types/hello-pangea__dnd": "^16.3.0",
     "@typescript-eslint/eslint-plugin": "^5.59.11",
     "@typescript-eslint/parser": "^5.59.11",
     "eslint": "^8.42.0",

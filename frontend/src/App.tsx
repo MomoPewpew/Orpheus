@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Environment, EnvironmentPreset, Layer, LayerSound, SoundFile } from './types/audio';
-import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { Environment, Layer, LayerSound, SoundFile, Preset, PresetLayer, PresetSound } from './types/audio';
+import { Box, CssBaseline, ThemeProvider, createTheme, Typography } from '@mui/material';
 import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
@@ -100,8 +100,8 @@ const App: React.FC = () => {
   };
 
   const handleEnvironmentUpdate = (updatedEnvironment: Environment) => {
-    setEnvironments(prevEnvironments => 
-      prevEnvironments.map(env => 
+    setEnvironments((prevEnvironments: Environment[]) => 
+      prevEnvironments.map((env: Environment) => 
         env.id === updatedEnvironment.id ? updatedEnvironment : env
       )
     );
@@ -109,35 +109,111 @@ const App: React.FC = () => {
   };
 
   const handleEnvironmentRemove = (environmentId: string) => {
-    setEnvironments(prevEnvironments => prevEnvironments.filter(env => env.id !== environmentId));
+    setEnvironments((prevEnvironments: Environment[]) => 
+      prevEnvironments.filter((env: Environment) => env.id !== environmentId)
+    );
     setActiveEnvironment(null);
   };
 
   const handleLayerAdd = (layer: Layer) => {
     if (!activeEnvironment) return;
 
-    const updatedEnvironment = {
+    // Ensure each sound has an ID
+    const layerWithSoundIds = {
+      ...layer,
+      sounds: layer.sounds.map(sound => ({
+        ...sound,
+        id: generateId()
+      }))
+    };
+
+    const updatedEnvironment: Environment = {
       ...activeEnvironment,
-      layers: [...activeEnvironment.layers, layer]
+      layers: [...activeEnvironment.layers, layerWithSoundIds]
     };
 
     handleEnvironmentUpdate(updatedEnvironment);
   };
 
   const handleLayerUpdate = (updatedLayer: Layer) => {
-    if (!activeEnvironment) return;
+    if (!activeEnvironment || !activeEnvironment.layers) return;
 
-    const updatedEnvironment = {
-      ...activeEnvironment,
-      layers: activeEnvironment.layers.map(layer =>
-        layer.id === updatedLayer.id ? updatedLayer : layer
-      )
-    };
+    const originalLayer = activeEnvironment.layers.find((l: Layer) => l.id === updatedLayer.id);
+    if (!originalLayer) return;
 
-    handleEnvironmentUpdate(updatedEnvironment);
+    const activePreset = activeEnvironment.activePresetId 
+      ? activeEnvironment.presets?.find((p: Preset) => p.id === activeEnvironment.activePresetId)
+      : undefined;
+
+    if (activePreset && activePreset.layers) {
+      // Update the preset with the changes
+      const presetLayer = activePreset.layers.find((p: PresetLayer) => p.id === updatedLayer.id) || { 
+        id: updatedLayer.id 
+      };
+      const updatedPresetLayer = { ...presetLayer };
+
+      // Compare each property and only store changes
+      if (updatedLayer.volume !== originalLayer.volume) {
+        updatedPresetLayer.volume = updatedLayer.volume;
+      }
+      if (updatedLayer.weight !== originalLayer.weight) {
+        updatedPresetLayer.weight = updatedLayer.weight;
+      }
+      if (updatedLayer.chance !== originalLayer.chance) {
+        updatedPresetLayer.chance = updatedLayer.chance;
+      }
+
+      // Compare sound properties
+      const updatedPresetSounds = updatedLayer.sounds.map((sound, index) => {
+        const originalSound = originalLayer.sounds[index];
+        if (!originalSound) return null;
+
+        // Always include required properties
+        const changes: PresetSound = {
+          id: sound.id,
+          fileId: sound.fileId,
+          volume: sound.volume !== originalSound.volume ? sound.volume : undefined,
+          frequency: sound.frequency !== originalSound.frequency ? sound.frequency : undefined
+        };
+
+        // Only update if there are actual changes
+        const hasChanges = 
+          sound.volume !== originalSound.volume ||
+          sound.frequency !== originalSound.frequency;
+
+        return hasChanges ? changes : null;
+      }).filter((sound): sound is PresetSound => sound !== null);
+
+      if (updatedPresetSounds.length > 0) {
+        updatedPresetLayer.sounds = updatedPresetSounds;
+      }
+
+      // Update the preset if we have any changes
+      if (Object.keys(updatedPresetLayer).length > 1) { // More than just id
+        const updatedPreset = {
+          ...activePreset,
+          layers: [
+            ...(activePreset.layers || []).filter((p: PresetLayer) => p.id !== updatedLayer.id),
+            updatedPresetLayer
+          ]
+        };
+
+        handlePresetUpdate(updatedPreset);
+      }
+    } else {
+      // Update the environment directly
+      const updatedEnvironment = {
+        ...activeEnvironment,
+        layers: activeEnvironment.layers.map((l: Layer) =>
+          l.id === updatedLayer.id ? updatedLayer : l
+        )
+      };
+
+      handleEnvironmentUpdate(updatedEnvironment);
+    }
   };
 
-  const handlePresetCreate = (preset: EnvironmentPreset) => {
+  const handlePresetCreate = (preset: Preset) => {
     if (!activeEnvironment) return;
 
     const updatedEnvironment = {
@@ -148,12 +224,50 @@ const App: React.FC = () => {
     handleEnvironmentUpdate(updatedEnvironment);
   };
 
+  const handlePresetUpdate = (preset: Preset) => {
+    if (!activeEnvironment) return;
+
+    const updatedEnvironment: Environment = {
+      ...activeEnvironment,
+      presets: activeEnvironment.presets.map((p: Preset) => 
+        p.id === preset.id ? preset : p
+      )
+    };
+
+    handleEnvironmentUpdate(updatedEnvironment);
+  };
+
+  const handlePresetDelete = (presetId: string) => {
+    if (!activeEnvironment) return;
+
+    const updatedEnvironment: Environment = {
+      ...activeEnvironment,
+      presets: activeEnvironment.presets.filter((p: Preset) => p.id !== presetId),
+      activePresetId: activeEnvironment.activePresetId === presetId 
+        ? undefined 
+        : activeEnvironment.activePresetId
+    };
+
+    handleEnvironmentUpdate(updatedEnvironment);
+  };
+
+  const handlePresetsReorder = (presets: Preset[]) => {
+    if (!activeEnvironment) return;
+
+    const updatedEnvironment: Environment = {
+      ...activeEnvironment,
+      presets
+    };
+
+    handleEnvironmentUpdate(updatedEnvironment);
+  };
+
   const handlePresetSelect = (presetId: string | undefined) => {
     if (!activeEnvironment) return;
 
-    const updatedEnvironment = {
+    const updatedEnvironment: Environment = {
       ...activeEnvironment,
-      defaultPresetId: presetId
+      activePresetId: presetId
     };
 
     handleEnvironmentUpdate(updatedEnvironment);
@@ -230,22 +344,41 @@ const App: React.FC = () => {
               position: 'relative' // Add this to ensure proper stacking context
             }}
           >
-            <MainContent
-              environment={activeEnvironment}
-              showSoundboard={showSoundboard}
-              soundFiles={soundFiles}
-              globalSoundboard={globalSoundboard}
-              onEnvironmentUpdate={handleEnvironmentUpdate}
-              onEnvironmentRemove={handleEnvironmentRemove}
-              onLayerAdd={handleLayerAdd}
-              onLayerUpdate={handleLayerUpdate}
-              onPresetCreate={handlePresetCreate}
-              onPresetSelect={handlePresetSelect}
-              onSoundFilesChange={setSoundFiles}
-              onGlobalSoundboardChange={setGlobalSoundboard}
-              onToggleSoundboard={() => setShowSoundboard(!showSoundboard)}
-            />
+            {activeEnvironment ? (
+              <MainContent
+                environment={activeEnvironment}
+                showSoundboard={showSoundboard}
+                soundFiles={soundFiles}
+                globalSoundboard={globalSoundboard}
+                onEnvironmentUpdate={handleEnvironmentUpdate}
+                onEnvironmentRemove={handleEnvironmentRemove}
+                onLayerAdd={handleLayerAdd}
+                onLayerUpdate={handleLayerUpdate}
+                onPresetCreate={handlePresetCreate}
+                onPresetSelect={handlePresetSelect}
+                onPresetUpdate={handlePresetUpdate}
+                onPresetDelete={handlePresetDelete}
+                onPresetsReorder={handlePresetsReorder}
+                onSoundFilesChange={setSoundFiles}
+                onGlobalSoundboardChange={setGlobalSoundboard}
+                onToggleSoundboard={handleToggleSoundboard}
+              />
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <Typography>Select an environment to begin</Typography>
+              </Box>
+            )}
           </Box>
+          <ConfigOverlay
+            open={showConfig}
+            onClose={handleToggleConfig}
+            environments={environments}
+            onEnvironmentUpdate={handleEnvironmentUpdate}
+            masterVolume={masterVolume}
+            onMasterVolumeChange={handleMasterVolumeChange}
+            soundFiles={soundFiles}
+            onSoundFilesChange={setSoundFiles}
+          />
         </Box>
       </DragDropContext>
     </ThemeProvider>

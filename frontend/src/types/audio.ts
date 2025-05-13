@@ -1,3 +1,5 @@
+import { generateId } from '../utils/ids';
+
 /**
  * Represents a sound file in the system
  */
@@ -15,7 +17,8 @@ export interface SoundFile {
  * Represents a sound within a layer, with layer-specific settings
  */
 export interface LayerSound {
-  fileId: string;    // Reference to a SoundFile
+  id: string;       // Unique identifier for this sound instance
+  fileId: string;   // Reference to a SoundFile
   frequency: number; // Frequency of selection within the layer (was weight)
   volume: number;    // Sound-specific volume adjustment
 }
@@ -28,29 +31,10 @@ export interface Layer {
   name: string;
   sounds: LayerSound[];  // List of possible sounds for this layer
   chance: number;      // Probability of playing (0-1)
-  cooldownMs: number;  // Cooldown in cycles
-  loopLengthMs: number; // Length of a cycle in milliseconds
+  cooldownMs?: number;  // Cooldown in cycles
+  loopLengthMs?: number; // Length of a cycle in milliseconds
   weight: number;      // How much this layer contributes to the total environment weight
   volume: number;      // Layer-level volume multiplier (0-1)
-}
-
-/**
- * Represents layer-specific overrides for a preset
- */
-export interface LayerPresetOverrides {
-  chance?: number;     // Optional override for chance (0-1)
-  volume?: number;     // Optional override for volume (0-1)
-  weight?: number;     // Optional override for layer weight
-}
-
-/**
- * Represents a preset configuration for an environment
- */
-export interface EnvironmentPreset {
-  id: string;
-  name: string;        // e.g., "High Tension", "Peaceful", "Combat"
-  environmentId: string; // Reference to parent environment
-  layerOverrides: Record<string, LayerPresetOverrides>; // Map of layer ID to overrides
 }
 
 /**
@@ -61,9 +45,10 @@ export interface Environment {
   name: string;
   maxWeight: number;
   layers: Layer[];
-  presets: EnvironmentPreset[];
+  presets: Preset[];
   backgroundImage?: string;
   soundboard: string[]; // List of sound IDs for quick playback
+  activePresetId?: string;  // undefined means using default preset
 }
 
 /**
@@ -118,35 +103,10 @@ export function isSoundFile(obj: any): obj is SoundFile {
 export function isLayerSound(obj: any): obj is LayerSound {
   return (
     typeof obj === 'object' &&
+    typeof obj.id === 'string' &&
     typeof obj.fileId === 'string' &&
     typeof obj.frequency === 'number' &&
     typeof obj.volume === 'number'
-  );
-}
-
-/**
- * Type guard to check if an object is a valid LayerPresetOverrides
- */
-export function isLayerPresetOverrides(obj: any): obj is LayerPresetOverrides {
-  return (
-    typeof obj === 'object' &&
-    (obj.chance === undefined || (typeof obj.chance === 'number' && obj.chance >= 0 && obj.chance <= 1)) &&
-    (obj.volume === undefined || (typeof obj.volume === 'number' && obj.volume >= 0 && obj.volume <= 1)) &&
-    (obj.weight === undefined || typeof obj.weight === 'number')
-  );
-}
-
-/**
- * Type guard to check if an object is a valid EnvironmentPreset
- */
-export function isEnvironmentPreset(obj: any): obj is EnvironmentPreset {
-  return (
-    typeof obj === 'object' &&
-    typeof obj.id === 'string' &&
-    typeof obj.name === 'string' &&
-    typeof obj.environmentId === 'string' &&
-    typeof obj.layerOverrides === 'object' &&
-    Object.keys(obj.layerOverrides).every(key => isLayerPresetOverrides(obj.layerOverrides[key]))
   );
 }
 
@@ -182,8 +142,9 @@ export function isEnvironment(obj: any): obj is Environment {
     Array.isArray(obj.soundboard) &&
     obj.soundboard.every((id: any) => typeof id === 'string') &&
     Array.isArray(obj.presets) &&
-    obj.presets.every(isEnvironmentPreset) &&
-    typeof obj.maxWeight === 'number'
+    obj.presets.every(isPreset) &&
+    typeof obj.maxWeight === 'number' &&
+    (obj.activePresetId === undefined || typeof obj.activePresetId === 'string')
   );
 }
 
@@ -221,45 +182,185 @@ export function isAppState(obj: any): obj is AppState {
 }
 
 /**
- * Helper function to get the effective layer settings considering preset overrides
+ * Represents a sound override in a preset
  */
-export function getEffectiveLayerSettings(
-  layer: Layer,
-  preset?: EnvironmentPreset
-): { chance: number; weight: number; sounds: LayerSound[] } {
-  if (!preset) {
-    return { 
-      chance: layer.chance,
-      weight: layer.weight,
-      sounds: layer.sounds.map(sound => ({
-        ...sound,
-        frequency: sound.frequency || 1 // Provide default if missing
-      }))
-    };
-  }
-
-  const override = preset.layerOverrides[layer.id];
-  return {
-    chance: override?.chance ?? layer.chance,
-    weight: override?.weight ?? layer.weight,
-    sounds: layer.sounds.map(sound => ({
-      ...sound,
-      frequency: sound.frequency || 1, // Provide default if missing
-      volume: override?.volume !== undefined ? sound.volume * override.volume : sound.volume
-    }))
-  };
+export interface PresetSound {
+  id: string;       // Must match the original sound ID
+  fileId: string;   // Must match the original sound's fileId
+  volume?: number;  // Override for the sound's volume
+  frequency?: number; // Override for the sound's frequency
 }
 
 /**
- * Helper function to check if adding a layer would exceed the environment's max weight
+ * Represents a layer override in a preset
  */
-export function canAddLayer(
-  activeEnvironment: ActiveEnvironment,
+export interface PresetLayer {
+  id: string;           // Must match the original layer ID
+  volume?: number;      // Override for the layer's volume
+  weight?: number;      // Override for the layer's weight
+  chance?: number;      // Override for the layer's chance
+  sounds?: PresetSound[]; // Sound-specific overrides
+}
+
+/**
+ * Represents a preset configuration for an environment
+ */
+export interface Preset {
+  id: string;
+  name: string;
+  maxWeight?: number;   // Optional override for environment's maxWeight
+  layers: PresetLayer[];  // Layer-specific overrides
+  isDefault?: boolean;  // Whether this is the default preset
+}
+
+/**
+ * Type guard to check if an object is a valid PresetSound
+ */
+export function isPresetSound(obj: any): obj is PresetSound {
+  return (
+    typeof obj === 'object' &&
+    typeof obj.id === 'string' &&
+    typeof obj.fileId === 'string' &&
+    (obj.volume === undefined || typeof obj.volume === 'number') &&
+    (obj.frequency === undefined || typeof obj.frequency === 'number')
+  );
+}
+
+/**
+ * Type guard to check if an object is a valid PresetLayer
+ */
+export function isPresetLayer(obj: any): obj is PresetLayer {
+  return (
+    typeof obj === 'object' &&
+    typeof obj.id === 'string' &&
+    (obj.volume === undefined || typeof obj.volume === 'number') &&
+    (obj.weight === undefined || typeof obj.weight === 'number') &&
+    (obj.chance === undefined || typeof obj.chance === 'number') &&
+    (!obj.sounds || (Array.isArray(obj.sounds) && obj.sounds.every(isPresetSound)))
+  );
+}
+
+/**
+ * Type guard to check if an object is a valid Preset
+ */
+export function isPreset(obj: any): obj is Preset {
+  return (
+    typeof obj === 'object' &&
+    typeof obj.id === 'string' &&
+    typeof obj.name === 'string' &&
+    (obj.maxWeight === undefined || typeof obj.maxWeight === 'number') &&
+    Array.isArray(obj.layers) &&
+    obj.layers.every(isPresetLayer) &&
+    (obj.isDefault === undefined || typeof obj.isDefault === 'boolean')
+  );
+}
+
+/**
+ * Helper function to get the effective layer settings considering preset values
+ */
+export function getEffectiveLayerSettings(
   layer: Layer,
-  preset?: EnvironmentPreset
-): boolean {
-  const { weight } = getEffectiveLayerSettings(layer, preset);
-  return activeEnvironment.currentWeight + weight <= activeEnvironment.environment.maxWeight;
+  preset?: Preset
+): Layer {
+  if (!preset) return layer;
+
+  // Find the preset layer that matches this layer's ID
+  const presetLayer = preset.layers.find(p => p.id === layer.id);
+  if (!presetLayer) return layer;
+
+  // Merge the preset values with the base layer
+  const effectiveLayer = { ...layer };
+
+  // Apply layer-level overrides if they exist
+  if (presetLayer.volume !== undefined) effectiveLayer.volume = presetLayer.volume;
+  if (presetLayer.weight !== undefined) effectiveLayer.weight = presetLayer.weight;
+  if (presetLayer.chance !== undefined) effectiveLayer.chance = presetLayer.chance;
+
+  // Apply sound-level overrides if any exist
+  if (presetLayer.sounds) {
+    effectiveLayer.sounds = layer.sounds.map(sound => {
+      const presetSound = presetLayer.sounds?.find(ps => ps.id === sound.id);
+      if (!presetSound) return sound;
+
+      return {
+        ...sound,
+        fileId: presetSound.fileId, // Use the preset's fileId if it exists
+        volume: presetSound.volume ?? sound.volume,
+        frequency: presetSound.frequency ?? sound.frequency
+      };
+    });
+  }
+
+  return effectiveLayer;
+}
+
+/**
+ * Creates a new preset layer by comparing base and modified layers
+ */
+export function createPresetLayer(baseLayer: Layer, modifiedLayer: Layer): PresetLayer {
+  const presetLayer: PresetLayer = { id: baseLayer.id };
+
+  // Only include values that differ from the base
+  if (modifiedLayer.volume !== baseLayer.volume) presetLayer.volume = modifiedLayer.volume;
+  if (modifiedLayer.weight !== baseLayer.weight) presetLayer.weight = modifiedLayer.weight;
+  if (modifiedLayer.chance !== baseLayer.chance) presetLayer.chance = modifiedLayer.chance;
+
+  // Compare sounds and include only those with changes
+  const soundChanges = modifiedLayer.sounds
+    .map(sound => {
+      const baseSound = baseLayer.sounds.find(s => s.id === sound.id);
+      if (!baseSound) return null;
+
+      const changes: PresetSound = { 
+        id: sound.id,
+        fileId: sound.fileId // Always include fileId
+      };
+      let hasChanges = false;
+
+      if (sound.volume !== baseSound.volume) {
+        changes.volume = sound.volume;
+        hasChanges = true;
+      }
+      if (sound.frequency !== baseSound.frequency) {
+        changes.frequency = sound.frequency;
+        hasChanges = true;
+      }
+
+      return hasChanges ? changes : null;
+    })
+    .filter((sound): sound is PresetSound => sound !== null);
+
+  if (soundChanges.length > 0) {
+    presetLayer.sounds = soundChanges;
+  }
+
+  return presetLayer;
+}
+
+/**
+ * Creates a new preset from the current state of an environment
+ */
+export function createPreset(
+  environment: Environment,
+  name: string,
+  basePreset?: Preset
+): Preset {
+  const baseLayers = basePreset 
+    ? environment.layers.map(layer => getEffectiveLayerSettings(layer, basePreset))
+    : environment.layers;
+
+  return {
+    id: generateId(),
+    name,
+    layers: environment.layers
+      .map((layer, index) => createPresetLayer(baseLayers[index], layer))
+      .filter(layer => 
+        layer.volume !== undefined || 
+        layer.weight !== undefined || 
+        layer.chance !== undefined ||
+        layer.sounds !== undefined
+      )
+  };
 }
 
 /**
@@ -326,4 +427,35 @@ export function getLayerSoundName(layer: Layer, soundFiles?: SoundFile[]): strin
     if (!soundFiles || soundFiles.length === 0) return "Loading sounds...";
     const primarySound = soundFiles.find(sf => sf.id === layer.sounds[0].fileId);
     return primarySound?.name || "Unknown sound";
+}
+
+/**
+ * Helper function to check if adding a layer would exceed the environment's max weight
+ */
+export function canAddLayer(
+  activeEnvironment: ActiveEnvironment,
+  layer: Layer,
+  preset?: Preset
+): boolean {
+  const { weight } = getEffectiveLayerSettings(layer, preset);
+  return activeEnvironment.currentWeight + weight <= activeEnvironment.environment.maxWeight;
+}
+
+/**
+ * Apply a preset to an environment
+ */
+export function applyPreset(environment: Environment, preset: Preset): Environment {
+  // Apply the preset's overrides to the environment
+  const updatedEnvironment = { ...environment };
+  
+  if (preset.maxWeight !== undefined) {
+    updatedEnvironment.maxWeight = preset.maxWeight;
+  }
+
+  // Apply layer overrides
+  updatedEnvironment.layers = environment.layers.map(layer => {
+    return getEffectiveLayerSettings(layer, preset);
+  });
+
+  return updatedEnvironment;
 } 
