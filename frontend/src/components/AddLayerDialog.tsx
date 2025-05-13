@@ -59,7 +59,8 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [layerName, setLayerName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | SoundFile | null>(null);
+  const [loopLengthMs, setLoopLengthMs] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
@@ -69,6 +70,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
     setActiveTab(newValue);
     // Clear selected file when switching tabs
     setSelectedFile(null);
+    setLoopLengthMs(null);
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,15 +86,30 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
 
   const handleExistingFileSelect = (file: SoundFile) => {
     setShowFileBrowser(false);
-    setSelectedFile(file as any); // To reuse the file selection state
+    setSelectedFile(file);
+    setLoopLengthMs(file.duration_ms);
     // Only set name to file name if the current name is empty
     if (!layerName) {
       setLayerName(file.name);
     }
   };
 
+  // Type guards
+  const isSoundFile = (file: File | SoundFile): file is SoundFile => {
+    return 'id' in file && 'duration_ms' in file;
+  };
+
+  const isFile = (file: File | SoundFile): file is File => {
+    return 'type' in file && 'size' in file;
+  };
+
   const handleConfirm = () => {
     if (!selectedFile) return;
+
+    if (!isSoundFile(selectedFile)) {
+      console.error('Selected file is not a SoundFile');
+      return;
+    }
 
     // Create layer with existing file
     const newLayer: Layer = {
@@ -101,14 +118,14 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
       sounds: [
         {
           id: generateId(),
-          fileId: (selectedFile as any).id || selectedFile.name,
+          fileId: selectedFile.id,
           frequency: 1,
           volume: 0.8
         }
       ],
       chance: 1,
       cooldownMs: 0,
-      loopLengthMs: 0,
+      loopLengthMs: loopLengthMs ?? selectedFile.duration_ms,
       weight: 1,
       volume: 1
     };
@@ -118,6 +135,11 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
 
   const handleUpload = async () => {
     if (!selectedFile) return;
+
+    if (!isFile(selectedFile)) {
+      console.error('Selected file is not a File object');
+      return;
+    }
 
     try {
       setUploading(true);
@@ -138,7 +160,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
         ],
         chance: 1,
         cooldownMs: 0,
-        loopLengthMs: 0,
+        loopLengthMs: loopLengthMs ?? uploadedFile.duration_ms,
         weight: 1,
         volume: 1
       };
@@ -160,6 +182,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
   const resetAndClose = () => {
     setLayerName('');
     setSelectedFile(null);
+    setLoopLengthMs(null);
     setActiveTab(0);
     setError(null);
     onClose();
@@ -189,6 +212,21 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
               }
             />
           )}
+
+          {/* Loop Length field */}
+          {selectedFile && (
+            <TextField
+              type="number"
+              margin="dense"
+              label="Loop Length (ms)"
+              fullWidth
+              value={loopLengthMs ?? ''}
+              onChange={(e) => setLoopLengthMs(e.target.value ? Number(e.target.value) : null)}
+              sx={{ mb: 2 }}
+              helperText={`Default: ${isSoundFile(selectedFile) ? selectedFile.duration_ms : 'Calculating...'} ms`}
+            />
+          )}
+
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
             <Tabs value={activeTab} onChange={handleTabChange}>
               <Tab label="Upload New File" />

@@ -16,7 +16,7 @@ import {
   TextField,
   styled,
 } from '@mui/material';
-import { Edit, Delete, Add, DragIndicator } from '@mui/icons-material';
+import { Edit, Delete, Add, DragIndicator, Settings } from '@mui/icons-material';
 import { Layer, LayerSound, SoundFile, getLayerSoundName, Preset, PresetLayer, PresetSound } from '../../types/audio';
 import AddLayerDialog from '../AddLayerDialog';
 import { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
@@ -113,8 +113,9 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   const [selectedSoundIndex, setSelectedSoundIndex] = useState(0);
   const [isAddingSoundOpen, setIsAddingSoundOpen] = useState(false);
   const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
-  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [isConfigureOpen, setIsConfigureOpen] = useState(false);
   const [newLayerName, setNewLayerName] = useState(layer.name);
+  const [newLoopLength, setNewLoopLength] = useState(layer.loopLengthMs);
 
   // Get the current effective value for a property (preset value if exists, otherwise layer value)
   const getEffectiveValue = (property: 'volume' | 'weight' | 'chance' | 'frequency', soundId?: string): number => {
@@ -239,10 +240,14 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
     frequency: 1
   };
 
-  const handleRename = () => {
+  const handleConfigure = () => {
     if (newLayerName.trim()) {
-      onLayerUpdate({ ...layer, name: newLayerName.trim() });
-      setIsRenameOpen(false);
+      onLayerUpdate({ 
+        ...layer, 
+        name: newLayerName.trim(),
+        loopLengthMs: newLoopLength
+      });
+      setIsConfigureOpen(false);
     }
   };
 
@@ -637,11 +642,20 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             }} 
           />
         </div>
-        <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
-          {layer.name}
-        </Typography>
-        <IconButton size="small" onClick={() => setIsRenameOpen(true)}>
-          <Edit fontSize="small" />
+        <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'baseline', gap: 1 }}>
+          <Typography variant="subtitle1">
+            {layer.name}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {layer.loopLengthMs}ms
+          </Typography>
+        </Box>
+        <IconButton size="small" onClick={() => {
+          setNewLayerName(layer.name);
+          setNewLoopLength(layer.loopLengthMs);
+          setIsConfigureOpen(true);
+        }}>
+          <Settings fontSize="small" />
         </IconButton>
         <IconButton size="small" onClick={() => setIsConfirmRemoveOpen(true)}>
           <Delete fontSize="small" />
@@ -839,14 +853,14 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
         </Box>
       </Box>
 
-      {/* Rename Dialog */}
-      <Dialog 
-        open={isRenameOpen} 
-        onClose={() => setIsRenameOpen(false)}
+      {/* Configure Layer Dialog */}
+      <Dialog
+        open={isConfigureOpen}
+        onClose={() => setIsConfigureOpen(false)}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Rename Layer</DialogTitle>
+        <DialogTitle>Configure Layer</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -855,17 +869,22 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             fullWidth
             value={newLayerName}
             onChange={(e) => setNewLayerName(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                handleRename();
-              }
-            }}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            type="number"
+            margin="dense"
+            label="Loop Length (ms)"
+            fullWidth
+            value={newLoopLength}
+            onChange={(e) => setNewLoopLength(Number(e.target.value))}
+            sx={{ mb: 2 }}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setIsRenameOpen(false)}>Cancel</Button>
-          <Button onClick={handleRename} variant="contained" disabled={!newLayerName.trim()}>
-            Rename
+          <Button onClick={() => setIsConfigureOpen(false)}>Cancel</Button>
+          <Button onClick={handleConfigure} variant="contained" disabled={!newLayerName.trim()}>
+            Save
           </Button>
         </DialogActions>
       </Dialog>
