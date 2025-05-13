@@ -106,10 +106,40 @@ export const MainContent: React.FC<MainContentProps> = ({
   const handleMaxWeightChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!environment) return;
     const newMaxWeight = parseFloat(event.target.value);
-    onEnvironmentUpdate({
-      ...environment,
-      maxWeight: newMaxWeight
-    });
+    
+    if (activePreset) {
+      // If the new value matches the environment's base value, remove the override
+      if (newMaxWeight === environment.maxWeight) {
+        const { maxWeight, ...presetWithoutMaxWeight } = activePreset;
+        onPresetUpdate(presetWithoutMaxWeight);
+      } else {
+        // Otherwise update the preset with the new maxWeight
+        const updatedPreset = {
+          ...activePreset,
+          maxWeight: newMaxWeight
+        };
+        onPresetUpdate(updatedPreset);
+      }
+    } else {
+      // Update the environment's maxWeight directly
+      onEnvironmentUpdate({
+        ...environment,
+        maxWeight: newMaxWeight
+      });
+    }
+  };
+
+  // Get the effective maxWeight (preset override or environment default)
+  const getEffectiveMaxWeight = () => {
+    if (activePreset?.maxWeight !== undefined) {
+      return activePreset.maxWeight;
+    }
+    return environment.maxWeight;
+  };
+
+  // Check if maxWeight has a preset override
+  const hasMaxWeightOverride = () => {
+    return activePreset?.maxWeight !== undefined;
   };
 
   const handleLayerPropertyChange = (layer: Layer, property: keyof Layer | 'volume', value: number) => {
@@ -248,18 +278,32 @@ export const MainContent: React.FC<MainContentProps> = ({
                 </Typography>
                 <TextField
                   type="number"
-                  value={environment?.maxWeight}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value);
-                    if (!isNaN(value) && value >= 0 && environment) {
-                      onEnvironmentUpdate({
-                        ...environment,
-                        maxWeight: value
-                      });
+                  value={getEffectiveMaxWeight()}
+                  onChange={handleMaxWeightChange}
+                  size="small"
+                  sx={{ 
+                    width: 100,
+                    // Apply purple color when there's a preset override
+                    '& .MuiInputBase-root': {
+                      color: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
+                      borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
+                      '&:hover': {
+                        borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
+                      },
+                      '&.Mui-focused': {
+                        borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
+                      }
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
+                    },
+                    '& .Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
                     }
                   }}
-                  size="small"
-                  sx={{ width: 100 }}
                   inputProps={{ min: 0, step: 0.1 }}
                 />
               </Box>
