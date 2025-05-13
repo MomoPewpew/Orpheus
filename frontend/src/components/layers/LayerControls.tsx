@@ -19,6 +19,7 @@ import {
   ToggleButtonGroup,
   Tooltip,
 } from '@mui/material';
+import { Theme } from '@mui/material/styles';
 import { Edit, Delete, Add, DragIndicator, Settings, Shuffle, Repeat, RadioButtonChecked } from '@mui/icons-material';
 import { Layer, LayerSound, SoundFile, getLayerSoundName, Preset, PresetLayer, PresetSound, LayerMode } from '../../types/audio';
 import AddLayerDialog from '../AddLayerDialog';
@@ -107,6 +108,22 @@ const DualValueSlider = styled(Slider)(({ theme }) => ({
   },
 }));
 
+// Status light component that shows if the layer is currently playing
+const StatusLight = styled('div', {
+  shouldForwardProp: (prop: string) => prop !== 'isPlaying'
+})<{ isPlaying?: boolean }>(({ theme, isPlaying }: { theme: Theme; isPlaying?: boolean }) => ({
+  width: 8,
+  height: 8,
+  borderRadius: '50%',
+  backgroundColor: isPlaying ? theme.palette.success.main : theme.palette.grey[400],
+  transition: theme.transitions.create('background-color', {
+    duration: theme.transitions.duration.shortest
+  }),
+  marginRight: theme.spacing(1),
+  opacity: isPlaying ? 1 : 0.5,
+  boxShadow: isPlaying ? `0 0 6px ${theme.palette.success.main}` : 'none'
+}));
+
 interface LayerControlsProps {
   layer: Layer;
   soundFiles: SoundFile[];
@@ -117,6 +134,7 @@ interface LayerControlsProps {
   activePreset?: Preset;
   defaultLayer?: Layer; // The layer without preset overrides
   onPresetUpdate: (preset: Preset) => void;
+  isPlaying?: boolean; // New prop to indicate if the layer is currently playing
 }
 
 export const LayerControls: React.FC<LayerControlsProps> = ({
@@ -129,6 +147,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   activePreset,
   defaultLayer,
   onPresetUpdate,
+  isPlaying = false, // Default to false if not provided
 }) => {
   const sounds = layer.sounds || [];
   const defaultSounds = defaultLayer?.sounds || sounds;
@@ -821,6 +840,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
           <DragIndicator sx={{ color: 'text.secondary', opacity: 0.5 }} />
         </Box>
         <Typography variant="subtitle1" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+          <StatusLight isPlaying={isPlaying} />
           {layer.name}
           <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
             ({layer.loopLengthMs} ms)

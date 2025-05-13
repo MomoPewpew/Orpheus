@@ -1,6 +1,7 @@
 {
   "environments": [
     {
+      "activePresetId": "mamwly9d-uz9f66",
       "id": "mamt4llw-g1von7",
       "layers": [
         {
@@ -38,6 +39,12 @@
               "chance": 0.5,
               "id": "mamwjvio-3ndyy7",
               "sounds": []
+            },
+            {
+              "chance": 0.47,
+              "id": "mamyvaow-f9uz73",
+              "sounds": [],
+              "weight": 1.4
             }
           ],
           "name": "Tension 2"
