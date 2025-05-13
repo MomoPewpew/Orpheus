@@ -199,6 +199,7 @@ export interface PresetLayer {
   volume?: number;      // Override for the layer's volume
   weight?: number;      // Override for the layer's weight
   chance?: number;      // Override for the layer's chance
+  cooldownCycles?: number; // Override for the layer's cooldown cycles
   sounds?: PresetSound[]; // Sound-specific overrides
 }
 
@@ -236,6 +237,7 @@ export function isPresetLayer(obj: any): obj is PresetLayer {
     (obj.volume === undefined || typeof obj.volume === 'number') &&
     (obj.weight === undefined || typeof obj.weight === 'number') &&
     (obj.chance === undefined || typeof obj.chance === 'number') &&
+    (obj.cooldownCycles === undefined || typeof obj.cooldownCycles === 'number') &&
     (!obj.sounds || (Array.isArray(obj.sounds) && obj.sounds.every(isPresetSound)))
   );
 }
@@ -304,6 +306,7 @@ export function createPresetLayer(baseLayer: Layer, modifiedLayer: Layer): Prese
   if (modifiedLayer.volume !== baseLayer.volume) presetLayer.volume = modifiedLayer.volume;
   if (modifiedLayer.weight !== baseLayer.weight) presetLayer.weight = modifiedLayer.weight;
   if (modifiedLayer.chance !== baseLayer.chance) presetLayer.chance = modifiedLayer.chance;
+  if (modifiedLayer.cooldownCycles !== baseLayer.cooldownCycles) presetLayer.cooldownCycles = modifiedLayer.cooldownCycles;
 
   // Compare sounds and include only those with changes
   const soundChanges = modifiedLayer.sounds

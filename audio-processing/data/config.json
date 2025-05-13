@@ -1,20 +1,21 @@
 {
   "environments": [
     {
+      "activePresetId": "mamwly9d-uz9f66",
       "id": "mamt4llw-g1von7",
       "layers": [
         {
           "chance": 1,
           "cooldownCycles": 0,
-          "id": "mamw644u-5kvlpa",
+          "id": "mamwjvio-3ndyy7",
           "loopLengthMs": 124551,
           "name": "Mii Channel - Plaza Theme (HQ)",
           "sounds": [
             {
               "fileId": "1a05189b-a20a-49cc-8f71-0c16e879a1a7",
               "frequency": 1,
-              "id": "mamw644u-aq1kop",
-              "volume": 0.8
+              "id": "mamwjvio-mufo6n",
+              "volume": 1
             }
           ],
           "volume": 1,
@@ -23,7 +24,13 @@
       ],
       "maxWeight": 2,
       "name": "New Environment",
-      "presets": [],
+      "presets": [
+        {
+          "id": "mamwly9d-uz9f66",
+          "layers": [],
+          "name": "Tension 2"
+        }
+      ],
       "soundboard": []
     }
   ],

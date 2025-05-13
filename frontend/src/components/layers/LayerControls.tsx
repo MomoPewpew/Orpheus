@@ -118,7 +118,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   const [newLoopLength, setNewLoopLength] = useState(layer.loopLengthMs);
 
   // Get the current effective value for a property (preset value if exists, otherwise layer value)
-  const getEffectiveValue = (property: 'volume' | 'weight' | 'chance' | 'frequency', soundId?: string): number => {
+  const getEffectiveValue = (property: 'volume' | 'weight' | 'chance' | 'frequency' | 'cooldownCycles', soundId?: string): number => {
     if (activePreset?.layers) {
       const presetLayer = activePreset.layers.find(p => p.id === layer.id);
       if (soundId && presetLayer?.sounds) {
@@ -131,8 +131,8 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
           }
         }
       } else if (!soundId) {
-        // Handle layer-level properties (volume, weight, chance)
-        if (presetLayer && property !== 'frequency') {
+        // Handle layer-level properties (volume, weight, chance, cooldownCycles)
+        if (presetLayer && (property !== 'frequency')) {
           // Only use preset value if it's explicitly set
           const value = presetLayer[property as keyof typeof presetLayer];
           if (value !== undefined) {
@@ -151,7 +151,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
       return 1;
     } else {
       if (property !== 'frequency') {
-        return layer[property] ?? 1;
+        return layer[property] ?? (property === 'cooldownCycles' ? 0 : 1);
       }
       return 1;
     }
@@ -177,7 +177,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   };
 
   // Check if a value has a preset override
-  const hasPresetOverride = (property: 'volume' | 'weight' | 'chance' | 'frequency', soundId?: string): boolean => {
+  const hasPresetOverride = (property: 'volume' | 'weight' | 'chance' | 'frequency' | 'cooldownCycles', soundId?: string): boolean => {
     if (!activePreset?.layers) return false;
     
     const presetLayer = activePreset.layers.find(p => p.id === layer.id);
@@ -198,8 +198,8 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
       }
       return false;
     } else {
-      // Only check volume, weight, and chance for layers
-      if (property === 'volume' || property === 'weight' || property === 'chance') {
+      // Check layer-level properties
+      if (property === 'volume' || property === 'weight' || property === 'chance' || property === 'cooldownCycles') {
         const defaultValue = getDefaultValue(property);
         if (defaultValue === undefined) return false;
         return presetLayer[property] !== undefined && presetLayer[property] !== defaultValue;
@@ -284,6 +284,12 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
           updatedLayer.chance = existingPresetLayer.chance;
         }
       }
+      if (existingPresetLayer?.cooldownCycles !== undefined) {
+        const baseCooldown = getDefaultValue('cooldownCycles');
+        if (existingPresetLayer.cooldownCycles !== baseCooldown) {
+          updatedLayer.cooldownCycles = existingPresetLayer.cooldownCycles;
+        }
+      }
 
       // Create a new array of PresetLayer objects
       const existingLayers = activePreset.layers
@@ -309,6 +315,12 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             const baseChance = getDefaultValue('chance');
             if (p.chance !== baseChance) {
               layer.chance = p.chance;
+            }
+          }
+          if (p.cooldownCycles !== undefined) {
+            const baseCooldown = getDefaultValue('cooldownCycles');
+            if (p.cooldownCycles !== baseCooldown) {
+              layer.cooldownCycles = p.cooldownCycles;
             }
           }
           return layer;
@@ -361,6 +373,12 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
           updatedLayer.chance = existingPresetLayer.chance;
         }
       }
+      if (existingPresetLayer?.cooldownCycles !== undefined) {
+        const baseCooldown = getDefaultValue('cooldownCycles');
+        if (existingPresetLayer.cooldownCycles !== baseCooldown) {
+          updatedLayer.cooldownCycles = existingPresetLayer.cooldownCycles;
+        }
+      }
 
       // Create a new array of PresetLayer objects
       const existingLayers = activePreset.layers
@@ -386,6 +404,12 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             const baseChance = getDefaultValue('chance');
             if (p.chance !== baseChance) {
               layer.chance = p.chance;
+            }
+          }
+          if (p.cooldownCycles !== undefined) {
+            const baseCooldown = getDefaultValue('cooldownCycles');
+            if (p.cooldownCycles !== baseCooldown) {
+              layer.cooldownCycles = p.cooldownCycles;
             }
           }
           return layer;
@@ -438,6 +462,12 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
       if (newValue !== baseChance) {
         updatedLayer.chance = newValue;
       }
+      if (existingPresetLayer?.cooldownCycles !== undefined) {
+        const baseCooldown = getDefaultValue('cooldownCycles');
+        if (existingPresetLayer.cooldownCycles !== baseCooldown) {
+          updatedLayer.cooldownCycles = existingPresetLayer.cooldownCycles;
+        }
+      }
 
       // Create a new array of PresetLayer objects
       const existingLayers = activePreset.layers
@@ -465,6 +495,12 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
               layer.chance = p.chance;
             }
           }
+          if (p.cooldownCycles !== undefined) {
+            const baseCooldown = getDefaultValue('cooldownCycles');
+            if (p.cooldownCycles !== baseCooldown) {
+              layer.cooldownCycles = p.cooldownCycles;
+            }
+          }
           return layer;
         });
 
@@ -484,6 +520,95 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
       onPresetUpdate(updatedPreset);
     } else {
       onLayerUpdate({ ...layer, chance: newValue });
+    }
+  };
+
+  const handleLayerCooldownChange = (newValue: number) => {
+    if (activePreset && activePreset.layers) {
+      // Get existing preset layer if it exists
+      const existingPresetLayer = activePreset.layers.find(p => p.id === layer.id);
+      
+      // Create a new layer with required id and preserve existing sounds
+      const updatedLayer: PresetLayer = {
+        id: layer.id,
+        sounds: existingPresetLayer?.sounds || []
+      };
+
+      // Only add properties that differ from base layer
+      if (existingPresetLayer?.volume !== undefined) {
+        const baseVolume = getDefaultValue('volume');
+        if (existingPresetLayer.volume !== baseVolume) {
+          updatedLayer.volume = existingPresetLayer.volume;
+        }
+      }
+      if (existingPresetLayer?.weight !== undefined) {
+        const baseWeight = getDefaultValue('weight');
+        if (existingPresetLayer.weight !== baseWeight) {
+          updatedLayer.weight = existingPresetLayer.weight;
+        }
+      }
+      if (existingPresetLayer?.chance !== undefined) {
+        const baseChance = getDefaultValue('chance');
+        if (existingPresetLayer.chance !== baseChance) {
+          updatedLayer.chance = existingPresetLayer.chance;
+        }
+      }
+      const baseCooldown = getDefaultValue('cooldownCycles');
+      if (newValue !== baseCooldown) {
+        updatedLayer.cooldownCycles = newValue;
+      }
+
+      // Create a new array of PresetLayer objects
+      const existingLayers = activePreset.layers
+        .filter(p => p.id !== layer.id)
+        .map(p => {
+          const layer: PresetLayer = {
+            id: p.id,
+            sounds: p.sounds || []
+          };
+          if (p.volume !== undefined) {
+            const baseVolume = getDefaultValue('volume');
+            if (p.volume !== baseVolume) {
+              layer.volume = p.volume;
+            }
+          }
+          if (p.weight !== undefined) {
+            const baseWeight = getDefaultValue('weight');
+            if (p.weight !== baseWeight) {
+              layer.weight = p.weight;
+            }
+          }
+          if (p.chance !== undefined) {
+            const baseChance = getDefaultValue('chance');
+            if (p.chance !== baseChance) {
+              layer.chance = p.chance;
+            }
+          }
+          if (p.cooldownCycles !== undefined) {
+            const baseCooldown = getDefaultValue('cooldownCycles');
+            if (p.cooldownCycles !== baseCooldown) {
+              layer.cooldownCycles = p.cooldownCycles;
+            }
+          }
+          return layer;
+        });
+
+      // Only include the layer if it has any overrides or sound overrides
+      const hasOverrides = Object.keys(updatedLayer).length > 2 || // More than just id and sounds
+                          (updatedLayer.sounds && updatedLayer.sounds.length > 0);
+
+      const updatedLayers = hasOverrides 
+        ? [...existingLayers, updatedLayer]
+        : existingLayers;
+
+      const updatedPreset = {
+        ...activePreset,
+        layers: updatedLayers
+      };
+
+      onPresetUpdate(updatedPreset);
+    } else {
+      onLayerUpdate({ ...layer, cooldownCycles: newValue });
     }
   };
 
@@ -659,7 +784,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
       {/* Controls row */}
       <Box sx={{ 
         display: 'grid', 
-        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', 
+        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr', 
         gap: 2, 
         alignItems: 'center',
         px: 2,
@@ -842,6 +967,34 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
               getDefaultValue('chance'),
               0,
               1
+            )}
+          />
+        </Box>
+
+        {/* Cooldown Cycles slider */}
+        <Box>
+          <Typography variant="caption" sx={{ mb: 0.5, display: 'block', textAlign: 'center' }}>
+            Cooldown
+          </Typography>
+          <DualValueSlider
+            value={getEffectiveValue('cooldownCycles')}
+            onChange={(_, value) => handleLayerCooldownChange(value as number)}
+            onChangeCommitted={(_, value) => handleLayerCooldownChange(value as number)}
+            valueLabelDisplay="auto"
+            min={0}
+            max={15}
+            step={1}
+            size="small"
+            aria-label="Layer Cooldown Cycles"
+            className={hasPresetOverride('cooldownCycles') ? 'preset-active' : ''}
+            marks={[{ 
+              value: getMarkValue('cooldownCycles'),
+              label: ''
+            }]}
+            sx={getDefaultValueStyle(
+              getDefaultValue('cooldownCycles'),
+              0,
+              15
             )}
           />
         </Box>
