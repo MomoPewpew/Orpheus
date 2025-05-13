@@ -87,6 +87,19 @@
           ],
           "maxWeight": 4,
           "name": "Tension 2"
+        },
+        {
+          "id": "mamsz3zw-e6tvc9",
+          "layers": [
+            {
+              "chance": 0.16,
+              "id": "mamp0ho4-4bxbdq",
+              "sounds": [],
+              "weight": 1.5
+            }
+          ],
+          "maxWeight": 4,
+          "name": "Tension 3"
         }
       ],
       "soundboard": []

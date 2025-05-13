@@ -74,10 +74,15 @@ export const PresetControls: React.FC<PresetControlsProps> = ({
   const handleAddPreset = () => {
     if (!newPresetName.trim()) return;
 
+    const basePreset = activePresetId 
+      ? presets.find(p => p.id === activePresetId)
+      : undefined;
+
     const newPreset: Preset = {
       id: generateId(),
       name: newPresetName.trim(),
-      layers: []
+      layers: basePreset?.layers ?? [],
+      maxWeight: basePreset?.maxWeight
     };
 
     onPresetAdd(newPreset);
