@@ -120,7 +120,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
           id: generateId(),
           fileId: selectedFile.id,
           frequency: 1,
-          volume: 0.8
+          volume: 1.0
         }
       ],
       chance: 1,
@@ -155,7 +155,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
             id: generateId(),
             fileId: uploadedFile.id,
             frequency: 1,
-            volume: 0.8
+            volume: 1.0
           }
         ],
         chance: 1,
