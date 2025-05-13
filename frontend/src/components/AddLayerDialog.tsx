@@ -124,7 +124,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
         }
       ],
       chance: 1,
-      cooldownMs: 0,
+      cooldownCycles: 0,
       loopLengthMs: loopLengthMs ?? selectedFile.duration_ms,
       weight: 1,
       volume: 1
@@ -159,7 +159,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
           }
         ],
         chance: 1,
-        cooldownMs: 0,
+        cooldownCycles: 0,
         loopLengthMs: loopLengthMs ?? uploadedFile.duration_ms,
         weight: 1,
         volume: 1

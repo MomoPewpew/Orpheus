@@ -9,7 +9,7 @@ const newLayer: Layer = {
     }
   ],
   chance: 1,
-  cooldownMs: 0,
+  cooldownCycles: 0,
   loopLengthMs: 0,
   weight: 1,
   volume: 1  // Add default layer volume

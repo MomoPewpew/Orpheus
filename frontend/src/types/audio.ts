@@ -31,7 +31,7 @@ export interface Layer {
   name: string;
   sounds: LayerSound[];  // List of possible sounds for this layer
   chance: number;      // Probability of playing (0-1)
-  cooldownMs?: number;  // Cooldown in cycles
+  cooldownCycles?: number;  // Cooldown in cycles
   loopLengthMs?: number; // Length of a cycle in milliseconds
   weight: number;      // How much this layer contributes to the total environment weight
   volume: number;      // Layer-level volume multiplier (0-1)
@@ -121,7 +121,7 @@ export function isLayer(obj: any): obj is Layer {
     Array.isArray(obj.sounds) &&
     obj.sounds.every(isLayerSound) &&
     typeof obj.chance === 'number' &&
-    typeof obj.cooldownMs === 'number' &&
+    typeof obj.cooldownCycles === 'number' &&
     typeof obj.loopLengthMs === 'number' &&
     typeof obj.weight === 'number' &&
     typeof obj.volume === 'number'

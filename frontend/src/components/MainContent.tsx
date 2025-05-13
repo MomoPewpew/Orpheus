@@ -395,7 +395,6 @@ export const MainContent: React.FC<MainContentProps> = ({
                         <div
                           ref={provided.innerRef}
                           {...provided.draggableProps}
-                          {...provided.dragHandleProps}
                           style={{
                             ...provided.draggableProps.style,
                             opacity: snapshot.isDragging ? 0.5 : 1,

@@ -632,16 +632,22 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   return (
     <Paper sx={{ p: 2 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-        <div {...dragHandleProps}>
+        <Box {...dragHandleProps} sx={{ 
+          cursor: 'grab',
+          display: 'flex',
+          alignItems: 'center',
+          '&:active': {
+            cursor: 'grabbing'
+          }
+        }}>
           <DragIndicator 
             sx={{ 
               color: 'text.secondary',
               opacity: 0.5,
-              cursor: 'grab',
               fontSize: 20,
             }} 
           />
-        </div>
+        </Box>
         <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'baseline', gap: 1 }}>
           <Typography variant="subtitle1">
             {layer.name}
