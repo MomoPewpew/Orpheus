@@ -71,6 +71,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   const [showAddLayer, setShowAddLayer] = useState(false);
   const [showEnvironmentConfig, setShowEnvironmentConfig] = useState(false);
   const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
+  const [editingLayer, setEditingLayer] = useState<Layer | null>(null);
 
   if (!environment) {
     return (
@@ -203,6 +204,31 @@ export const MainContent: React.FC<MainContentProps> = ({
       ...environment,
       layers
     });
+  };
+
+  const handleLayerEdit = (layer: Layer) => {
+    // The LayerControls component handles its own dialog state
+    // We just need to pass the layer update handler
+    onLayerUpdate(layer);
+  };
+
+  const handleLayerRemove = (layerId: string) => {
+    // The LayerControls component handles its own confirmation dialog
+    // We just need to pass the layer removal handler
+    const updatedEnvironment = {
+      ...environment,
+      layers: environment.layers.filter(l => l.id !== layerId)
+    };
+    onEnvironmentUpdate(updatedEnvironment);
+  };
+
+  const handleLayerUpdate = (updatedLayer: Layer) => {
+    const updatedEnvironment = {
+      ...environment,
+      layers: environment.layers.map(l => l.id === updatedLayer.id ? updatedLayer : l)
+    };
+    onEnvironmentUpdate(updatedEnvironment);
+    setEditingLayer(null);
   };
 
   return (
@@ -418,8 +444,8 @@ export const MainContent: React.FC<MainContentProps> = ({
                           layer={layer}
                           soundFiles={soundFiles}
                           onLayerUpdate={onLayerUpdate}
-                          onLayerEdit={() => {}}
-                          onLayerRemove={() => {}}
+                          onLayerEdit={handleLayerEdit}
+                          onLayerRemove={handleLayerRemove}
                           dragHandleProps={provided.dragHandleProps}
                           activePreset={activePreset}
                           defaultLayer={getDefaultLayer(layer)}

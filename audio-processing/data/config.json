@@ -6,14 +6,14 @@
         {
           "chance": 1,
           "cooldownCycles": 0,
-          "id": "mamt4yqg-8p2bo9",
-          "loopLengthMs": 1000,
+          "id": "mamw644u-5kvlpa",
+          "loopLengthMs": 124551,
           "name": "Mii Channel - Plaza Theme (HQ)",
           "sounds": [
             {
               "fileId": "1a05189b-a20a-49cc-8f71-0c16e879a1a7",
               "frequency": 1,
-              "id": "mamt4yqg-hah9nz",
+              "id": "mamw644u-aq1kop",
               "volume": 0.8
             }
           ],
