@@ -145,14 +145,38 @@ const App: React.FC = () => {
       ? activeEnvironment.presets?.find((p: Preset) => p.id === activeEnvironment.activePresetId)
       : undefined;
 
+    // Check if we're updating a non-preset property (mode, name, or loopLengthMs)
+    const isNonPresetUpdate = 
+      updatedLayer.mode !== originalLayer.mode ||
+      updatedLayer.name !== originalLayer.name ||
+      updatedLayer.loopLengthMs !== originalLayer.loopLengthMs;
+
+    if (isNonPresetUpdate) {
+      // For non-preset properties, update the base layer directly
+      const updatedEnvironment = {
+        ...activeEnvironment,
+        layers: activeEnvironment.layers.map((l: Layer) =>
+          l.id === updatedLayer.id ? {
+            ...l,
+            mode: updatedLayer.mode,
+            name: updatedLayer.name,
+            loopLengthMs: updatedLayer.loopLengthMs
+          } : l
+        )
+      };
+      handleEnvironmentUpdate(updatedEnvironment);
+      return; // Exit early, don't handle preset properties
+    }
+
+    // If we get here, we're handling preset-managed properties
     if (activePreset && activePreset.layers) {
-      // Update the preset with the changes
+      // Update the preset with the changes for preset-managed properties only
       const presetLayer = activePreset.layers.find((p: PresetLayer) => p.id === updatedLayer.id) || { 
         id: updatedLayer.id 
       };
       const updatedPresetLayer = { ...presetLayer };
 
-      // Compare each property and only store changes
+      // Compare each preset-managed property and only store changes
       if (updatedLayer.volume !== originalLayer.volume) {
         updatedPresetLayer.volume = updatedLayer.volume;
       }
@@ -161,6 +185,9 @@ const App: React.FC = () => {
       }
       if (updatedLayer.chance !== originalLayer.chance) {
         updatedPresetLayer.chance = updatedLayer.chance;
+      }
+      if (updatedLayer.cooldownCycles !== originalLayer.cooldownCycles) {
+        updatedPresetLayer.cooldownCycles = updatedLayer.cooldownCycles;
       }
 
       // Compare sound properties
@@ -201,14 +228,13 @@ const App: React.FC = () => {
         handlePresetUpdate(updatedPreset);
       }
     } else {
-      // Update the environment directly
+      // No preset active, update the base layer directly
       const updatedEnvironment = {
         ...activeEnvironment,
         layers: activeEnvironment.layers.map((l: Layer) =>
           l.id === updatedLayer.id ? updatedLayer : l
         )
       };
-
       handleEnvironmentUpdate(updatedEnvironment);
     }
   };

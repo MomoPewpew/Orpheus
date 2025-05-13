@@ -9,6 +9,7 @@
           "cooldownCycles": 0,
           "id": "mamwjvio-3ndyy7",
           "loopLengthMs": 124551,
+          "mode": "SEQUENCE",
           "name": "Mii Channel - Plaza Theme (HQ)",
           "sounds": [
             {
@@ -27,7 +28,13 @@
       "presets": [
         {
           "id": "mamwly9d-uz9f66",
-          "layers": [],
+          "layers": [
+            {
+              "chance": 0.5,
+              "id": "mamwjvio-3ndyy7",
+              "sounds": []
+            }
+          ],
           "name": "Tension 2"
         }
       ],

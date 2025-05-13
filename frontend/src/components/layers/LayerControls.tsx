@@ -15,9 +15,11 @@ import {
   Button,
   TextField,
   styled,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
-import { Edit, Delete, Add, DragIndicator, Settings } from '@mui/icons-material';
-import { Layer, LayerSound, SoundFile, getLayerSoundName, Preset, PresetLayer, PresetSound } from '../../types/audio';
+import { Edit, Delete, Add, DragIndicator, Settings, Shuffle, Repeat, RadioButtonChecked } from '@mui/icons-material';
+import { Layer, LayerSound, SoundFile, getLayerSoundName, Preset, PresetLayer, PresetSound, LayerMode } from '../../types/audio';
 import AddLayerDialog from '../AddLayerDialog';
 import { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
 import { alpha } from '@mui/material/styles';
@@ -118,7 +120,13 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   const [newLoopLength, setNewLoopLength] = useState(layer.loopLengthMs);
 
   // Get the current effective value for a property (preset value if exists, otherwise layer value)
-  const getEffectiveValue = (property: 'volume' | 'weight' | 'chance' | 'frequency' | 'cooldownCycles', soundId?: string): number => {
+  const getEffectiveValue = (property: 'volume' | 'weight' | 'chance' | 'frequency' | 'cooldownCycles' | 'mode', soundId?: string): number | LayerMode => {
+    // These properties are never managed by presets, always return base layer values
+    if (property === 'mode') {
+      return layer.mode ?? LayerMode.Shuffle;
+    }
+
+    // For preset-managed properties, check preset values
     if (activePreset?.layers) {
       const presetLayer = activePreset.layers.find(p => p.id === layer.id);
       if (soundId && presetLayer?.sounds) {
@@ -130,9 +138,9 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             return presetSound[property] as number;
           }
         }
-      } else if (!soundId) {
+      } else if (!soundId && property !== 'frequency') {
         // Handle layer-level properties (volume, weight, chance, cooldownCycles)
-        if (presetLayer && (property !== 'frequency')) {
+        if (presetLayer) {
           // Only use preset value if it's explicitly set
           const value = presetLayer[property as keyof typeof presetLayer];
           if (value !== undefined) {
@@ -150,10 +158,12 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
       }
       return 1;
     } else {
-      if (property !== 'frequency') {
-        return layer[property] ?? (property === 'cooldownCycles' ? 0 : 1);
+      if (property === 'frequency') {
+        return 1; // Frequency is only valid for sounds, not layers
       }
-      return 1;
+      // Handle remaining layer properties
+      const layerProperty = property as keyof Pick<Layer, 'volume' | 'weight' | 'chance' | 'cooldownCycles'>;
+      return layer[layerProperty] ?? (property === 'cooldownCycles' ? 0 : 1);
     }
   };
 
@@ -168,16 +178,34 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
     
     // For layer properties, use the current layer's value
     const value = layer[property as keyof Layer];
+    // Only return numeric values
     return typeof value === 'number' ? value : undefined;
+  };
+
+  // Get the default mode value for a layer
+  const getDefaultMode = (): LayerMode => {
+    return layer.mode ?? LayerMode.Shuffle;
   };
 
   // Get mark value for sliders (always returns a number)
   const getMarkValue = (property: string, soundId?: string): number => {
-    return getDefaultValue(property, soundId) ?? 1;
+    const value = getDefaultValue(property, soundId);
+    return typeof value === 'number' ? value : 1;
+  };
+
+  // Get numeric value for sliders (handles both number and LayerMode types)
+  const getNumericValue = (property: 'volume' | 'weight' | 'chance' | 'frequency' | 'cooldownCycles' | 'mode', soundId?: string): number => {
+    const value = getEffectiveValue(property, soundId);
+    return typeof value === 'number' ? value : 1;
   };
 
   // Check if a value has a preset override
-  const hasPresetOverride = (property: 'volume' | 'weight' | 'chance' | 'frequency' | 'cooldownCycles', soundId?: string): boolean => {
+  const hasPresetOverride = (property: 'volume' | 'weight' | 'chance' | 'frequency' | 'cooldownCycles' | 'mode', soundId?: string): boolean => {
+    // These properties are never managed by presets
+    if (property === 'mode') {
+      return false;
+    }
+
     if (!activePreset?.layers) return false;
     
     const presetLayer = activePreset.layers.find(p => p.id === layer.id);
@@ -242,6 +270,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
 
   const handleConfigure = () => {
     if (newLayerName.trim()) {
+      // Name and loop length are not managed by presets, so always update the base layer directly
       onLayerUpdate({ 
         ...layer, 
         name: newLayerName.trim(),
@@ -736,6 +765,11 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
     }
   };
 
+  const handleModeChange = (newMode: LayerMode) => {
+    // Mode is not managed by presets, so always update the base layer directly
+    onLayerUpdate({ ...layer, mode: newMode });
+  };
+
   // Helper to calculate the left position for the default value ghost thumb
   const getDefaultValueStyle = (defaultValue: number | undefined, min: number, max: number) => {
     // Only show ghost thumb if we have a real default value
@@ -773,6 +807,23 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             ({layer.loopLengthMs} ms)
           </Typography>
         </Typography>
+        <ToggleButtonGroup
+          value={getEffectiveValue('mode')}
+          exclusive
+          onChange={(_, value) => value && handleModeChange(value)}
+          size="small"
+          sx={{ mr: 1 }}
+        >
+          <ToggleButton value={LayerMode.Shuffle} aria-label="shuffle mode">
+            <Shuffle fontSize="small" />
+          </ToggleButton>
+          <ToggleButton value={LayerMode.Sequence} aria-label="sequence mode">
+            <Repeat fontSize="small" />
+          </ToggleButton>
+          <ToggleButton value={LayerMode.Single} aria-label="single mode">
+            <RadioButtonChecked fontSize="small" />
+          </ToggleButton>
+        </ToggleButtonGroup>
         <IconButton onClick={() => setIsConfigureOpen(true)} size="small">
           <Settings />
         </IconButton>
@@ -838,7 +889,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
               Volume
             </Typography>
             <DualValueSlider
-              value={getEffectiveValue('volume', selectedSound.id)}
+              value={getNumericValue('volume', selectedSound.id)}
               onChange={(_, value) => handleSoundVolumeChange(selectedSound, value as number)}
               min={0}
               max={1}
@@ -850,7 +901,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
                 value: getMarkValue('volume', selectedSound.id),
                 label: ''
               }]}
-              disabled={sounds.length === 0}
+              disabled={sounds.length === 0 || sounds.length === 1}
               sx={getDefaultValueStyle(
                 getDefaultValue('volume', selectedSound.id),
                 0,
@@ -865,7 +916,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
               Frequency
             </Typography>
             <DualValueSlider
-              value={getEffectiveValue('frequency', selectedSound.id)}
+              value={getNumericValue('frequency', selectedSound.id)}
               onChange={(_, value) => handleSoundFrequencyChange(selectedSound, value as number)}
               min={0}
               max={1}
@@ -877,7 +928,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
                 value: getMarkValue('frequency', selectedSound.id),
                 label: ''
               }]}
-              disabled={sounds.length === 0}
+              disabled={sounds.length === 0 || sounds.length === 1 || (getEffectiveValue('mode') as LayerMode) === LayerMode.Single}
               sx={getDefaultValueStyle(
                 getDefaultValue('frequency', selectedSound.id),
                 0,
@@ -893,7 +944,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             Volume
           </Typography>
           <DualValueSlider
-            value={getEffectiveValue('volume')}
+            value={getNumericValue('volume')}
             onChange={(_, value) => handleLayerVolumeChange(value as number)}
             onChangeCommitted={(_, value) => handleLayerVolumeChange(value as number)}
             valueLabelDisplay="auto"
@@ -921,7 +972,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             Weight
           </Typography>
           <DualValueSlider
-            value={getEffectiveValue('weight')}
+            value={getNumericValue('weight')}
             onChange={(_, value) => handleLayerWeightChange(value as number)}
             onChangeCommitted={(_, value) => handleLayerWeightChange(value as number)}
             valueLabelDisplay="auto"
@@ -949,7 +1000,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             Chance
           </Typography>
           <DualValueSlider
-            value={getEffectiveValue('chance')}
+            value={getNumericValue('chance')}
             onChange={(_, value) => handleLayerChanceChange(value as number)}
             onChangeCommitted={(_, value) => handleLayerChanceChange(value as number)}
             valueLabelDisplay="auto"
@@ -977,7 +1028,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             Cooldown
           </Typography>
           <DualValueSlider
-            value={getEffectiveValue('cooldownCycles')}
+            value={getNumericValue('cooldownCycles')}
             onChange={(_, value) => handleLayerCooldownChange(value as number)}
             onChangeCommitted={(_, value) => handleLayerCooldownChange(value as number)}
             valueLabelDisplay="auto"

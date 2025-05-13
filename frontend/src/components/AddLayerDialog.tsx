@@ -18,6 +18,7 @@ import { Layer, SoundFile } from '../types/audio';
 import { uploadFile } from '../services/fileService';
 import { FileBrowserDialog } from './FileBrowserDialog';
 import { generateId } from '../utils/ids';
+import { LayerMode } from '../types/audio';
 
 interface AddLayerDialogProps {
   open: boolean;
@@ -120,14 +121,15 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
           id: generateId(),
           fileId: selectedFile.id,
           frequency: 1,
-          volume: 1.0
+          volume: 0.8
         }
       ],
       chance: 1,
       cooldownCycles: 0,
       loopLengthMs: loopLengthMs ?? selectedFile.duration_ms,
       weight: 1,
-      volume: 1
+      volume: 1,
+      mode: LayerMode.Shuffle
     };
     onAdd(newLayer);
     resetAndClose();
@@ -155,14 +157,15 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
             id: generateId(),
             fileId: uploadedFile.id,
             frequency: 1,
-            volume: 1.0
+            volume: 0.8
           }
         ],
         chance: 1,
         cooldownCycles: 0,
         loopLengthMs: loopLengthMs ?? uploadedFile.duration_ms,
         weight: 1,
-        volume: 1
+        volume: 1,
+        mode: LayerMode.Shuffle
       };
 
       // Add the new file to the soundFiles list

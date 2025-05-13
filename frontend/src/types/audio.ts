@@ -24,6 +24,15 @@ export interface LayerSound {
 }
 
 /**
+ * Represents the playback mode of a layer
+ */
+export enum LayerMode {
+  Shuffle = 'SHUFFLE',
+  Sequence = 'SEQUENCE',
+  Single = 'SINGLE'
+}
+
+/**
  * Represents a layer in an environment (e.g., background music, ambient sounds)
  */
 export interface Layer {
@@ -35,6 +44,7 @@ export interface Layer {
   loopLengthMs?: number; // Length of a cycle in milliseconds
   weight: number;      // How much this layer contributes to the total environment weight
   volume: number;      // Layer-level volume multiplier (0-1)
+  mode: LayerMode;     // Playback mode of the layer
 }
 
 /**
@@ -124,7 +134,9 @@ export function isLayer(obj: any): obj is Layer {
     typeof obj.cooldownCycles === 'number' &&
     typeof obj.loopLengthMs === 'number' &&
     typeof obj.weight === 'number' &&
-    typeof obj.volume === 'number'
+    typeof obj.volume === 'number' &&
+    typeof obj.mode === 'string' &&
+    Object.values(LayerMode).includes(obj.mode)
   );
 }
 
@@ -200,6 +212,7 @@ export interface PresetLayer {
   weight?: number;      // Override for the layer's weight
   chance?: number;      // Override for the layer's chance
   cooldownCycles?: number; // Override for the layer's cooldown cycles
+  mode?: LayerMode;     // Override for the layer's mode
   sounds?: PresetSound[]; // Sound-specific overrides
 }
 
@@ -238,6 +251,7 @@ export function isPresetLayer(obj: any): obj is PresetLayer {
     (obj.weight === undefined || typeof obj.weight === 'number') &&
     (obj.chance === undefined || typeof obj.chance === 'number') &&
     (obj.cooldownCycles === undefined || typeof obj.cooldownCycles === 'number') &&
+    (obj.mode === undefined || Object.values(LayerMode).includes(obj.mode)) &&
     (!obj.sounds || (Array.isArray(obj.sounds) && obj.sounds.every(isPresetSound)))
   );
 }
