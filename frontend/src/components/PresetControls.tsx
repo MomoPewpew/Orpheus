@@ -12,6 +12,8 @@ import {
   IconButton,
   Typography,
   Paper,
+  Stack,
+  Chip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -59,6 +61,14 @@ export const PresetControls: React.FC<PresetControlsProps> = ({
     }
   };
 
+  const handleDragEnd = (result: any) => {
+    if (!result.destination) return;
+    const items = Array.from(presets);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    onPresetsReorder(items);
+  };
+
   const handleAddPreset = () => {
     if (!newPresetName.trim()) return;
 
@@ -87,16 +97,6 @@ export const PresetControls: React.FC<PresetControlsProps> = ({
     setShowRenameDialog(false);
   };
 
-  const handleDragEnd = (result: any) => {
-    if (!result.destination) return;
-
-    const items = Array.from(presets);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-
-    onPresetsReorder(items);
-  };
-
   const handlePresetClick = (preset: Preset) => {
     switch (mode) {
       case 'delete':
@@ -115,12 +115,24 @@ export const PresetControls: React.FC<PresetControlsProps> = ({
 
   return (
     <Box sx={{ width: '100%' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 2 }}>
+      {/* Click modes row */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 2 
+      }}>
+        <Typography variant="h6">Presets</Typography>
         <ToggleButtonGroup
           value={mode}
           exclusive
           onChange={handleModeChange}
           size="small"
+          sx={{
+            '& .MuiToggleButton-root': {
+              borderRadius: 1,
+            }
+          }}
         >
           <ToggleButton value="play">
             <PlayArrowIcon />
@@ -135,79 +147,91 @@ export const PresetControls: React.FC<PresetControlsProps> = ({
             <DragIndicatorIcon />
           </ToggleButton>
         </ToggleButtonGroup>
-
-        <Button
-          startIcon={<AddIcon />}
-          onClick={() => setShowAddDialog(true)}
-          variant="outlined"
-          size="small"
-        >
-          Add Preset
-        </Button>
       </Box>
 
+      {/* Presets row */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="presets">
+        <Droppable droppableId="presets" direction="horizontal">
           {(provided) => (
-            <Box
-              {...provided.droppableProps}
+            <Stack 
+              direction="row" 
+              spacing={1} 
+              sx={{ 
+                overflowX: 'auto',
+                pb: 1,
+                flexWrap: 'nowrap',
+                minHeight: 32
+              }}
               ref={provided.innerRef}
-              sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}
+              {...provided.droppableProps}
             >
-              {/* Default Preset */}
-              <Paper
-                sx={{
-                  p: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  bgcolor: activePresetId === undefined ? 'primary.main' : 'background.paper',
-                  color: activePresetId === undefined ? 'primary.contrastText' : 'text.primary',
-                }}
+              {/* Default preset */}
+              <Chip
+                label="Default"
                 onClick={() => onPresetSelect(undefined)}
-              >
-                <Typography>Default Preset</Typography>
-              </Paper>
+                color={activePresetId === undefined ? "primary" : "default"}
+                variant={activePresetId === undefined ? "filled" : "outlined"}
+                sx={{ 
+                  minWidth: 80,
+                  borderRadius: 1,
+                  '&:hover': {
+                    backgroundColor: activePresetId === undefined ? undefined : 'action.hover'
+                  }
+                }}
+              />
 
-              {/* User Presets */}
+              {/* User presets */}
               {presets.map((preset, index) => (
-                <Draggable
-                  key={preset.id}
-                  draggableId={preset.id}
+                <Draggable 
+                  key={preset.id} 
+                  draggableId={preset.id} 
                   index={index}
                   isDragDisabled={mode !== 'rearrange'}
                 >
                   {(provided, snapshot) => (
-                    <Paper
+                    <div
                       ref={provided.innerRef}
                       {...provided.draggableProps}
-                      sx={{
-                        p: 2,
-                        display: 'flex',
-                        alignItems: 'center',
-                        cursor: mode === 'rearrange' ? 'move' : 'pointer',
-                        bgcolor: activePresetId === preset.id ? 'primary.main' : 'background.paper',
-                        color: activePresetId === preset.id ? 'primary.contrastText' : 'text.primary',
+                      {...provided.dragHandleProps}
+                      style={{
+                        ...provided.draggableProps.style,
                         opacity: snapshot.isDragging ? 0.8 : 1,
                       }}
-                      onClick={() => handlePresetClick(preset)}
                     >
-                      {mode === 'rearrange' && (
-                        <IconButton
-                          size="small"
-                          {...provided.dragHandleProps}
-                          sx={{ mr: 1 }}
-                        >
-                          <DragIndicatorIcon />
-                        </IconButton>
-                      )}
-                      <Typography>{preset.name}</Typography>
-                    </Paper>
+                      <Chip
+                        label={preset.name}
+                        onClick={() => handlePresetClick(preset)}
+                        color={activePresetId === preset.id ? "primary" : "default"}
+                        variant={activePresetId === preset.id ? "filled" : "outlined"}
+                        sx={{ 
+                          minWidth: 80,
+                          borderRadius: 1,
+                          '&:hover': {
+                            backgroundColor: activePresetId === preset.id ? undefined : 'action.hover'
+                          }
+                        }}
+                      />
+                    </div>
                   )}
                 </Draggable>
               ))}
+
               {provided.placeholder}
-            </Box>
+
+              {/* Add preset button */}
+              <Button
+                startIcon={<AddIcon />}
+                onClick={() => setShowAddDialog(true)}
+                variant="outlined"
+                size="small"
+                sx={{ 
+                  minWidth: 120,
+                  borderRadius: 1,
+                }}
+              >
+                Add Preset
+              </Button>
+            </Stack>
           )}
         </Droppable>
       </DragDropContext>
