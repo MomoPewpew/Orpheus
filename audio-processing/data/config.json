@@ -1,7 +1,6 @@
 {
   "environments": [
     {
-      "activePresetId": "mamwly9d-uz9f66",
       "id": "mamt4llw-g1von7",
       "layers": [
         {
@@ -9,7 +8,7 @@
           "cooldownCycles": 0,
           "id": "mamyvaow-f9uz73",
           "loopLengthMs": 124551,
-          "mode": "SHUFFLE",
+          "mode": "SINGLE",
           "name": "Mii Channel - Plaza Theme (HQ)",
           "sounds": [
             {
@@ -43,7 +42,6 @@
             {
               "chance": 0.47,
               "id": "mamyvaow-f9uz73",
-              "sounds": [],
               "weight": 1.4
             }
           ],

@@ -1,30 +1,28 @@
 import React, { useState } from 'react';
 import {
   Box,
-  IconButton,
   Drawer,
+  Typography,
+  IconButton,
+  Button,
+  Stack,
   TextField,
+  InputAdornment,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
-  Stack,
+  ListItemIcon,
+  Divider,
   Tooltip,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import SettingsIcon from '@mui/icons-material/Settings';
-import SpeakerIcon from '@mui/icons-material/Speaker';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import {
+  Add as AddIcon,
+  Search as SearchIcon,
+  Settings as SettingsIcon,
+  Speaker as SpeakerIcon,
+} from '@mui/icons-material';
 import { Environment, SoundFile } from '../types/audio';
-import { 
-  Droppable, 
-  Draggable, 
-  DroppableProvided, 
-  DroppableStateSnapshot,
-  DraggableProvided,
-  DraggableStateSnapshot 
-} from '@hello-pangea/dnd';
-import ConfigOverlay from './overlays/ConfigOverlay';
 
 interface SidebarProps {
   environments: Environment[];
@@ -54,247 +52,95 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSoundFilesChange,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showConfig, setShowConfig] = useState(false);
 
   const filteredEnvironments = environments.filter(env =>
     env.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleToggleConfig = () => {
-    setShowConfig(!showConfig);
-    onToggleConfig();
-  };
-
   return (
-    <>
-      <Drawer
-        variant="permanent"
-        sx={{
+    <Drawer
+      variant="permanent"
+      sx={{
+        width: DRAWER_WIDTH,
+        flexShrink: 0,
+        '& .MuiDrawer-paper': {
           width: DRAWER_WIDTH,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: DRAWER_WIDTH,
-            boxSizing: 'border-box',
-            bgcolor: '#f5f5f5',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          },
-        }}
-      >
-        <Box sx={{ p: 2, flexShrink: 0 }}>
-          <Stack direction="row" spacing={1} sx={{ mb: 2, justifyContent: 'space-between' }}>
-            <Tooltip title="Add Environment">
-              <IconButton
-                color="primary"
-                onClick={onNewEnvironment}
-                size="small"
-                sx={{
-                  bgcolor: '#fff',
-                  '&:hover': {
-                    bgcolor: '#f0f0f0',
-                  },
-                }}
-              >
-                <AddIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Configuration">
-              <IconButton
-                onClick={handleToggleConfig}
-                size="small"
-                sx={{
-                  bgcolor: '#fff',
-                  '&:hover': {
-                    bgcolor: '#f0f0f0',
-                  },
-                }}
-              >
+          boxSizing: 'border-box',
+          bgcolor: '#f5f5f5',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        },
+      }}
+    >
+      <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Header */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" component="h1">
+            Orpheus
+          </Typography>
+          <Box>
+            <Tooltip title="Global Settings">
+              <IconButton onClick={onToggleConfig} size="small">
                 <SettingsIcon />
               </IconButton>
             </Tooltip>
             <Tooltip title="Soundboard">
-              <IconButton
-                onClick={onToggleSoundboard}
-                size="small"
-                sx={{
-                  bgcolor: '#fff',
-                  '&:hover': {
-                    bgcolor: '#f0f0f0',
-                  },
-                }}
-              >
+              <IconButton onClick={onToggleSoundboard} size="small">
                 <SpeakerIcon />
               </IconButton>
             </Tooltip>
-          </Stack>
-
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Search environments..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{
-              mb: 2,
-              '& .MuiOutlinedInput-root': {
-                bgcolor: '#fff',
-              },
-            }}
-          />
+          </Box>
         </Box>
 
-        <Box 
-          sx={{ 
-            flexGrow: 1, 
-            overflow: 'auto',
-            px: 2,
-            pb: 2,
-            position: 'relative',
-            height: '100%'
+        {/* Search */}
+        <TextField
+          size="small"
+          placeholder="Search environments..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
           }}
-        >
-          <Droppable droppableId="environments" type="environment">
-            {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
-              <List
-                disablePadding
-                ref={provided.innerRef}
-                {...provided.droppableProps}
-                sx={{ 
-                  minHeight: 50,
-                  backgroundColor: snapshot.isDraggingOver ? 'action.hover' : 'transparent',
-                  transition: 'background-color 0.2s ease'
-                }}
+          sx={{ mb: 2 }}
+        />
+
+        {/* Environment List */}
+        <List sx={{ flex: 1, overflow: 'auto' }}>
+          {filteredEnvironments.map((env) => (
+            <ListItem key={env.id} disablePadding>
+              <ListItemButton
+                selected={activeEnvironment?.id === env.id}
+                onClick={() => onEnvironmentSelect(env)}
               >
-                {filteredEnvironments.map((env, index) => (
-                  <Draggable 
-                    key={env.id} 
-                    draggableId={env.id} 
-                    index={index}
-                  >
-                    {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
-                      <ListItem
-                        component="div"
-                        disablePadding
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        sx={{
-                          backgroundColor: snapshot.isDragging ? 'action.hover' : 'transparent',
-                          transition: 'background-color 0.2s ease',
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        {/* Background Image */}
-                        {env.backgroundImage && (
-                          <Box
-                            sx={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              zIndex: 0,
-                              opacity: 0.15,
-                              overflow: 'hidden',
-                              '&::before': {
-                                content: '""',
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                backdropFilter: 'blur(1px)',
-                              }
-                            }}
-                          >
-                            <Box
-                              component="img"
-                              src={env.backgroundImage}
-                              alt=""
-                              sx={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                objectPosition: 'center',
-                                transform: 'scale(1.1)', // Slight zoom for a more dynamic look
-                                transition: 'transform 0.3s ease',
-                                '.MuiListItemButton-root:hover &': {
-                                  transform: 'scale(1.15)', // Zoom in slightly on hover
-                                }
-                              }}
-                            />
-                          </Box>
-                        )}
+                <ListItemText primary={env.name} />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
 
-                        <ListItemButton
-                          selected={env.id === activeEnvironment?.id}
-                          onClick={() => onEnvironmentSelect(env)}
-                          sx={{ 
-                            pr: 1,
-                            position: 'relative',
-                            zIndex: 1,
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                            }
-                          }}
-                        >
-                          <ListItemText 
-                            primary={env.name}
-                            secondary={`${env.layers.length} layers`}
-                            primaryTypographyProps={{
-                              fontSize: '0.9rem',
-                              noWrap: true,
-                            }}
-                            secondaryTypographyProps={{
-                              fontSize: '0.8rem',
-                              noWrap: true,
-                            }}
-                          />
-                          <Box {...provided.dragHandleProps}>
-                            <DragIndicatorIcon 
-                              sx={{ 
-                                color: 'text.secondary',
-                                opacity: 0.5,
-                                cursor: 'grab',
-                              }} 
-                            />
-                          </Box>
-                        </ListItemButton>
-                      </ListItem>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </List>
-            )}
-          </Droppable>
-        </Box>
-      </Drawer>
-
-      {showConfig && (
-        <ConfigOverlay
-          open={showConfig}
-          onClose={handleToggleConfig}
-          environments={environments}
-          onEnvironmentUpdate={(updatedEnvironment) => {
-            // Find and update the environment in the list
-            const updatedEnvironments = environments.map(env =>
-              env.id === updatedEnvironment.id ? updatedEnvironment : env
-            );
-            // Update the active environment if it was modified
-            if (activeEnvironment?.id === updatedEnvironment.id) {
-              onEnvironmentSelect(updatedEnvironment);
+        {/* Add Environment Button */}
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={onNewEnvironment}
+          sx={{ 
+            mt: 2,
+            bgcolor: '#fff',
+            color: 'primary.main',
+            '&:hover': {
+              bgcolor: '#f0f0f0',
             }
           }}
-          masterVolume={masterVolume}
-          onMasterVolumeChange={onMasterVolumeChange}
-          soundFiles={soundFiles}
-          onSoundFilesChange={onSoundFilesChange}
-        />
-      )}
-    </>
+        >
+          Add Environment
+        </Button>
+      </Box>
+    </Drawer>
   );
 };
 
