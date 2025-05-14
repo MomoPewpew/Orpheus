@@ -1,6 +1,31 @@
 {
   "environments": [
     {
+      "effects": {
+        "compressor": {
+          "highThreshold": 0,
+          "lowThreshold": -40,
+          "ratio": 1
+        },
+        "fades": {
+          "crossfadeDuration": 4000,
+          "fadeInDuration": 4000
+        },
+        "filters": {
+          "dampenSpeechRange": {
+            "amount": 0
+          },
+          "highPass": {
+            "frequency": 400
+          },
+          "lowPass": {
+            "frequency": 10000
+          }
+        },
+        "normalize": {
+          "enabled": true
+        }
+      },
       "id": "mamt4llw-g1von7",
       "layers": [
         {
