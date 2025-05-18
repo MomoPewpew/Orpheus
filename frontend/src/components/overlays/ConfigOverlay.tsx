@@ -337,6 +337,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
       if (selection.globalSettings) {
         const config = {
           masterVolume,
+          soundboard: soundFiles.map(file => file.id),  // Add global soundboard
           effects: {
             normalize: {
               enabled: normalizeVolume
