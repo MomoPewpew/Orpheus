@@ -18,9 +18,11 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { SoundFile, Environment, Effects } from '../../types/audio';
 import FileManagerDialog from '../dialogs/FileManagerDialog';
-import { deleteFile, listFiles, getFileUrl } from '../../services/fileService';
+import { deleteFile, listFiles, getFileUrl, uploadFile } from '../../services/fileService';
 import ExportDialog, { ExportSelection } from '../dialogs/ExportDialog';
+import ImportDialog, { EnvironmentImportMode, ImportSelection } from '../dialogs/ImportDialog';
 import JSZip from 'jszip';
+import { generateId } from '../../utils/ids';
 
 interface CompressorVisualizerProps {
   lowThreshold: number;
@@ -186,6 +188,7 @@ export interface ConfigOverlayProps {
   soundFiles: SoundFile[];
   onSoundFilesChange: (files: SoundFile[]) => void;
   onEffectsUpdate: (effects: Effects) => void;
+  onGlobalSoundboardUpdate: (soundFileIds: string[]) => void;
 }
 
 const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
@@ -198,10 +201,13 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
   soundFiles,
   onSoundFilesChange,
   onEffectsUpdate,
+  onGlobalSoundboardUpdate,
 }) => {
   const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [localSoundFiles, setLocalSoundFiles] = useState(soundFiles);
+  const [importSelection, setImportSelection] = useState<ImportSelection | null>(null);
   
   // Effect chain states with default values
   const [normalizeVolume, setNormalizeVolume] = useState(true);
@@ -421,7 +427,21 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
       // Create a manifest file with metadata about the export
       const manifest = {
         exportDate: new Date().toISOString(),
-        selection,
+        selection: {
+          globalSettings: selection.globalSettings,
+          globalSoundboard: selection.globalSoundboard,
+          environments: selection.environments.map(envId => {
+            const env = environments.find(e => e.id === envId);
+            if (!env) {
+              console.warn(`Environment ${envId} not found`);
+              return { id: envId, name: 'Unknown Environment' };
+            }
+            return {
+              id: envId,
+              name: env.name
+            };
+          })
+        },
         includedFiles: includedFiles.map(file => ({
           id: file.id,
           name: file.name,
@@ -498,28 +518,189 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
     }
   };
 
+  const handleImport = async (selection: ImportSelection, zipData: JSZip) => {
+    try {
+      // First, handle the audio files
+      const audioFolder = zipData.folder('data/audio');
+      if (!audioFolder) throw new Error('Invalid import file: Missing audio folder');
+
+      // Map of old file IDs to new file IDs (needed for environment references)
+      const fileIdMap = new Map<string, string>();
+      
+      // Get manifest to know what files we're importing
+      const manifestFile = zipData.file('data/export-manifest.json');
+      if (!manifestFile) throw new Error('Invalid import file: Missing manifest');
+      
+      const manifest = JSON.parse(await manifestFile.async('string'));
+      
+      // Create import selection with environment names from manifest
+      setImportSelection({
+        globalSettings: manifest.selection.globalSettings,
+        globalSoundboard: manifest.selection.globalSoundboard,
+        environments: Object.fromEntries(
+          manifest.selection.environments.map((env: { id: string; name: string }) => [
+            env.id,
+            {
+              mode: EnvironmentImportMode.Update,
+              name: env.name || env.id
+            }
+          ])
+        )
+      });
+
+      // Upload all audio files and build the ID mapping
+      for (const fileInfo of manifest.includedFiles) {
+        try {
+          const filename = fileInfo.path.split('/').pop()!;
+          const audioFile = audioFolder.file(filename);
+          if (!audioFile) {
+            console.error(`Audio file not found in zip: ${filename}`);
+            continue;
+          }
+
+          console.debug('Processing audio file:', {
+            originalId: fileInfo.id,
+            filename,
+            originalPath: fileInfo.path,
+            originalName: fileInfo.name
+          });
+
+          const blob = await audioFile.async('blob');
+          const file = new File([blob], filename, {
+            type: 'audio/*'
+          });
+
+          const uploadedFile = await uploadFile(file, fileInfo.name);
+          console.debug('File uploaded successfully:', {
+            originalId: fileInfo.id,
+            newId: uploadedFile.id,
+            filename: fileInfo.name
+          });
+          fileIdMap.set(fileInfo.id, uploadedFile.id);
+        } catch (error) {
+          console.error(`Failed to process file ${fileInfo.path}:`, error);
+        }
+      }
+
+      // Handle global settings if selected
+      if (selection.globalSettings) {
+        const configFile = zipData.file('data/config.json');
+        if (configFile) {
+          const config = JSON.parse(await configFile.async('string'));
+          
+          // Update master volume
+          onMasterVolumeChange(config.masterVolume);
+          
+          // Update effects
+          onEffectsUpdate(config.effects);
+          
+          // Update global soundboard if it exists
+          if (config.soundboard) {
+            const newSoundboard = config.soundboard.map((oldId: string) => fileIdMap.get(oldId)).filter(Boolean);
+            onGlobalSoundboardUpdate(newSoundboard);
+          }
+        }
+      }
+
+      // Handle environments
+      const environmentsFolder = zipData.folder('data/environments');
+      if (environmentsFolder) {
+        for (const [envId, mode] of Object.entries(selection.environments)) {
+          if (mode === EnvironmentImportMode.Skip) continue;
+
+          const envFile = environmentsFolder.file(`${envId}.json`);
+          if (!envFile) continue;
+
+          const envData = JSON.parse(await envFile.async('string'));
+
+          if (mode === EnvironmentImportMode.Insert) {
+            // Generate new IDs for everything
+            const newEnvId = generateId();
+            const idMap = new Map<string, string>();
+
+            // Create new environment with new IDs
+            const newEnv: Environment = {
+              ...envData,
+              id: newEnvId,
+              layers: envData.layers.map((layer: any) => ({
+                ...layer,
+                id: generateId(),
+                sounds: layer.sounds.map((sound: any) => ({
+                  ...sound,
+                  id: generateId(),
+                  fileId: fileIdMap.get(sound.fileId) || sound.fileId
+                }))
+              })),
+              soundboard: envData.soundboard
+                .map((oldId: string) => fileIdMap.get(oldId))
+                .filter(Boolean)
+            };
+
+            // Add the new environment
+            environments.push(newEnv);
+          } else {
+            // Update mode - keep IDs but update content
+            const existingEnv = environments.find(e => e.id === envId);
+            if (existingEnv) {
+              // Update existing environment, mapping file IDs
+              const updatedEnv: Environment = {
+                ...envData,
+                id: envId,
+                layers: envData.layers.map((layer: any) => ({
+                  ...layer,
+                  sounds: layer.sounds.map((sound: any) => ({
+                    ...sound,
+                    fileId: fileIdMap.get(sound.fileId) || sound.fileId
+                  }))
+                })),
+                soundboard: envData.soundboard
+                  .map((oldId: string) => fileIdMap.get(oldId))
+                  .filter(Boolean)
+              };
+
+              // Update the environment
+              await onEnvironmentUpdate(updatedEnv);
+            }
+          }
+        }
+      }
+
+      // Refresh the file list
+      await refreshFiles();
+    } catch (error) {
+      console.error('Import failed:', error);
+      throw error;
+    }
+  };
+
   return (
     <>
-      <Dialog
-        open={open}
-        onClose={onClose}
-        maxWidth="md"
-        fullWidth
-      >
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+    >
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h5">Configuration</Typography>
             <Box>
+              <Button 
+                onClick={() => setIsImportDialogOpen(true)}
+                sx={{ mr: 1 }}
+              >
+                Import
+              </Button>
               <Button 
                 onClick={() => setIsExportDialogOpen(true)}
                 sx={{ mr: 1 }}
               >
                 Export
               </Button>
-              <IconButton onClick={onClose} size="small">
-                <CloseIcon />
-              </IconButton>
-            </Box>
+            <IconButton onClick={onClose} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
           </Box>
         </DialogTitle>
         <DialogContent>
@@ -536,22 +717,22 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
               </Typography>
             </Button>
 
-            {/* Master Volume */}
-            <Box>
-              <Typography gutterBottom>
-                Master Volume ({Math.round(masterVolume * 100)}%)
-              </Typography>
-              <Slider
-                value={masterVolume}
-                onChange={(_, value) => onMasterVolumeChange(value as number)}
-                min={0}
-                max={1}
-                step={0.01}
-                aria-label="Master Volume"
-                valueLabelDisplay="auto"
-                valueLabelFormat={(value) => `${Math.round(value * 100)}%`}
-              />
-            </Box>
+          {/* Master Volume */}
+          <Box>
+            <Typography gutterBottom>
+              Master Volume ({Math.round(masterVolume * 100)}%)
+            </Typography>
+            <Slider
+              value={masterVolume}
+              onChange={(_, value) => onMasterVolumeChange(value as number)}
+              min={0}
+              max={1}
+              step={0.01}
+              aria-label="Master Volume"
+              valueLabelDisplay="auto"
+              valueLabelFormat={(value) => `${Math.round(value * 100)}%`}
+            />
+          </Box>
 
             <Divider />
 
@@ -632,7 +813,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
               <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
                 <Typography variant="subtitle1" gutterBottom>
                   Glue Compressor
-                </Typography>
+            </Typography>
                 
                 <CompressorVisualizer
                   lowThreshold={compressorLowThreshold}
@@ -689,16 +870,23 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
               </Paper>
             </Box>
 
-            {/* Actions */}
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
-              <Button onClick={onClose}>Close</Button>
+          {/* Actions */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+            <Button onClick={onClose}>Close</Button>
               <Button variant="contained" color="primary" onClick={handleApply}>
                 Apply
               </Button>
-            </Box>
-          </Stack>
-        </DialogContent>
+          </Box>
+        </Stack>
+      </DialogContent>
       </Dialog>
+
+      <ImportDialog
+        open={isImportDialogOpen}
+        onClose={() => setIsImportDialogOpen(false)}
+        onImport={handleImport}
+        environments={environments.map(env => ({ id: env.id, name: env.name }))}
+      />
 
       <ExportDialog
         open={isExportDialogOpen}
