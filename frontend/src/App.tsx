@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Environment, Layer, LayerSound, SoundFile, Preset, PresetLayer, PresetSound } from './types/audio';
+import { Environment, Layer, LayerSound, SoundFile, Preset, PresetLayer, PresetSound, Effects } from './types/audio';
 import { Box, CssBaseline, ThemeProvider, createTheme, Typography } from '@mui/material';
 import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import Sidebar from './components/Sidebar';
@@ -22,6 +22,20 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [masterVolume, setMasterVolume] = useState<number>(1);
   const [globalSoundboard, setGlobalSoundboard] = useState<string[]>([]);
+  const [effects, setEffects] = useState<Effects>({
+    normalize: { enabled: true },
+    fades: { fadeInDuration: 4000, crossfadeDuration: 4000 },
+    filters: {
+      highPass: { frequency: 400 },
+      lowPass: { frequency: 10000 },
+      dampenSpeechRange: { amount: 0 }
+    },
+    compressor: {
+      lowThreshold: -40,
+      highThreshold: 0,
+      ratio: 1
+    }
+  });
 
   // Load initial workspace and sound files
   useEffect(() => {
@@ -38,6 +52,9 @@ const App: React.FC = () => {
         if (typeof workspace.masterVolume === 'number') {
           setMasterVolume(workspace.masterVolume);
         }
+        if (workspace.effects) {
+          setEffects(workspace.effects);
+        }
         // Set first environment as active if we have any
         if (workspace.environments.length > 0) {
           setActiveEnvironment(workspace.environments[0]);
@@ -50,6 +67,20 @@ const App: React.FC = () => {
         setSoundFiles([]);
         setGlobalSoundboard([]);
         setMasterVolume(1);
+        setEffects({
+          normalize: { enabled: true },
+          fades: { fadeInDuration: 4000, crossfadeDuration: 4000 },
+          filters: {
+            highPass: { frequency: 400 },
+            lowPass: { frequency: 10000 },
+            dampenSpeechRange: { amount: 0 }
+          },
+          compressor: {
+            lowThreshold: -40,
+            highThreshold: 0,
+            ratio: 1
+          }
+        });
       })
       .finally(() => {
         setIsLoading(false);
@@ -60,18 +91,25 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isLoading) return;
 
+    console.debug('State change detected:', {
+      hasEffects: !!effects,
+      effectsKeys: Object.keys(effects),
+      fullEffects: effects
+    });
+
     const state = {
       environments,
       files: soundFiles,
       soundboard: globalSoundboard,
-      masterVolume
+      masterVolume,
+      effects
     };
 
     console.debug('Saving state:', state);
     saveWorkspace(state).catch((error) => {
       console.error('Failed to save workspace:', error);
     });
-  }, [environments, soundFiles, globalSoundboard, masterVolume, isLoading]);
+  }, [environments, soundFiles, globalSoundboard, masterVolume, effects, isLoading]);
 
   const handleNewEnvironment = () => {
     const newEnvironment: Environment = {
@@ -370,6 +408,14 @@ const App: React.FC = () => {
     }
   };
 
+  const handleEffectsUpdate = (newEffects: Effects) => {
+    console.debug('Updating effects:', {
+      oldEffects: effects,
+      newEffects: newEffects
+    });
+    setEffects(newEffects);
+  };
+
   if (isLoading) {
     return <div>Loading...</div>; // You might want to show a proper loading spinner
   }
@@ -441,6 +487,7 @@ const App: React.FC = () => {
             onMasterVolumeChange={handleMasterVolumeChange}
             soundFiles={soundFiles}
             onSoundFilesChange={setSoundFiles}
+            onEffectsUpdate={handleEffectsUpdate}
           />
         </Box>
       </DragDropContext>

@@ -46,7 +46,9 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 # Install dependencies in a separate layer
 RUN npm install --legacy-peer-deps && \
     npm install --save-dev @types/lodash && \
-    npm install --save lodash
+    npm install --save lodash && \
+    npm install --save jszip@3.10.1 && \
+    npm install --save-dev @types/jszip@3.4.1
 
 # Copy frontend source code
 COPY frontend/ ./

@@ -24,7 +24,21 @@ def load_workspace() -> dict:
                 "environments": [],
                 "playState": "STOPPED",
                 "masterVolume": 1,
-                "soundboard": []
+                "soundboard": [],
+                "effects": {
+                    "normalize": { "enabled": True },
+                    "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
+                    "filters": {
+                        "highPass": { "frequency": 400 },
+                        "lowPass": { "frequency": 10000 },
+                        "dampenSpeechRange": { "amount": 0 }
+                    },
+                    "compressor": {
+                        "lowThreshold": -40,
+                        "highThreshold": 0,
+                        "ratio": 1
+                    }
+                }
             }
         with open(CONFIG_FILE, 'r') as f:
             config = json.load(f)
@@ -33,7 +47,21 @@ def load_workspace() -> dict:
                 "environments": config.get("environments", []),
                 "playState": config.get("playState", "STOPPED"),
                 "masterVolume": config.get("masterVolume", 1),
-                "soundboard": config.get("soundboard", [])
+                "soundboard": config.get("soundboard", []),
+                "effects": config.get("effects", {
+                    "normalize": { "enabled": True },
+                    "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
+                    "filters": {
+                        "highPass": { "frequency": 400 },
+                        "lowPass": { "frequency": 10000 },
+                        "dampenSpeechRange": { "amount": 0 }
+                    },
+                    "compressor": {
+                        "lowThreshold": -40,
+                        "highThreshold": 0,
+                        "ratio": 1
+                    }
+                })
             }
     except Exception as e:
         logger.error(f"Error loading config: {e}")
@@ -41,7 +69,21 @@ def load_workspace() -> dict:
             "environments": [],
             "playState": "STOPPED",
             "masterVolume": 1,
-            "soundboard": []
+            "soundboard": [],
+            "effects": {
+                "normalize": { "enabled": True },
+                "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
+                "filters": {
+                    "highPass": { "frequency": 400 },
+                    "lowPass": { "frequency": 10000 },
+                    "dampenSpeechRange": { "amount": 0 }
+                },
+                "compressor": {
+                    "lowThreshold": -40,
+                    "highThreshold": 0,
+                    "ratio": 1
+                }
+            }
         }
 
 def save_workspace(workspace: dict):
@@ -65,7 +107,21 @@ def save_workspace(workspace: dict):
             "playState": workspace.get("playState", "STOPPED"),
             "masterVolume": workspace.get("masterVolume", 1),
             "soundboard": workspace.get("soundboard", []),
-            "files": current_config.get("files", [])
+            "files": current_config.get("files", []),
+            "effects": workspace.get("effects", {
+                "normalize": { "enabled": True },
+                "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
+                "filters": {
+                    "highPass": { "frequency": 400 },
+                    "lowPass": { "frequency": 10000 },
+                    "dampenSpeechRange": { "amount": 0 }
+                },
+                "compressor": {
+                    "lowThreshold": -40,
+                    "highThreshold": 0,
+                    "ratio": 1
+                }
+            })
         }
             
         # Write the new config
@@ -144,7 +200,7 @@ def update_workspace():
             return jsonify({"error": f"Expected dict, got {type(workspace)}"}), 400
             
         # Validate required fields
-        required_fields = {'environments', 'files', 'masterVolume', 'soundboard', 'playState'}
+        required_fields = {'environments', 'files', 'masterVolume', 'soundboard', 'playState', 'effects'}
         missing_fields = required_fields - set(workspace.keys())
         if missing_fields:
             return jsonify({"error": f"Missing required fields: {missing_fields}"}), 400

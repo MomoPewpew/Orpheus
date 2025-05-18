@@ -18,7 +18,9 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { SoundFile, Environment, Effects } from '../../types/audio';
 import FileManagerDialog from '../dialogs/FileManagerDialog';
-import { deleteFile, listFiles } from '../../services/fileService';
+import { deleteFile, listFiles, getFileUrl } from '../../services/fileService';
+import ExportDialog, { ExportSelection } from '../dialogs/ExportDialog';
+import JSZip from 'jszip';
 
 interface CompressorVisualizerProps {
   lowThreshold: number;
@@ -183,6 +185,7 @@ export interface ConfigOverlayProps {
   onMasterVolumeChange: (volume: number) => void;
   soundFiles: SoundFile[];
   onSoundFilesChange: (files: SoundFile[]) => void;
+  onEffectsUpdate: (effects: Effects) => void;
 }
 
 const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
@@ -194,8 +197,10 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
   onMasterVolumeChange,
   soundFiles,
   onSoundFilesChange,
+  onEffectsUpdate,
 }) => {
   const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [localSoundFiles, setLocalSoundFiles] = useState(soundFiles);
   
   // Effect chain states with default values
@@ -284,11 +289,16 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
         }
       };
 
-      // Update the environment with the effects settings
-      await onEnvironmentUpdate({
-        ...environments[0],
-        effects
-      });
+      // Update workspace-level effects
+      onEffectsUpdate(effects);
+
+      // Update the environment WITHOUT the effects
+      if (environments.length > 0) {
+        const { effects: oldEffects, ...envWithoutEffects } = environments[0];
+        await onEnvironmentUpdate({
+          ...envWithoutEffects
+        });
+      }
       
       onClose();
     } catch (error) {
@@ -296,197 +306,405 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
     }
   };
 
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="md"
-      fullWidth
-    >
-      <DialogTitle>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h5">Configuration</Typography>
-          <IconButton onClick={onClose} size="small">
-            <CloseIcon />
-          </IconButton>
-        </Box>
-      </DialogTitle>
-      <DialogContent>
-        <Stack spacing={3}>
-          {/* File Management */}
-          <Button
-            variant="outlined"
-            onClick={handleOpenFileManager}
-            sx={{ justifyContent: 'space-between' }}
-          >
-            <span>Manage Sound Files</span>
-            <Typography variant="caption" color="text.secondary">
-              ({localSoundFiles.length} files)
-            </Typography>
-          </Button>
+  const handleExport = async (selection: ExportSelection) => {
+    try {
+      const zip = new JSZip();
+      const dataFolder = zip.folder('data')!;
+      
+      // Track which sound files we need to include
+      const soundFileIds = new Set<string>();
 
-          {/* Master Volume */}
-          <Box>
-            <Typography gutterBottom>
-              Master Volume ({Math.round(masterVolume * 100)}%)
-            </Typography>
-            <Slider
-              value={masterVolume}
-              onChange={(_, value) => onMasterVolumeChange(value as number)}
-              min={0}
-              max={1}
-              step={0.01}
-              aria-label="Master Volume"
-              valueLabelDisplay="auto"
-              valueLabelFormat={(value) => `${Math.round(value * 100)}%`}
-            />
-          </Box>
+      // Helper to collect sound file IDs from an environment
+      const collectSoundFileIds = (environment: Environment) => {
+        console.debug('Collecting sound files from environment:', {
+          envId: environment.id,
+          soundboardCount: environment.soundboard.length,
+          layersCount: environment.layers.length,
+          soundboardIds: environment.soundboard,
+          layerSounds: environment.layers.map(layer => layer.sounds.map(sound => sound.fileId))
+        });
+        
+        // Add soundboard sounds
+        environment.soundboard.forEach(id => soundFileIds.add(id));
+        
+        // Add sounds from layers
+        environment.layers.forEach(layer => {
+          layer.sounds.forEach(sound => soundFileIds.add(sound.fileId));
+        });
+      };
 
-          <Divider />
-
-          {/* Effects Section */}
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Effects
-            </Typography>
-            
-            {/* Volume Normalization */}
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={normalizeVolume}
-                  onChange={(e) => setNormalizeVolume(e.target.checked)}
-                />
+      // Handle global settings
+      if (selection.globalSettings) {
+        const config = {
+          masterVolume,
+          effects: {
+            normalize: {
+              enabled: normalizeVolume
+            },
+            fades: {
+              fadeInDuration,
+              crossfadeDuration
+            },
+            filters: {
+              highPass: {
+                frequency: highPassFreq
+              },
+              lowPass: {
+                frequency: lowPassFreq
+              },
+              dampenSpeechRange: {
+                amount: dampenSpeechRange
               }
-              label="Normalize volume"
-            />
+            },
+            compressor: {
+              lowThreshold: compressorLowThreshold,
+              highThreshold: compressorHighThreshold,
+              ratio: compressorRatio
+            }
+          }
+        };
+        dataFolder.file('config.json', JSON.stringify(config, null, 2));
+      }
 
-            {/* Fade Durations */}
-            <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-              <TextField
-                type="number"
-                label="Fade-in duration (ms)"
-                value={fadeInDuration}
-                onChange={(e) => setFadeInDuration(Number(e.target.value))}
-                size="small"
-                inputProps={{ min: 0 }}
-              />
-              <TextField
-                type="number"
-                label="Crossfade duration (ms)"
-                value={crossfadeDuration}
-                onChange={(e) => setCrossfadeDuration(Number(e.target.value))}
-                size="small"
-                inputProps={{ min: 0 }}
-              />
-            </Stack>
+      // Handle global soundboard
+      if (selection.globalSoundboard) {
+        console.debug('Adding global soundboard files:', {
+          totalFiles: soundFiles.length,
+          fileIds: soundFiles.map(f => f.id)
+        });
+        // Add soundboard IDs to the collection
+        soundFiles.forEach(file => soundFileIds.add(file.id));
+      }
 
-            {/* Filters */}
-            <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-              <TextField
-                type="number"
-                label="High-pass frequency (Hz)"
-                value={highPassFreq}
-                onChange={(e) => setHighPassFreq(Number(e.target.value))}
-                size="small"
-                inputProps={{ min: 20, max: 20000 }}
-              />
-              <TextField
-                type="number"
-                label="Low-pass frequency (Hz)"
-                value={lowPassFreq}
-                onChange={(e) => setLowPassFreq(Number(e.target.value))}
-                size="small"
-                inputProps={{ min: 20, max: 20000 }}
-              />
-            </Stack>
+      // Handle selected environments
+      const environmentsFolder = dataFolder.folder('environments')!;
+      console.debug('Processing selected environments:', {
+        selectedIds: selection.environments,
+        availableEnvs: environments.map(e => ({ id: e.id, name: e.name }))
+      });
+      
+      for (const envId of selection.environments) {
+        const environment = environments.find(env => env.id === envId);
+        if (environment) {
+          console.debug('Processing environment:', {
+            envId,
+            name: environment.name,
+            layerCount: environment.layers.length,
+            soundboardCount: environment.soundboard.length
+          });
+          
+          // Create a copy of the environment without effects
+          const { effects, ...envWithoutEffects } = environment;
+          
+          // Add environment file
+          environmentsFolder.file(`${envId}.json`, JSON.stringify(envWithoutEffects, null, 2));
+          
+          // Collect sound file IDs from this environment
+          collectSoundFileIds(environment);
+        }
+      }
 
-            {/* Speech Range Dampening */}
+      // Add all referenced sound files
+      const audioFolder = dataFolder.folder('audio')!;
+      console.debug('Collected sound file IDs:', {
+        totalIds: soundFileIds.size,
+        ids: Array.from(soundFileIds)
+      });
+      
+      const includedFiles = soundFiles.filter(file => soundFileIds.has(file.id));
+      console.debug('Files to be included:', {
+        totalFiles: includedFiles.length,
+        files: includedFiles.map(f => ({ id: f.id, name: f.name }))
+      });
+      
+      // Create a manifest file with metadata about the export
+      const manifest = {
+        exportDate: new Date().toISOString(),
+        selection,
+        includedFiles: includedFiles.map(file => ({
+          id: file.id,
+          name: file.name,
+          path: file.path
+        }))
+      };
+      
+      dataFolder.file('export-manifest.json', JSON.stringify(manifest, null, 2));
+
+      // Fetch and add each sound file
+      await Promise.all(includedFiles.map(async file => {
+        try {
+          // Get just the filename from the path
+          const filename = file.path.split('/').pop() || '';
+          
+          console.debug('Fetching audio file:', {
+            fileId: file.id,
+            filename,
+            path: file.path
+          });
+          
+          // Use the correct API endpoint from fileService
+          const response = await fetch(getFileUrl(file.id), {
+            headers: {
+              'Accept': 'audio/*'  // Request audio content
+            }
+          });
+          
+          if (!response.ok) {
+            console.error('Failed to fetch audio file:', {
+              fileId: file.id,
+              status: response.status,
+              statusText: response.statusText
+            });
+            throw new Error(`Failed to fetch audio file ${file.id}`);
+          }
+          
+          const arrayBuffer = await response.arrayBuffer();
+          console.debug('Adding audio file to zip:', {
+            fileId: file.id,
+            filename,
+            size: arrayBuffer.byteLength
+          });
+          
+          audioFolder.file(filename, arrayBuffer, {
+            binary: true  // Ensure binary data is handled correctly
+          });
+        } catch (error) {
+          console.error(`Failed to add file ${file.id} to zip:`, error);
+        }
+      }));
+
+      // Generate the zip file
+      const blob = await zip.generateAsync({ 
+        type: 'blob',
+        compression: 'DEFLATE',  // Use compression
+        compressionOptions: {
+          level: 6  // Balanced between speed and compression
+        }
+      });
+      
+      // Create a download link and trigger it
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'orpheus-export.zip';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Failed to export:', error);
+      // TODO: Show error notification
+    }
+  };
+
+  return (
+    <>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h5">Configuration</Typography>
+            <Box>
+              <Button 
+                onClick={() => setIsExportDialogOpen(true)}
+                sx={{ mr: 1 }}
+              >
+                Export
+              </Button>
+              <IconButton onClick={onClose} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={3}>
+            {/* File Management */}
+            <Button
+              variant="outlined"
+              onClick={handleOpenFileManager}
+              sx={{ justifyContent: 'space-between' }}
+            >
+              <span>Manage Sound Files</span>
+              <Typography variant="caption" color="text.secondary">
+                ({localSoundFiles.length} files)
+              </Typography>
+            </Button>
+
+            {/* Master Volume */}
             <Box>
               <Typography gutterBottom>
-                Speech Range Dampening: {Math.round(dampenSpeechRange * 100)}%
+                Master Volume ({Math.round(masterVolume * 100)}%)
               </Typography>
               <Slider
-                value={dampenSpeechRange}
-                onChange={(_, value) => setDampenSpeechRange(value as number)}
+                value={masterVolume}
+                onChange={(_, value) => onMasterVolumeChange(value as number)}
                 min={0}
                 max={1}
-                step={0.05}
+                step={0.01}
+                aria-label="Master Volume"
                 valueLabelDisplay="auto"
                 valueLabelFormat={(value) => `${Math.round(value * 100)}%`}
               />
             </Box>
 
-            {/* Glue Compressor */}
-            <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Glue Compressor
+            <Divider />
+
+            {/* Effects Section */}
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                Effects
               </Typography>
               
-              <CompressorVisualizer
-                lowThreshold={compressorLowThreshold}
-                highThreshold={compressorHighThreshold}
-                ratio={compressorRatio}
+              {/* Volume Normalization */}
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={normalizeVolume}
+                    onChange={(e) => setNormalizeVolume(e.target.checked)}
+                  />
+                }
+                label="Normalize volume"
               />
 
-              <Stack spacing={2}>
-                <Box>
-                  <Typography gutterBottom>
-                    Low Threshold: {compressorLowThreshold} dB
-                  </Typography>
-                  <Slider
-                    value={compressorLowThreshold}
-                    onChange={(_, value) => setCompressorLowThreshold(Math.min(compressorHighThreshold, value as number))}
-                    min={-40}
-                    max={0}
-                    step={1}
-                    valueLabelDisplay="auto"
-                    valueLabelFormat={(value) => `${value} dB`}
-                  />
-                </Box>
-
-                <Box>
-                  <Typography gutterBottom>
-                    High Threshold: {compressorHighThreshold} dB
-                  </Typography>
-                  <Slider
-                    value={compressorHighThreshold}
-                    onChange={(_, value) => setCompressorHighThreshold(Math.max(compressorLowThreshold, value as number))}
-                    min={-40}
-                    max={0}
-                    step={1}
-                    valueLabelDisplay="auto"
-                    valueLabelFormat={(value) => `${value} dB`}
-                  />
-                </Box>
-
-                <Box>
-                  <Typography gutterBottom>
-                    Ratio: {compressorRatio}:1
-                  </Typography>
-                  <Slider
-                    value={compressorRatio}
-                    onChange={(_, value) => setCompressorRatio(value as number)}
-                    min={1}
-                    max={20}
-                    step={0.5}
-                    valueLabelDisplay="auto"
-                    valueLabelFormat={(value) => `${value}:1`}
-                  />
-                </Box>
+              {/* Fade Durations */}
+              <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+                <TextField
+                  type="number"
+                  label="Fade-in duration (ms)"
+                  value={fadeInDuration}
+                  onChange={(e) => setFadeInDuration(Number(e.target.value))}
+                  size="small"
+                  inputProps={{ min: 0 }}
+                />
+                <TextField
+                  type="number"
+                  label="Crossfade duration (ms)"
+                  value={crossfadeDuration}
+                  onChange={(e) => setCrossfadeDuration(Number(e.target.value))}
+                  size="small"
+                  inputProps={{ min: 0 }}
+                />
               </Stack>
-            </Paper>
-          </Box>
 
-          {/* Actions */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
-            <Button onClick={onClose}>Close</Button>
-            <Button variant="contained" color="primary" onClick={handleApply}>
-              Apply
-            </Button>
-          </Box>
-        </Stack>
-      </DialogContent>
+              {/* Filters */}
+              <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+                <TextField
+                  type="number"
+                  label="High-pass frequency (Hz)"
+                  value={highPassFreq}
+                  onChange={(e) => setHighPassFreq(Number(e.target.value))}
+                  size="small"
+                  inputProps={{ min: 20, max: 20000 }}
+                />
+                <TextField
+                  type="number"
+                  label="Low-pass frequency (Hz)"
+                  value={lowPassFreq}
+                  onChange={(e) => setLowPassFreq(Number(e.target.value))}
+                  size="small"
+                  inputProps={{ min: 20, max: 20000 }}
+                />
+              </Stack>
+
+              {/* Speech Range Dampening */}
+              <Box>
+                <Typography gutterBottom>
+                  Speech Range Dampening: {Math.round(dampenSpeechRange * 100)}%
+                </Typography>
+                <Slider
+                  value={dampenSpeechRange}
+                  onChange={(_, value) => setDampenSpeechRange(value as number)}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(value) => `${Math.round(value * 100)}%`}
+                />
+              </Box>
+
+              {/* Glue Compressor */}
+              <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Glue Compressor
+                </Typography>
+                
+                <CompressorVisualizer
+                  lowThreshold={compressorLowThreshold}
+                  highThreshold={compressorHighThreshold}
+                  ratio={compressorRatio}
+                />
+
+                <Stack spacing={2}>
+                  <Box>
+                    <Typography gutterBottom>
+                      Low Threshold: {compressorLowThreshold} dB
+                    </Typography>
+                    <Slider
+                      value={compressorLowThreshold}
+                      onChange={(_, value) => setCompressorLowThreshold(Math.min(compressorHighThreshold, value as number))}
+                      min={-40}
+                      max={0}
+                      step={1}
+                      valueLabelDisplay="auto"
+                      valueLabelFormat={(value) => `${value} dB`}
+                    />
+                  </Box>
+
+                  <Box>
+                    <Typography gutterBottom>
+                      High Threshold: {compressorHighThreshold} dB
+                    </Typography>
+                    <Slider
+                      value={compressorHighThreshold}
+                      onChange={(_, value) => setCompressorHighThreshold(Math.max(compressorLowThreshold, value as number))}
+                      min={-40}
+                      max={0}
+                      step={1}
+                      valueLabelDisplay="auto"
+                      valueLabelFormat={(value) => `${value} dB`}
+                    />
+                  </Box>
+
+                  <Box>
+                    <Typography gutterBottom>
+                      Ratio: {compressorRatio}:1
+                    </Typography>
+                    <Slider
+                      value={compressorRatio}
+                      onChange={(_, value) => setCompressorRatio(value as number)}
+                      min={1}
+                      max={20}
+                      step={0.5}
+                      valueLabelDisplay="auto"
+                      valueLabelFormat={(value) => `${value}:1`}
+                    />
+                  </Box>
+                </Stack>
+              </Paper>
+            </Box>
+
+            {/* Actions */}
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+              <Button onClick={onClose}>Close</Button>
+              <Button variant="contained" color="primary" onClick={handleApply}>
+                Apply
+              </Button>
+            </Box>
+          </Stack>
+        </DialogContent>
+      </Dialog>
+
+      <ExportDialog
+        open={isExportDialogOpen}
+        onClose={() => setIsExportDialogOpen(false)}
+        environments={environments}
+        onExport={handleExport}
+      />
 
       <FileManagerDialog
         open={isFileManagerOpen}
@@ -494,7 +712,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
         soundFiles={localSoundFiles}
         onDeleteFile={handleDeleteFile}
       />
-    </Dialog>
+    </>
   );
 };
 
