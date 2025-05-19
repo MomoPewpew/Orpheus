@@ -17,7 +17,7 @@ import {
   DialogActions,
   Divider,
 } from '@mui/material';
-import { Add as AddIcon, Delete, Settings } from '@mui/icons-material';
+import { Add as AddIcon, Delete, Settings, PlayArrow, Stop } from '@mui/icons-material';
 import { Environment, Layer, Preset, SoundFile, setLayerVolume, getLayerVolume, LayerSound } from '../types/audio';
 import { generateId } from '../utils/ids';
 import { LayerControls } from './layers/LayerControls';
@@ -45,6 +45,8 @@ interface MainContentProps {
   onSoundFilesChange: (files: SoundFile[]) => void;
   onGlobalSoundboardChange: (soundIds: string[]) => void;
   onToggleSoundboard: () => void;
+  onPlayStop: () => void;
+  playState: string | null;
 }
 
 const DRAWER_WIDTH = 300;
@@ -66,6 +68,8 @@ export const MainContent: React.FC<MainContentProps> = ({
   onSoundFilesChange,
   onGlobalSoundboardChange,
   onToggleSoundboard,
+  onPlayStop,
+  playState,
 }) => {
   const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
   const [showAddLayer, setShowAddLayer] = useState(false);
@@ -293,20 +297,26 @@ export const MainContent: React.FC<MainContentProps> = ({
             elevation={0}
             sx={{ 
               bgcolor: 'transparent',
-              borderBottom: '1px solid rgba(0, 0, 0, 0.12)'
+              borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+              pb: 2
             }}
           >
-            <Box sx={{ textAlign: 'center', mb: 2 }}>
+            <Box sx={{ 
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              mb: 2
+            }}>
               <Typography variant="h4" sx={{ fontWeight: 500 }}>{environment.name}</Typography>
             </Box>
             <Box sx={{ 
-              display: 'flex', 
+              display: 'grid',
+              gridTemplateColumns: '1fr auto 1fr',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              px: 2,
-              pb: 2
+              px: 2
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {/* Left side - Maximum Weight */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                   Maximum Weight:
                 </Typography>
@@ -315,33 +325,61 @@ export const MainContent: React.FC<MainContentProps> = ({
                   value={getEffectiveMaxWeight()}
                   onChange={handleMaxWeightChange}
                   size="small"
-                  sx={{ 
+                  sx={{
                     width: 100,
                     // Apply purple color when there's a preset override
                     '& .MuiInputBase-root': {
                       color: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
                       borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
                       '&:hover': {
-                        borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
+                        borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit'
                       },
                       '&.Mui-focused': {
-                        borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
+                        borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit'
                       }
                     },
                     '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
+                      borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit'
                     },
                     '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
+                      borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit'
                     },
                     '& .Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit',
+                      borderColor: hasMaxWeightOverride() ? 'secondary.main' : 'inherit'
                     }
                   }}
-                  inputProps={{ min: 0, step: 0.1 }}
+                  inputProps={{
+                    min: 0,
+                    step: 0.1
+                  }}
                 />
               </Box>
-              <Box>
+              
+              {/* Center - Play Button */}
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <IconButton 
+                  color="primary"
+                  onClick={onPlayStop}
+                  sx={{ 
+                    width: 48,
+                    height: 48,
+                    bgcolor: 'primary.main',
+                    color: 'white',
+                    '&:hover': {
+                      bgcolor: 'primary.dark'
+                    }
+                  }}
+                >
+                  {playState === environment.id ? (
+                    <Stop sx={{ fontSize: 28 }} />
+                  ) : (
+                    <PlayArrow sx={{ fontSize: 28 }} />
+                  )}
+                </IconButton>
+              </Box>
+
+              {/* Right side - Settings and Delete */}
+              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                 <IconButton onClick={() => setShowEnvironmentConfig(true)}>
                   <Settings />
                 </IconButton>

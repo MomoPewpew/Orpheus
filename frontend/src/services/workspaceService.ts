@@ -36,6 +36,7 @@ export interface WorkspaceState {
   masterVolume: number;
   soundboard: string[];
   effects: Effects;
+  playState: string;  // Either 'STOPPED' or an environment ID
 }
 
 interface BackendState {
@@ -43,7 +44,7 @@ interface BackendState {
   files: SoundFile[];
   masterVolume: number;
   soundboard: string[];
-  playState: PlayState;
+  playState: string;  // Either 'STOPPED' or an environment ID
   effects: Effects;
 }
 
@@ -71,7 +72,7 @@ export async function saveWorkspace(state: WorkspaceState): Promise<void> {
       files: state.files || [],
       masterVolume: typeof state.masterVolume === 'number' ? state.masterVolume : 1,
       soundboard: state.soundboard || [],
-      playState: 'STOPPED' as const,
+      playState: state.playState || 'STOPPED',
       effects: state.effects || {
         normalize: { enabled: true },
         fades: { fadeInDuration: 4000, crossfadeDuration: 4000 },
@@ -218,7 +219,8 @@ export async function loadWorkspace(): Promise<WorkspaceState> {
       files: data.files || [],
       masterVolume,
       soundboard: data.soundboard || [], // Global soundboard
-      effects
+      effects,
+      playState: data.playState || 'STOPPED'
     };
   } catch (error) {
     console.error('Error loading workspace:', error);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Environment, Layer, LayerSound, SoundFile, Preset, PresetLayer, PresetSound, Effects } from './types/audio';
+import { Environment, Layer, LayerSound, SoundFile, Preset, PresetLayer, PresetSound, Effects, PlayState } from './types/audio';
 import { Box, CssBaseline, ThemeProvider, createTheme, Typography } from '@mui/material';
 import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import Sidebar from './components/Sidebar';
@@ -37,6 +37,7 @@ const App: React.FC = () => {
       ratio: 1
     }
   });
+  const [playState, setPlayState] = useState<string | null>(null);
 
   // Load initial workspace and sound files
   useEffect(() => {
@@ -60,6 +61,8 @@ const App: React.FC = () => {
         if (workspace.environments.length > 0) {
           setActiveEnvironment(workspace.environments[0]);
         }
+        // Set the play state from workspace
+        setPlayState(workspace.playState === 'STOPPED' ? null : workspace.playState);
       })
       .catch((error) => {
         console.error('Failed to load workspace or files:', error);
@@ -82,6 +85,7 @@ const App: React.FC = () => {
             ratio: 1
           }
         });
+        setPlayState(null);
       })
       .finally(() => {
         setIsLoading(false);
@@ -103,14 +107,15 @@ const App: React.FC = () => {
       files: soundFiles,
       soundboard: globalSoundboard,
       masterVolume,
-      effects
+      effects,
+      playState: playState || 'STOPPED'
     };
 
     console.debug('Saving state:', state);
     saveWorkspace(state).catch((error) => {
       console.error('Failed to save workspace:', error);
     });
-  }, [environments, soundFiles, globalSoundboard, masterVolume, effects, isLoading]);
+  }, [environments, soundFiles, globalSoundboard, masterVolume, effects, playState, isLoading]);
 
   const handleNewEnvironment = () => {
     const newEnvironment: Environment = {
@@ -417,6 +422,18 @@ const App: React.FC = () => {
     setEffects(newEffects);
   };
 
+  const handlePlayStop = () => {
+    if (!activeEnvironment) return;
+    
+    // If this environment is playing, stop it
+    if (playState === activeEnvironment.id) {
+      setPlayState(null);
+    } else {
+      // Stop any currently playing environment and start this one
+      setPlayState(activeEnvironment.id);
+    }
+  };
+
   if (isLoading) {
     return <div>Loading...</div>; // You might want to show a proper loading spinner
   }
@@ -472,6 +489,8 @@ const App: React.FC = () => {
                 onSoundFilesChange={setSoundFiles}
                 onGlobalSoundboardChange={setGlobalSoundboard}
                 onToggleSoundboard={handleToggleSoundboard}
+                onPlayStop={handlePlayStop}
+                playState={playState}
               />
             ) : (
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>

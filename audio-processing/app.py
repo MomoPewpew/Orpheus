@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
-from routes.workspace import workspace_bp
+from routes.workspace import workspace_bp, ensure_workspace_dir
 from routes.files import files_bp
 import os
 import logging
@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
+
+# Reset play state on server startup
+ensure_workspace_dir()
 
 # Register blueprints
 logger.info("Registering workspace blueprint with /api prefix")

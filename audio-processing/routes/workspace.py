@@ -143,12 +143,22 @@ def ensure_workspace_dir():
     logger.debug(f"Ensuring workspace directory exists: {DATA_DIR}")
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     
-    if not CONFIG_FILE.exists():
-        logger.debug(f"Creating default config file at {CONFIG_FILE}")
-        save_workspace({
-            "environments": [],
-            "playState": "STOPPED"
-        })
+    # Always reset playState to STOPPED on server startup
+    current_config = {}
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                current_config = json.load(f)
+        except json.JSONDecodeError:
+            logger.error("Error reading config file, starting fresh")
+            current_config = {}
+    
+    # Update config with STOPPED state while preserving other settings
+    current_config["playState"] = "STOPPED"
+    
+    # Save the updated config
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(current_config, f, indent=2)
 
 # Call this when the blueprint is created
 ensure_workspace_dir()
@@ -157,7 +167,6 @@ ensure_workspace_dir()
 def get_workspace():
     """Get the current workspace state."""
     try:
-        ensure_workspace_dir()
         workspace = load_workspace()
         return jsonify(workspace)
     except Exception as e:
