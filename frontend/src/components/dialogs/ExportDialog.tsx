@@ -33,9 +33,9 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   onExport,
 }: ExportDialogProps) => {
   const [selection, setSelection] = useState<ExportSelection>({
-    globalSettings: true,
-    globalSoundboard: true,
-    environments: environments.map((env: Environment) => env.id),
+    globalSettings: false,
+    globalSoundboard: false,
+    environments: [],
   });
 
   const handleToggleEnvironment = (envId: string) => {
