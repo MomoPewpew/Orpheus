@@ -673,6 +673,52 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
     }
   };
 
+  const handleRevertToDefaults = () => {
+    // Reset master volume
+    onMasterVolumeChange(1);
+
+    // Reset effects to default values
+    setNormalizeVolume(true);
+    setFadeInDuration(4000);
+    setCrossfadeDuration(4000);
+    setHighPassFreq(400);
+    setLowPassFreq(10000);
+    setDampenSpeechRange(0);
+    setCompressorLowThreshold(-40);
+    setCompressorHighThreshold(0);
+    setCompressorRatio(1);
+
+    // Update effects without closing the dialog
+    const effects: Effects = {
+      normalize: {
+        enabled: true
+      },
+      fades: {
+        fadeInDuration: 4000,
+        crossfadeDuration: 4000
+      },
+      filters: {
+        highPass: {
+          frequency: 400
+        },
+        lowPass: {
+          frequency: 10000
+        },
+        dampenSpeechRange: {
+          amount: 0
+        }
+      },
+      compressor: {
+        lowThreshold: -40,
+        highThreshold: 0,
+        ratio: 1
+      }
+    };
+
+    // Update workspace-level effects
+    onEffectsUpdate(effects);
+  };
+
   return (
     <>
     <Dialog
@@ -738,9 +784,16 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
 
             {/* Effects Section */}
             <Box>
-              <Typography variant="h6" gutterBottom>
-                Effects
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">Effects</Typography>
+                <Button 
+                  onClick={handleRevertToDefaults}
+                  size="small"
+                  color="secondary"
+                >
+                  Revert to Defaults
+                </Button>
+              </Box>
               
               {/* Volume Normalization */}
               <FormControlLabel
