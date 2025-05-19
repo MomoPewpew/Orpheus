@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { PlayArrow, Stop, Check } from '@mui/icons-material';
 import { SoundFile } from '../types/audio';
+import { getFileUrl } from '../services/fileService';
 
 interface FileBrowserDialogProps {
   open: boolean;
@@ -66,7 +67,7 @@ export const FileBrowserDialog: React.FC<FileBrowserDialogProps> = ({
         if (audioRef.current) {
           audioRef.current.pause();
         }
-        const audio = new Audio(`/api/files/${file.id}`);
+        const audio = new Audio(getFileUrl(file.id));
         audio.addEventListener('ended', () => setPlayingFile(null));
         audioRef.current = audio;
         await audio.play();
