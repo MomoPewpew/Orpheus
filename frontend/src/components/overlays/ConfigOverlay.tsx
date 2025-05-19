@@ -14,6 +14,7 @@ import {
   FormControlLabel,
   Divider,
   Paper,
+  DialogActions,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { SoundFile, Environment, Effects } from '../../types/audio';
@@ -206,6 +207,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
   const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isConfirmRevertOpen, setIsConfirmRevertOpen] = useState(false);
   const [localSoundFiles, setLocalSoundFiles] = useState(soundFiles);
   const [importSelection, setImportSelection] = useState<ImportSelection | null>(null);
   
@@ -717,6 +719,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
 
     // Update workspace-level effects
     onEffectsUpdate(effects);
+    setIsConfirmRevertOpen(false);
   };
 
   return (
@@ -787,7 +790,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6">Effects</Typography>
                 <Button 
-                  onClick={handleRevertToDefaults}
+                  onClick={() => setIsConfirmRevertOpen(true)}
                   size="small"
                   color="secondary"
                 >
@@ -954,6 +957,31 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
         soundFiles={localSoundFiles}
         onDeleteFile={handleDeleteFile}
       />
+
+      {/* Revert to Defaults Confirmation Dialog */}
+      <Dialog
+        open={isConfirmRevertOpen}
+        onClose={() => setIsConfirmRevertOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Revert to Default Settings</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to revert all effects settings to their default values? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsConfirmRevertOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleRevertToDefaults}
+            color="secondary"
+            variant="contained"
+          >
+            Revert
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };
