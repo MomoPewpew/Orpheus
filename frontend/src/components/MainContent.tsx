@@ -221,7 +221,14 @@ export const MainContent: React.FC<MainContentProps> = ({
     // We just need to pass the layer removal handler
     const updatedEnvironment = {
       ...environment,
-      layers: environment.layers.filter(l => l.id !== layerId)
+      // Remove the layer from the layers array
+      layers: environment.layers.filter(l => l.id !== layerId),
+      // Clean up presets by removing any references to this layer
+      presets: environment.presets.map(preset => ({
+        ...preset,
+        // Remove the layer from each preset's layers array
+        layers: preset.layers.filter(l => l.id !== layerId)
+      }))
     };
     onEnvironmentUpdate(updatedEnvironment);
   };
