@@ -62,6 +62,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
   const [layerName, setLayerName] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | SoundFile | null>(null);
   const [loopLengthMs, setLoopLengthMs] = useState<number | null>(null);
+  const [defaultDurationMs, setDefaultDurationMs] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
@@ -72,12 +73,17 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
     // Clear selected file when switching tabs
     setSelectedFile(null);
     setLoopLengthMs(null);
+    setDefaultDurationMs(null);
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
+      // Reset the duration states
+      setDefaultDurationMs(null);
+      setLoopLengthMs(null);
+      
       // Only set name to file name if the current name is empty
       if (!layerName) {
         setLayerName(file.name.split('.').slice(0, -1).join('.'));
@@ -90,6 +96,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
       
       audio.addEventListener('loadedmetadata', () => {
         const durationMs = Math.round(audio.duration * 1000);
+        setDefaultDurationMs(durationMs);
         setLoopLengthMs(durationMs);
         URL.revokeObjectURL(objectUrl);
       });
@@ -99,6 +106,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
   const handleExistingFileSelect = (file: SoundFile) => {
     setShowFileBrowser(false);
     setSelectedFile(file);
+    setDefaultDurationMs(file.duration_ms);
     setLoopLengthMs(file.duration_ms);
     // Only set name to file name if the current name is empty
     if (!layerName) {
@@ -173,7 +181,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
         ],
         chance: 1,
         cooldownCycles: 0,
-        loopLengthMs: uploadedFile.duration_ms,
+        loopLengthMs: loopLengthMs ?? uploadedFile.duration_ms,
         weight: 1,
         volume: 1,
         mode: LayerMode.Shuffle
@@ -197,6 +205,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
     setLayerName('');
     setSelectedFile(null);
     setLoopLengthMs(null);
+    setDefaultDurationMs(null);
     setActiveTab(0);
     setError(null);
     onClose();
@@ -238,11 +247,9 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
               onChange={(e) => setLoopLengthMs(e.target.value ? Number(e.target.value) : null)}
               sx={{ mb: 2 }}
               helperText={`Default: ${
-                isSoundFile(selectedFile) 
-                  ? selectedFile.duration_ms 
-                  : loopLengthMs 
-                    ? loopLengthMs 
-                    : 'Calculating...'
+                defaultDurationMs !== null
+                  ? defaultDurationMs
+                  : 'Calculating...'
               } ms`}
             />
           )}
