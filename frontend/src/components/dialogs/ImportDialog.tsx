@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -68,6 +68,26 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     environments: {}
   });
   const [error, setError] = useState<string | null>(null);
+
+  // Reset state when dialog is opened
+  useEffect(() => {
+    if (open) {
+      setImportZip(null);
+      setManifest(null);
+      setSelection({
+        globalSettings: false,
+        globalSoundboard: false,
+        environments: {}
+      });
+      setError(null);
+      
+      // Also reset the file input if it exists
+      const fileInput = document.getElementById('import-file-input') as HTMLInputElement;
+      if (fileInput) {
+        fileInput.value = '';
+      }
+    }
+  }, [open]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
