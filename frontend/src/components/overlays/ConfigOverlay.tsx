@@ -190,6 +190,7 @@ export interface ConfigOverlayProps {
   onSoundFilesChange: (files: SoundFile[]) => void;
   onEffectsUpdate: (effects: Effects) => void;
   onGlobalSoundboardUpdate: (soundFileIds: string[]) => void;
+  globalSoundboard: string[];
 }
 
 const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
@@ -203,6 +204,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
   onSoundFilesChange,
   onEffectsUpdate,
   onGlobalSoundboardUpdate,
+  globalSoundboard,
 }) => {
   const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -345,7 +347,6 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
       if (selection.globalSettings) {
         const config = {
           masterVolume,
-          soundboard: soundFiles.map(file => file.id),  // Add global soundboard
           effects: {
             normalize: {
               enabled: normalizeVolume
@@ -378,11 +379,30 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
       // Handle global soundboard
       if (selection.globalSoundboard) {
         console.debug('Adding global soundboard files:', {
-          totalFiles: soundFiles.length,
-          fileIds: soundFiles.map(f => f.id)
+          totalFiles: globalSoundboard.length,
+          fileIds: globalSoundboard
         });
         // Add soundboard IDs to the collection
-        soundFiles.forEach(file => soundFileIds.add(file.id));
+        globalSoundboard.forEach(id => soundFileIds.add(id));
+        
+        // Add soundboard to config.json
+        const configFile = dataFolder.file('config.json');
+        let config = {};
+        
+        if (configFile) {
+          // If config.json already exists from global settings, read it
+          const content = await configFile.async('string');
+          config = JSON.parse(content);
+        }
+        
+        // Add or update the soundboard in the config
+        config = {
+          ...config,
+          soundboard: globalSoundboard
+        };
+        
+        // Write back the updated config
+        dataFolder.file('config.json', JSON.stringify(config, null, 2));
       }
 
       // Handle selected environments
