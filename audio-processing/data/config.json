@@ -25,19 +25,8 @@
     }
   },
   "environments": [],
-  "files": [
-    {
-      "duration_ms": 124551,
-      "id": "fd26a312-0939-4f1b-a112-909538d6c0ab",
-      "name": "Mii Channel - Plaza Theme (HQ)",
-      "original_filename": "Mii_Channel_-_Plaza_Theme_HQ",
-      "path": "/app/audio-processing/data/audio/fd26a312-0939-4f1b-a112-909538d6c0ab.mp3",
-      "peak_volume": 0.9068580865859985
-    }
-  ],
+  "files": [],
   "masterVolume": 1,
   "playState": "STOPPED",
-  "soundboard": [
-    "fd26a312-0939-4f1b-a112-909538d6c0ab"
-  ]
+  "soundboard": []
 }
