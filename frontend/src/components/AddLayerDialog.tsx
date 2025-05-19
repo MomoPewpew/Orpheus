@@ -82,6 +82,17 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
       if (!layerName) {
         setLayerName(file.name.split('.').slice(0, -1).join('.'));
       }
+
+      // Get audio duration from the file
+      const audio = new Audio();
+      const objectUrl = URL.createObjectURL(file);
+      audio.src = objectUrl;
+      
+      audio.addEventListener('loadedmetadata', () => {
+        const durationMs = Math.round(audio.duration * 1000);
+        setLoopLengthMs(durationMs);
+        URL.revokeObjectURL(objectUrl);
+      });
     }
   };
 
@@ -162,7 +173,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
         ],
         chance: 1,
         cooldownCycles: 0,
-        loopLengthMs: loopLengthMs ?? uploadedFile.duration_ms,
+        loopLengthMs: uploadedFile.duration_ms,
         weight: 1,
         volume: 1,
         mode: LayerMode.Shuffle
@@ -226,7 +237,13 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
               value={loopLengthMs ?? ''}
               onChange={(e) => setLoopLengthMs(e.target.value ? Number(e.target.value) : null)}
               sx={{ mb: 2 }}
-              helperText={`Default: ${isSoundFile(selectedFile) ? selectedFile.duration_ms : 'Calculating...'} ms`}
+              helperText={`Default: ${
+                isSoundFile(selectedFile) 
+                  ? selectedFile.duration_ms 
+                  : loopLengthMs 
+                    ? loopLengthMs 
+                    : 'Calculating...'
+              } ms`}
             />
           )}
 
