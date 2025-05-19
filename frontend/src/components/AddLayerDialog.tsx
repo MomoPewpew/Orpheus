@@ -227,8 +227,8 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
             />
           )}
 
-          {/* Loop Length field */}
-          {selectedFile && (
+          {/* Loop Length field - only show in layer mode */}
+          {mode === 'layer' && selectedFile && (
             <TextField
               type="number"
               margin="dense"
