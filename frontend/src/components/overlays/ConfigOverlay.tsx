@@ -621,6 +621,17 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
           
           // Update effects
           onEffectsUpdate(config.effects);
+
+          // Update local state to match imported settings
+          setNormalizeVolume(config.effects.normalize.enabled);
+          setFadeInDuration(config.effects.fades.fadeInDuration);
+          setCrossfadeDuration(config.effects.fades.crossfadeDuration);
+          setHighPassFreq(config.effects.filters.highPass.frequency);
+          setLowPassFreq(config.effects.filters.lowPass.frequency);
+          setDampenSpeechRange(config.effects.filters.dampenSpeechRange.amount);
+          setCompressorLowThreshold(config.effects.compressor.lowThreshold);
+          setCompressorHighThreshold(config.effects.compressor.highThreshold);
+          setCompressorRatio(config.effects.compressor.ratio);
         }
         
         // Handle global soundboard if selected (separate from global settings)
