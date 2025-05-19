@@ -24,69 +24,20 @@
       "enabled": "True"
     }
   },
-  "environments": [
-    {
-      "id": "mau20y93-gjqkqo",
-      "layers": [
-        {
-          "chance": 1,
-          "cooldownCycles": 0,
-          "id": "mau20y93-ill49q",
-          "loopLengthMs": 124551,
-          "mode": "SINGLE",
-          "name": "Mii Channel - Plaza Theme (HQ)",
-          "sounds": [
-            {
-              "fileId": "32a593d4-7f61-42e2-ba66-9a8f1911f960",
-              "frequency": 1,
-              "id": "mau20y93-9huy1m",
-              "volume": 1
-            },
-            {
-              "fileId": "32a593d4-7f61-42e2-ba66-9a8f1911f960",
-              "frequency": 0.45,
-              "id": "mau20y93-uqret2",
-              "volume": 1
-            }
-          ],
-          "volume": 1,
-          "weight": 1
-        }
-      ],
-      "maxWeight": 2,
-      "name": "New Environment",
-      "presets": [
-        {
-          "id": "mamwly9d-uz9f66",
-          "layers": [
-            {
-              "chance": 0.5,
-              "id": "mamwjvio-3ndyy7",
-              "sounds": []
-            },
-            {
-              "chance": 0.47,
-              "id": "mamyvaow-f9uz73",
-              "weight": 1.4
-            }
-          ],
-          "name": "Tension 2"
-        }
-      ],
-      "soundboard": []
-    }
-  ],
+  "environments": [],
   "files": [
     {
       "duration_ms": 124551,
-      "id": "32a593d4-7f61-42e2-ba66-9a8f1911f960",
+      "id": "fd26a312-0939-4f1b-a112-909538d6c0ab",
       "name": "Mii Channel - Plaza Theme (HQ)",
-      "original_filename": "44d6246f-8a1c-4984-b2ab-5789421bd77d",
-      "path": "/app/audio-processing/data/audio/32a593d4-7f61-42e2-ba66-9a8f1911f960.mp3",
+      "original_filename": "Mii_Channel_-_Plaza_Theme_HQ",
+      "path": "/app/audio-processing/data/audio/fd26a312-0939-4f1b-a112-909538d6c0ab.mp3",
       "peak_volume": 0.9068580865859985
     }
   ],
   "masterVolume": 1,
   "playState": "STOPPED",
-  "soundboard": []
+  "soundboard": [
+    "fd26a312-0939-4f1b-a112-909538d6c0ab"
+  ]
 }

@@ -5,6 +5,7 @@ import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import ConfigOverlay from './components/overlays/ConfigOverlay';
+import { SoundboardOverlay } from './components/overlays/SoundboardOverlay';
 import { generateId } from './utils/ids';
 import { saveWorkspace, loadWorkspace } from './services/workspaceService';
 import { listFiles } from './services/fileService';
@@ -476,6 +477,17 @@ const App: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                 <Typography>Select an environment to begin</Typography>
               </Box>
+            )}
+            {showSoundboard && (
+              <SoundboardOverlay
+                environment={activeEnvironment || { id: '', name: '', layers: [], soundboard: [], presets: [], maxWeight: 2 }}
+                onClose={handleToggleSoundboard}
+                soundFiles={soundFiles}
+                globalSoundboard={globalSoundboard}
+                onSoundFilesChange={setSoundFiles}
+                onEnvironmentUpdate={handleEnvironmentUpdate}
+                onGlobalSoundboardChange={setGlobalSoundboard}
+              />
             )}
           </Box>
           <ConfigOverlay

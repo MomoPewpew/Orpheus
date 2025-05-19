@@ -216,56 +216,58 @@ export const SoundboardOverlay: React.FC<SoundboardOverlayProps> = ({
         <DialogContent sx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
           <Box sx={{ overflow: 'auto', flexGrow: 1 }}>
             {/* Environment Sounds */}
-            <Box sx={{ mb: 3 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
-                  Environment Sounds
-                </Typography>
-                <Button
-                  startIcon={<AddIcon />}
-                  onClick={() => setShowAddEnvironmentSound(true)}
-                  size="small"
-                >
-                  Add Sound
-                </Button>
-              </Box>
-              <Droppable droppableId="environment-sounds" direction="horizontal" type="environment-sound">
-                {(provided) => (
-                  <Box 
-                    ref={provided.innerRef} 
-                    {...provided.droppableProps}
-                    sx={{ 
-                      display: 'flex',
-                      gap: 2,
-                      overflowX: 'auto',
-                      pb: 2,
-                      minHeight: 140,
-                      '&::-webkit-scrollbar': {
-                        height: 8,
-                      },
-                      '&::-webkit-scrollbar-track': {
-                        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-                        borderRadius: 4,
-                      },
-                      '&::-webkit-scrollbar-thumb': {
-                        backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                        borderRadius: 4,
-                        '&:hover': {
-                          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                        },
-                      },
-                    }}
+            {environment.id && (
+              <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+                    Environment Sounds
+                  </Typography>
+                  <Button
+                    startIcon={<AddIcon />}
+                    onClick={() => setShowAddEnvironmentSound(true)}
+                    size="small"
                   >
-                    {environment.soundboard.map((soundId, index) => (
-                      <Box key={`env-${index}-${soundId}`} sx={{ flexShrink: 0 }}>
-                        {renderSoundButton(soundId, false, index)}
-                      </Box>
-                    ))}
-                    {provided.placeholder}
-                  </Box>
-                )}
-              </Droppable>
-            </Box>
+                    Add Sound
+                  </Button>
+                </Box>
+                <Droppable droppableId="environment-sounds" direction="horizontal" type="environment-sound">
+                  {(provided) => (
+                    <Box 
+                      ref={provided.innerRef} 
+                      {...provided.droppableProps}
+                      sx={{ 
+                        display: 'flex',
+                        gap: 2,
+                        overflowX: 'auto',
+                        pb: 2,
+                        minHeight: 140,
+                        '&::-webkit-scrollbar': {
+                          height: 8,
+                        },
+                        '&::-webkit-scrollbar-track': {
+                          backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                          borderRadius: 4,
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                          borderRadius: 4,
+                          '&:hover': {
+                            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                          },
+                        },
+                      }}
+                    >
+                      {environment.soundboard.map((soundId, index) => (
+                        <Box key={`env-${index}-${soundId}`} sx={{ flexShrink: 0 }}>
+                          {renderSoundButton(soundId, false, index)}
+                        </Box>
+                      ))}
+                      {provided.placeholder}
+                    </Box>
+                  )}
+                </Droppable>
+              </Box>
+            )}
 
             <Divider sx={{ my: 3 }} />
 
