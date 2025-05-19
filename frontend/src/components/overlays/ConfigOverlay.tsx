@@ -554,6 +554,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
       if (!manifestFile) throw new Error('Invalid import file: Missing manifest');
       
       const manifest = JSON.parse(await manifestFile.async('string'));
+      console.debug('Import manifest:', manifest);
       
       // Create import selection with environment names from manifest
       setImportSelection({
@@ -604,24 +605,69 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
         }
       }
 
-      // Handle global settings if selected
-      if (selection.globalSettings) {
-        const configFile = zipData.file('data/config.json');
-        if (configFile) {
-          const config = JSON.parse(await configFile.async('string'));
-          
+      // Handle global settings and soundboard
+      const configFile = zipData.file('data/config.json');
+      if (configFile) {
+        const configContent = await configFile.async('string');
+        console.debug('Loaded config.json:', configContent);
+        const config = JSON.parse(configContent);
+        console.debug('Parsed config:', config);
+        
+        // Handle global settings if selected
+        if (selection.globalSettings) {
+          console.debug('Importing global settings');
           // Update master volume
           onMasterVolumeChange(config.masterVolume);
           
           // Update effects
           onEffectsUpdate(config.effects);
-          
-          // Update global soundboard if it exists
-          if (config.soundboard) {
-            const newSoundboard = config.soundboard.map((oldId: string) => fileIdMap.get(oldId)).filter(Boolean);
-            onGlobalSoundboardUpdate(newSoundboard);
-          }
         }
+        
+        // Handle global soundboard if selected (separate from global settings)
+        if (selection.globalSoundboard && config.soundboard) {
+          console.debug('Importing global soundboard:', {
+            selection,
+            configSoundboard: config.soundboard,
+            existingGlobalSoundboard: globalSoundboard
+          });
+          
+          const newSoundboardIds = config.soundboard
+            .map((oldId: string) => {
+              const newId = fileIdMap.get(oldId);
+              console.debug('Mapping soundboard ID:', {
+                oldId,
+                newId,
+                found: !!newId
+              });
+              return newId;
+            })
+            .filter(Boolean);
+          
+          // Create a Set from existing soundboard to remove duplicates
+          const mergedSoundboard = new Set([...globalSoundboard]);
+          
+          // Add new IDs to the set
+          newSoundboardIds.forEach((id: string) => mergedSoundboard.add(id));
+          
+          console.debug('Merged global soundboard:', {
+            originalIds: config.soundboard,
+            newIds: newSoundboardIds,
+            existingIds: globalSoundboard,
+            mergedIds: Array.from(mergedSoundboard),
+            mappedCount: newSoundboardIds.length,
+            totalCount: mergedSoundboard.size,
+            fileIdMap: Object.fromEntries(fileIdMap)
+          });
+          
+          onGlobalSoundboardUpdate(Array.from(mergedSoundboard));
+        } else {
+          console.debug('Skipping global soundboard import:', {
+            globalSoundboardSelected: selection.globalSoundboard,
+            hasSoundboardInConfig: !!config.soundboard
+          });
+        }
+      } else {
+        console.debug('No config.json found in import');
       }
 
       // Handle environments
