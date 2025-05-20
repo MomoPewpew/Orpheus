@@ -8,7 +8,10 @@ RUN apt-get update && \
     python3.11-venv \
     python3-pip \
     procps \
-    psmisc && \
+    psmisc \
+    libopus0 \
+    libopus-dev \
+    ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
 # Set working directory

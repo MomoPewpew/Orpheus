@@ -4,6 +4,11 @@ import discord
 from discord import app_commands
 from dotenv import load_dotenv
 from pathlib import Path
+from ..audio.stream import AudioStream
+import io
+from gtts import gTTS
+from pydub import AudioSegment
+from . import bot_instance
 
 # Set up logging
 logging.basicConfig(
@@ -54,7 +59,7 @@ class OrpheusBot(discord.Client):
     def __init__(self):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
-
+        
     async def setup_hook(self):
         logger.info("Setting up command tree...")
         # Get the development guild ID from environment
@@ -78,6 +83,7 @@ class OrpheusBot(discord.Client):
         logger.info("Command tree synced")
 
 bot = OrpheusBot()
+bot_instance.init(bot)  # Initialize the global bot instance
 
 @bot.event
 async def on_ready():
@@ -115,6 +121,15 @@ async def on_guild_join(guild):
     # Sync commands with the new guild
     await bot.tree.sync(guild=guild)
 
+@bot.event
+async def on_voice_state_update(member, before, after):
+    """Handle voice state changes to cleanup resources when bot is disconnected."""
+    if member.id == bot.user.id and before.channel and not after.channel:
+        # Bot was disconnected from a voice channel
+        if before.channel.guild.id in bot_instance._audio_streams:
+            logger.info(f"Bot disconnected from voice in {before.channel.guild.name}, cleaning up")
+            bot_instance.cleanup_guild(before.channel.guild.id)
+
 @bot.tree.command(name="join", description="Join your voice channel")
 async def join(interaction: discord.Interaction):
     """Join the voice channel you're currently in."""
@@ -132,7 +147,7 @@ async def join(interaction: discord.Interaction):
     try:
         logger.info(f"Joining channel {channel.name}")
         await channel.connect()
-        await interaction.response.send_message(f"Joined {channel.name}")
+        await interaction.response.send_message(f"Joined {channel.name}", ephemeral=True)
     except Exception as e:
         logger.error(f"Error joining channel: {e}")
         await interaction.response.send_message("Failed to join the voice channel. Please try again.", ephemeral=True)
@@ -151,52 +166,66 @@ async def leave(interaction: discord.Interaction):
     try:
         logger.info("Leaving voice channel")
         await interaction.guild.voice_client.disconnect()
-        await interaction.response.send_message("Left the voice channel")
+        await interaction.response.send_message("Left the voice channel", ephemeral=True)
     except Exception as e:
         logger.error(f"Error leaving channel: {e}")
         await interaction.response.send_message("Failed to leave the voice channel. Please try again.", ephemeral=True)
 
-@bot.tree.command(name="sync", description="Sync slash commands to the current guild")
-@app_commands.default_permissions(administrator=True)
-async def sync(interaction: discord.Interaction):
-    """Sync slash commands to the current guild. Admin only."""
-    logger.info(f"Sync command received from {interaction.user} in {interaction.guild.name}")
+@bot.tree.command(name="test", description="Test audio streaming with TTS")
+async def test(interaction: discord.Interaction):
+    """Test the audio streaming system with a TTS message."""
+    logger.info(f"Test command received from {interaction.user} in {interaction.guild.name}")
     
+    # Acknowledge the interaction immediately
+    await interaction.response.defer(ephemeral=True)
+    
+    # Check if bot is in a voice channel
+    voice_client = interaction.guild.voice_client
+    if not voice_client or not voice_client.is_connected():
+        logger.warning("Bot is not in a voice channel or connection is not ready")
+        await interaction.followup.send("I need to be in a voice channel first. Use /join to add me!", ephemeral=True)
+        return
+
     try:
-        # Respond immediately
-        await interaction.response.defer(ephemeral=True)
+        # Create TTS audio
+        await interaction.followup.send("Generating audio...", ephemeral=True)
+        logger.info("Generating TTS audio")
+        tts = gTTS("Testing audio streaming. If you can hear this, it's working!", lang='en')
+        mp3_buffer = io.BytesIO()
+        tts.write_to_fp(mp3_buffer)
+        mp3_buffer.seek(0)
         
-        logger.info(f"Syncing commands to guild {interaction.guild.id}")
-        # Copy global commands to guild and sync
-        bot.tree.copy_global_to(guild=interaction.guild)
-        await bot.tree.sync(guild=interaction.guild)
+        # Convert MP3 to PCM using pydub
+        logger.info("Converting audio to PCM format")
+        audio = AudioSegment.from_mp3(mp3_buffer)
         
-        # List all commands after sync
-        commands = await bot.tree.fetch_commands(guild=interaction.guild)
-        command_list = [f"{cmd.name} - {cmd.description}" for cmd in commands]
-        logger.info(f"Available commands after sync: {command_list}")
+        # Export as WAV (PCM) format with correct parameters for Discord
+        logger.info("Exporting as PCM")
+        pcm_buffer = io.BytesIO()
+        audio.export(pcm_buffer, format='wav', parameters=[
+            '-ar', '48000',  # Sample rate: 48kHz
+            '-ac', '2',      # Channels: 2 (stereo)
+            '-f', 's16le'    # Format: 16-bit little-endian PCM
+        ])
+        pcm_buffer.seek(0)
         
-        if command_list:
-            # Format commands nicely
-            command_text = "\n".join(f"• {cmd}" for cmd in command_list)
-            await interaction.followup.send(
-                f"Commands synced to this server! Available commands:\n{command_text}",
-                ephemeral=True
-            )
+        # Queue the audio
+        logger.info("Queueing audio data")
+        success = await bot_instance.queue_audio(interaction.guild_id, pcm_buffer)
+        
+        if success:
+            logger.info("Audio queued successfully")
+            await interaction.followup.send("Test audio queued! You should hear it soon.", ephemeral=True)
         else:
-            await interaction.followup.send(
-                "No commands available. This might be a bug - please try restarting the bot.",
-                ephemeral=True
-            )
+            logger.error("Failed to queue audio")
+            await interaction.followup.send("Failed to queue test audio. Please try using /join again.", ephemeral=True)
+            
+    except ValueError as e:
+        logger.error(f"Value error in test command: {e}")
+        await interaction.followup.send(str(e), ephemeral=True)
     except Exception as e:
-        logger.error(f"Error syncing commands: {e}")
-        try:
-            await interaction.followup.send(
-                "Failed to sync commands. Please try again or restart the bot.",
-                ephemeral=True
-            )
-        except:
-            logger.error("Failed to send error message")
+        logger.error(f"Error in test command: {e}", exc_info=True)
+        await interaction.followup.send("An error occurred while testing audio.", ephemeral=True)
 
 def main():
     """Run the bot."""
