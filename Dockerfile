@@ -18,24 +18,24 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Create necessary directories
-RUN mkdir -p /app/audio-processing/static \
-    /app/audio-processing/data/audio \
-    /app/discord-bot \
+RUN mkdir -p /app/audio_processing/static \
+    /app/audio_processing/data/audio \
+    /app/discord_bot \
     /app/frontend && \
-    chmod -R 777 /app/audio-processing/data  # Ensure directory is writable
+    chmod -R 777 /app/audio_processing/data  # Ensure directory is writable
 
 # Create and activate virtual environment
 RUN python3.11 -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
 
 # Copy backend requirements first
-COPY audio-processing/requirements.txt /app/audio-processing/
-COPY discord-bot/requirements.txt /app/discord-bot/
+COPY audio_processing/requirements.txt /app/audio_processing/
+COPY discord_bot/requirements.txt /app/discord_bot/
 
 # Install Python dependencies in virtual environment
 RUN . /app/venv/bin/activate && \
-    pip install --no-cache-dir -r /app/audio-processing/requirements.txt && \
-    pip install --no-cache-dir -r /app/discord-bot/requirements.txt
+    pip install --no-cache-dir -r /app/audio_processing/requirements.txt && \
+    pip install --no-cache-dir -r /app/discord_bot/requirements.txt
 
 # Set up frontend
 WORKDIR /app/frontend
@@ -61,21 +61,21 @@ RUN npm run build
 
 # Copy application code
 WORKDIR /app
-COPY audio-processing/ /app/audio-processing/
-COPY discord-bot/ /app/discord-bot/
+COPY audio_processing/ /app/audio_processing/
+COPY discord_bot/ /app/discord_bot/
 
 # Create startup script
 RUN echo '#!/bin/bash\n\
 source /app/venv/bin/activate\n\
 echo "Checking data directory permissions..."\n\
-ls -la /app/audio-processing/data\n\
+ls -la /app/audio_processing/data\n\
 echo "Current working directory: $(pwd)"\n\
 echo "Starting Discord bot..."\n\
-cd /app/discord-bot && PYTHONPATH=/app/discord-bot python -m src.bot.__main__ > discord.log 2>&1 & \n\
+cd /app/discord_bot && PYTHONPATH=/app/discord_bot python -m src.bot.__main__ > discord.log 2>&1 & \n\
 echo "Starting frontend development server..."\n\
 cd /app/frontend && NODE_OPTIONS="--max-old-space-size=4096" npm start & \n\
 echo "Starting Flask server in development mode..."\n\
-cd /app/audio-processing && FLASK_ENV=development FLASK_DEBUG=1 python -m flask run --host=0.0.0.0 --port=5000\n' > /app/start.sh && \
+cd /app/audio_processing && FLASK_ENV=development FLASK_DEBUG=1 python -m flask run --host=0.0.0.0 --port=5000\n' > /app/start.sh && \
     chmod +x /app/start.sh
 
 # Expose ports

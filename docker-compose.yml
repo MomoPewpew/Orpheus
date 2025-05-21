@@ -9,16 +9,16 @@ services:
       - "3000:3000"  # Frontend dev server port
     volumes:
       # Development volumes for hot reloading
-      - ./audio-processing:/app/audio-processing
-      - ./discord-bot:/app/discord-bot
+      - ./audio_processing:/app/audio_processing
+      - ./discord_bot:/app/discord_bot
       - ./frontend/src:/app/frontend/src:cached
       - ./frontend/public:/app/frontend/public:cached
       # Exclude node_modules from volume mount
       - /app/frontend/node_modules
       # Persist data
-      - ./audio-processing/data:/app/audio-processing/data
+      - ./audio_processing/data:/app/audio_processing/data
       # Don't override the static files from the frontend build
-      - /app/audio-processing/static
+      - /app/audio_processing/static
     environment:
       - NODE_ENV=development
       - PYTHONUNBUFFERED=1  # Better Python logging

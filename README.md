@@ -4,7 +4,7 @@ Orpheus is a Discord bot designed to play ambient sounds and layered musical tra
 
 ## Components
 
-1. **Discord Bot** (`/discord-bot`)
+1. **Discord Bot** (`/discord_bot`)
    - Handles joining voice channels and streaming audio
    - Written in Python using discord.py
 
@@ -52,7 +52,7 @@ Orpheus is a Discord bot designed to play ambient sounds and layered musical tra
 
 ```
 Orpheus/
-├── discord-bot/     # Discord bot component
+├── discord_bot/     # Discord bot component
 ├── frontend/        # Main web panel
 ├── backend/         # Backend server
 └── audio-player/    # Minimal audio player

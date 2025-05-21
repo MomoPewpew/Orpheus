@@ -27,4 +27,4 @@ env/
 
 # Data directories (will be created in container)
 **/data/
-**/audio-processing/data/ 
+**/audio_processing/data/ 
