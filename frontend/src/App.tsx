@@ -431,15 +431,13 @@ const App: React.FC = () => {
         // Update the target environment
         return {
           ...env,
-          playState: newState,
-          _fadeStartTime: Date.now()
+          playState: newState
         };
       } else if (newState === PlayState.Playing && env.playState === PlayState.Playing) {
         // Stop any other playing environments when starting a new one
         return {
           ...env,
-          playState: PlayState.Stopped,
-          _fadeStartTime: Date.now()
+          playState: PlayState.Stopped
         };
       }
       return env;

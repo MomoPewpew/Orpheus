@@ -150,9 +150,6 @@ def ensure_workspace_dir():
             if 'environments' in current_config:
                 for env in current_config['environments']:
                     env['playState'] = 'STOPPED'
-                    # Clear any fade timing fields that might have been saved
-                    env.pop('_fadeStartTime', None)
-                    env.pop('_fadeEndTime', None)
         except json.JSONDecodeError:
             logger.error("Error reading config file, starting fresh")
             current_config = {}
