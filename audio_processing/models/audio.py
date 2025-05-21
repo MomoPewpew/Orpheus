@@ -178,6 +178,45 @@ class Environment:
             effects=Effects.from_dict(data.get('effects', {}))
         )
 
+    def get_active_preset(self) -> Optional['Preset']:
+        """Get the currently active preset if any"""
+        if not self.active_preset_id:
+            return None
+        return next((p for p in self.presets if p.id == self.active_preset_id), None)
+
+    def get_preset_layer(self, layer_id: str, preset: Optional['Preset'] = None) -> Optional['PresetLayer']:
+        """Get preset layer override for a given layer ID"""
+        if not preset:
+            preset = self.get_active_preset()
+        if not preset:
+            return None
+        return next((pl for pl in preset.layers if pl.id == layer_id), None)
+
+    def get_effective_values(self) -> 'EffectiveEnvironment':
+        """Get effective values with any active preset applied"""
+        from .effective import EffectiveEnvironment, EffectiveLayer
+        
+        # Get active preset if any
+        preset = self.get_active_preset()
+        
+        # Get effective max weight
+        max_weight = preset.max_weight if preset and preset.max_weight is not None else self.max_weight
+        
+        # Get effective layers
+        effective_layers = []
+        for layer in self.layers:
+            preset_layer = self.get_preset_layer(layer.id, preset)
+            effective_layers.append(EffectiveLayer.from_layer(layer, preset_layer))
+            
+        return EffectiveEnvironment(
+            id=self.id,
+            name=self.name,
+            max_weight=max_weight,
+            layers=effective_layers,
+            effects=self.effects,  # Effects aren't preset-overridable yet
+            soundboard=self.soundboard  # Soundboard isn't preset-overridable yet
+        )
+
 @dataclass
 class ActiveEnvironment:
     """Represents the active environment and its state"""
