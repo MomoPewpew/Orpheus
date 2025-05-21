@@ -426,22 +426,32 @@ const App: React.FC = () => {
       PlayState.Stopped : 
       PlayState.Playing;
     
-    setEnvironments(prevEnvironments => prevEnvironments.map(env => {
-      if (env.id === activeEnvironment.id) {
-        // Update the target environment
-        return {
-          ...env,
-          playState: newState
-        };
-      } else if (newState === PlayState.Playing && env.playState === PlayState.Playing) {
-        // Stop any other playing environments when starting a new one
-        return {
-          ...env,
-          playState: PlayState.Stopped
-        };
+    setEnvironments(prevEnvironments => {
+      const newEnvironments = prevEnvironments.map(env => {
+        if (env.id === activeEnvironment.id) {
+          // Update the target environment
+          return {
+            ...env,
+            playState: newState
+          };
+        } else if (newState === PlayState.Playing && env.playState === PlayState.Playing) {
+          // Stop any other playing environments when starting a new one
+          return {
+            ...env,
+            playState: PlayState.Stopped
+          };
+        }
+        return env;
+      });
+
+      // Also update the active environment reference
+      const updatedActiveEnv = newEnvironments.find(env => env.id === activeEnvironment.id);
+      if (updatedActiveEnv) {
+        setActiveEnvironment(updatedActiveEnv);
       }
-      return env;
-    }));
+
+      return newEnvironments;
+    });
   };
 
   if (isLoading) {
