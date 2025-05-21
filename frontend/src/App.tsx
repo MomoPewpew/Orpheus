@@ -56,9 +56,11 @@ const App: React.FC = () => {
         if (workspace.effects) {
           setEffects(workspace.effects);
         }
-        // Set first environment as active if we have any
+        
+        // Set active environment: first playing one, or first one if none playing
         if (workspace.environments.length > 0) {
-          setActiveEnvironment(workspace.environments[0]);
+          const playingEnv = workspace.environments.find(env => env.playState === PlayState.Playing);
+          setActiveEnvironment(playingEnv || workspace.environments[0]);
         }
       })
       .catch((error) => {
