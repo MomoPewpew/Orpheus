@@ -77,27 +77,11 @@ export interface Effects {
 }
 
 /**
- * Represents a complete audio environment (e.g., "Town", "Dungeon")
- */
-export interface Environment {
-  id: string;
-  name: string;
-  maxWeight: number;
-  layers: Layer[];
-  presets: Preset[];
-  backgroundImage?: string;
-  soundboard: string[]; // List of sound IDs for quick playback
-  activePresetId?: string;  // undefined means using default preset
-  effects?: Effects;  // Audio effects configuration
-}
-
-/**
- * Represents the playback state of the application
+ * Represents the playback state of an environment
  */
 export enum PlayState {
   Playing = 'PLAYING',
-  Stopped = 'STOPPED',
-  Loading = 'LOADING'  // For when we're loading a new environment or initializing
+  Stopped = 'STOPPED'
 }
 
 /**
@@ -111,14 +95,28 @@ export interface ActiveEnvironment {
 }
 
 /**
+ * Represents a complete audio environment (e.g., "Town", "Dungeon")
+ */
+export interface Environment {
+  id: string;
+  name: string;
+  maxWeight: number;
+  layers: Layer[];
+  presets: Preset[];
+  backgroundImage?: string;
+  soundboard: string[]; // List of sound IDs for quick playback
+  activePresetId?: string;  // undefined means using default preset
+  effects?: Effects;  // Audio effects configuration
+  playState: PlayState; // Current play state of this environment
+}
+
+/**
  * Represents the complete application state
  */
 export interface AppState {
   environments: Environment[];
   masterVolume: number;      // Global volume multiplier (0-1)
   soundboard: string[];      // Global sound IDs available in all environments
-  playState: PlayState;      // Current play state of the application
-  activeEnvironment?: ActiveEnvironment; // Currently active environment and its state
 }
 
 /**
@@ -187,7 +185,9 @@ export function isEnvironment(obj: any): obj is Environment {
     obj.presets.every(isPreset) &&
     typeof obj.maxWeight === 'number' &&
     (obj.activePresetId === undefined || typeof obj.activePresetId === 'string') &&
-    (obj.effects === undefined || typeof obj.effects === 'object')
+    (obj.effects === undefined || typeof obj.effects === 'object') &&
+    typeof obj.playState === 'string' &&
+    Object.values(PlayState).includes(obj.playState)
   );
 }
 

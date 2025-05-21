@@ -22,7 +22,6 @@ def load_workspace() -> dict:
             return {
                 "files": [],
                 "environments": [],
-                "playState": "STOPPED",
                 "masterVolume": 1,
                 "soundboard": [],
                 "effects": {
@@ -45,7 +44,6 @@ def load_workspace() -> dict:
             logger.debug(f"Loaded config: {config}")
             return {
                 "environments": config.get("environments", []),
-                "playState": config.get("playState", "STOPPED"),
                 "masterVolume": config.get("masterVolume", 1),
                 "soundboard": config.get("soundboard", []),
                 "effects": config.get("effects", {
@@ -67,7 +65,6 @@ def load_workspace() -> dict:
         logger.error(f"Error loading config: {e}")
         return {
             "environments": [],
-            "playState": "STOPPED",
             "masterVolume": 1,
             "soundboard": [],
             "effects": {
@@ -104,7 +101,6 @@ def save_workspace(workspace: dict):
         # Create a clean config with only the fields we need
         new_config = {
             "environments": workspace.get("environments", []),
-            "playState": workspace.get("playState", "STOPPED"),
             "masterVolume": workspace.get("masterVolume", 1),
             "soundboard": workspace.get("soundboard", []),
             "files": current_config.get("files", []),
@@ -143,18 +139,23 @@ def ensure_workspace_dir():
     logger.debug(f"Ensuring workspace directory exists: {DATA_DIR}")
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     
-    # Always reset playState to STOPPED on server startup
+    # Reset all environment playStates to STOPPED on server startup
     current_config = {}
     if CONFIG_FILE.exists():
         try:
             with open(CONFIG_FILE, 'r') as f:
                 current_config = json.load(f)
+                
+            # Update all environments to STOPPED state while preserving other settings
+            if 'environments' in current_config:
+                for env in current_config['environments']:
+                    env['playState'] = 'STOPPED'
+                    # Clear any fade timing fields that might have been saved
+                    env.pop('_fadeStartTime', None)
+                    env.pop('_fadeEndTime', None)
         except json.JSONDecodeError:
             logger.error("Error reading config file, starting fresh")
             current_config = {}
-    
-    # Update config with STOPPED state while preserving other settings
-    current_config["playState"] = "STOPPED"
     
     # Save the updated config
     with open(CONFIG_FILE, 'w') as f:
@@ -209,7 +210,7 @@ def update_workspace():
             return jsonify({"error": f"Expected dict, got {type(workspace)}"}), 400
             
         # Validate required fields
-        required_fields = {'environments', 'files', 'masterVolume', 'soundboard', 'playState', 'effects'}
+        required_fields = {'environments', 'files', 'masterVolume', 'soundboard', 'effects'}
         missing_fields = required_fields - set(workspace.keys())
         if missing_fields:
             return jsonify({"error": f"Missing required fields: {missing_fields}"}), 400

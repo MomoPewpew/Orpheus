@@ -10,10 +10,9 @@ class LayerMode(str, Enum):
     SINGLE = 'SINGLE'
 
 class PlayState(str, Enum):
-    """Represents the playback state of the application"""
+    """Represents the playback state of an environment"""
     PLAYING = 'PLAYING'
     STOPPED = 'STOPPED'
-    LOADING = 'LOADING'
 
 @dataclass
 class SoundFile:
@@ -153,15 +152,62 @@ class Environment:
     name: str
     max_weight: float
     layers: List[Layer]
-    presets: List['Preset']  # Forward reference since Preset isn't defined yet
+    presets: List['Preset']
     background_image: Optional[str] = None
     soundboard: List[str] = None  # List of sound IDs for quick playback
     active_preset_id: Optional[str] = None
     effects: Optional[Effects] = None
+    play_state: PlayState = PlayState.STOPPED
+    
+    # Runtime-only fields (not serialized)
+    _fade_start_time: Optional[float] = None
+    _fade_end_time: Optional[float] = None
 
     def __post_init__(self):
         if self.soundboard is None:
             self.soundboard = []
+
+    @property
+    def is_fading(self) -> bool:
+        """Check if the environment is currently fading"""
+        return bool(self._fade_start_time and self._fade_end_time)
+
+    @property
+    def fade_progress(self) -> float:
+        """Get the current fade progress (0.0 to 1.0)"""
+        if not self.is_fading or self._fade_start_time is None or self._fade_end_time is None:
+            return 1.0 if self.play_state == PlayState.PLAYING else 0.0
+            
+        import time
+        current_time = time.time()
+        
+        # Clamp progress between 0 and 1
+        progress = max(0.0, min(1.0, 
+            (current_time - self._fade_start_time) / 
+            (self._fade_end_time - self._fade_start_time)
+        ))
+        
+        # Invert progress for fade out (when state is STOPPED)
+        return progress if self.play_state == PlayState.PLAYING else (1.0 - progress)
+
+    def start_fade(self, fade_in: bool, duration_seconds: float):
+        """Start fading this environment in or out"""
+        import time
+        current_time = time.time()
+        
+        self._fade_start_time = current_time
+        self._fade_end_time = current_time + duration_seconds
+        self.play_state = PlayState.PLAYING if fade_in else PlayState.STOPPED
+
+    def update_fade_state(self):
+        """Update the fade state based on current time"""
+        if not self.is_fading:
+            return
+            
+        # If fade is complete, clear the fade timing fields
+        if self.fade_progress >= 1.0 or self.fade_progress <= 0.0:
+            self._fade_start_time = None
+            self._fade_end_time = None
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'Environment':
@@ -175,8 +221,24 @@ class Environment:
             background_image=data.get('backgroundImage'),
             soundboard=data.get('soundboard', []),
             active_preset_id=data.get('activePresetId'),
-            effects=Effects.from_dict(data.get('effects', {}))
+            effects=Effects.from_dict(data.get('effects', {})),
+            play_state=PlayState(data.get('playState', PlayState.STOPPED.value))
         )
+
+    def to_dict(self) -> Dict:
+        """Convert to dictionary for serialization"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'maxWeight': self.max_weight,
+            'layers': [layer.__dict__ for layer in self.layers],
+            'presets': [preset.__dict__ for preset in self.presets],
+            'backgroundImage': self.background_image,
+            'soundboard': self.soundboard,
+            'activePresetId': self.active_preset_id,
+            'effects': self.effects.__dict__ if self.effects else None,
+            'playState': self.play_state.value
+        }
 
     def get_active_preset(self) -> Optional['Preset']:
         """Get the currently active preset if any"""
@@ -240,26 +302,42 @@ class AppState:
     environments: List[Environment]
     master_volume: float  # Global volume multiplier (0-1)
     soundboard: List[str]  # Global sound IDs available in all environments
-    play_state: PlayState
-    active_environment: Optional[ActiveEnvironment] = None
+
+    @property
+    def active_environments(self) -> List[Environment]:
+        """Get all environments that are currently active (playing or fading)"""
+        return [env for env in self.environments 
+                if env.play_state != PlayState.STOPPED]
+
+    def get_environment_volume(self, env_id: str) -> float:
+        """Get the effective volume for an environment including fade state"""
+        env = next((e for e in self.environments if e.id == env_id), None)
+        if not env:
+            return 0.0
+            
+        # Base volume is master volume
+        volume = self.master_volume
+        
+        # Apply fade progress
+        if env.is_fading:
+            volume *= env.fade_progress
+        elif env.play_state == PlayState.STOPPED:
+            volume = 0.0
+            
+        return volume
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'AppState':
         return cls(
             environments=[Environment.from_dict(e) for e in data['environments']],
             master_volume=float(data['masterVolume']),
-            soundboard=data['soundboard'],
-            play_state=PlayState(data['playState']),
-            active_environment=ActiveEnvironment.from_dict(data['activeEnvironment']) 
-                if data.get('activeEnvironment') else None
+            soundboard=data['soundboard']
         )
 
     def to_dict(self) -> Dict:
         """Convert the AppState to a dictionary"""
         return {
-            'environments': [env.__dict__ for env in self.environments],
+            'environments': [env.to_dict() for env in self.environments],
             'masterVolume': self.master_volume,
-            'soundboard': self.soundboard,
-            'playState': self.play_state.value,
-            'activeEnvironment': self.active_environment.__dict__ if self.active_environment else None
+            'soundboard': self.soundboard
         } 

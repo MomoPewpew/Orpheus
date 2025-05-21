@@ -37,7 +37,6 @@ const App: React.FC = () => {
       ratio: 1
     }
   });
-  const [playState, setPlayState] = useState<string | null>(null);
 
   // Load initial workspace and sound files
   useEffect(() => {
@@ -61,8 +60,6 @@ const App: React.FC = () => {
         if (workspace.environments.length > 0) {
           setActiveEnvironment(workspace.environments[0]);
         }
-        // Set the play state from workspace
-        setPlayState(workspace.playState === 'STOPPED' ? null : workspace.playState);
       })
       .catch((error) => {
         console.error('Failed to load workspace or files:', error);
@@ -85,7 +82,6 @@ const App: React.FC = () => {
             ratio: 1
           }
         });
-        setPlayState(null);
       })
       .finally(() => {
         setIsLoading(false);
@@ -108,14 +104,13 @@ const App: React.FC = () => {
       soundboard: globalSoundboard,
       masterVolume,
       effects,
-      playState: playState || 'STOPPED'
     };
 
     console.debug('Saving state:', state);
     saveWorkspace(state).catch((error) => {
       console.error('Failed to save workspace:', error);
     });
-  }, [environments, soundFiles, globalSoundboard, masterVolume, effects, playState, isLoading]);
+  }, [environments, soundFiles, globalSoundboard, masterVolume, effects, isLoading]);
 
   const handleNewEnvironment = () => {
     const newEnvironment: Environment = {
@@ -124,10 +119,11 @@ const App: React.FC = () => {
       layers: [],
       soundboard: [],
       presets: [],
-      maxWeight: 2
+      maxWeight: 2,
+      playState: PlayState.Stopped
     };
 
-    setEnvironments(prevEnvironments => [...prevEnvironments, newEnvironment]);
+    setEnvironments((prevEnvironments: Environment[]) => [...prevEnvironments, newEnvironment]);
     setActiveEnvironment(newEnvironment);
   };
 
@@ -425,13 +421,29 @@ const App: React.FC = () => {
   const handlePlayStop = () => {
     if (!activeEnvironment) return;
     
-    // If this environment is playing, stop it
-    if (playState === activeEnvironment.id) {
-      setPlayState(null);
-    } else {
-      // Stop any currently playing environment and start this one
-      setPlayState(activeEnvironment.id);
-    }
+    // Toggle the active environment's state
+    const newState = activeEnvironment.playState === PlayState.Playing ? 
+      PlayState.Stopped : 
+      PlayState.Playing;
+    
+    setEnvironments(prevEnvironments => prevEnvironments.map(env => {
+      if (env.id === activeEnvironment.id) {
+        // Update the target environment
+        return {
+          ...env,
+          playState: newState,
+          _fadeStartTime: Date.now()
+        };
+      } else if (newState === PlayState.Playing && env.playState === PlayState.Playing) {
+        // Stop any other playing environments when starting a new one
+        return {
+          ...env,
+          playState: PlayState.Stopped,
+          _fadeStartTime: Date.now()
+        };
+      }
+      return env;
+    }));
   };
 
   if (isLoading) {
@@ -490,7 +502,6 @@ const App: React.FC = () => {
                 onGlobalSoundboardChange={setGlobalSoundboard}
                 onToggleSoundboard={handleToggleSoundboard}
                 onPlayStop={handlePlayStop}
-                playState={playState}
               />
             ) : (
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -499,7 +510,15 @@ const App: React.FC = () => {
             )}
             {showSoundboard && (
               <SoundboardOverlay
-                environment={activeEnvironment || { id: '', name: '', layers: [], soundboard: [], presets: [], maxWeight: 2 }}
+                environment={activeEnvironment || { 
+                  id: '', 
+                  name: '', 
+                  layers: [], 
+                  soundboard: [], 
+                  presets: [], 
+                  maxWeight: 2,
+                  playState: PlayState.Stopped 
+                }}
                 onClose={handleToggleSoundboard}
                 soundFiles={soundFiles}
                 globalSoundboard={globalSoundboard}

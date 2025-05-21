@@ -18,7 +18,7 @@ import {
   Divider,
 } from '@mui/material';
 import { Add as AddIcon, Delete, Settings, PlayArrow, Stop } from '@mui/icons-material';
-import { Environment, Layer, Preset, SoundFile, setLayerVolume, getLayerVolume, LayerSound } from '../types/audio';
+import { Environment, Layer, Preset, SoundFile, setLayerVolume, getLayerVolume, LayerSound, PlayState } from '../types/audio';
 import { generateId } from '../utils/ids';
 import { LayerControls } from './layers/LayerControls';
 import AddLayerDialog from './AddLayerDialog';
@@ -46,7 +46,6 @@ interface MainContentProps {
   onGlobalSoundboardChange: (soundIds: string[]) => void;
   onToggleSoundboard: () => void;
   onPlayStop: () => void;
-  playState: string | null;
 }
 
 const DRAWER_WIDTH = 300;
@@ -69,7 +68,6 @@ export const MainContent: React.FC<MainContentProps> = ({
   onGlobalSoundboardChange,
   onToggleSoundboard,
   onPlayStop,
-  playState,
 }) => {
   const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
   const [showAddLayer, setShowAddLayer] = useState(false);
@@ -377,10 +375,10 @@ export const MainContent: React.FC<MainContentProps> = ({
                     }
                   }}
                 >
-                  {playState === environment.id ? (
-                    <Stop sx={{ fontSize: 28 }} />
+                  {environment.playState === PlayState.Playing ? (
+                    <Stop />
                   ) : (
-                    <PlayArrow sx={{ fontSize: 28 }} />
+                    <PlayArrow />
                   )}
                 </IconButton>
               </Box>
