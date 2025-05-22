@@ -1,7 +1,7 @@
 from flask import Flask
 from flask_cors import CORS
-from routes.workspace import workspace_bp, ensure_workspace_dir
-from routes.files import files_bp
+from audio_processing.routes.workspace import workspace_bp, ensure_workspace_dir
+from audio_processing.routes.files import files_bp
 import os
 import logging
 

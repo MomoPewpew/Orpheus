@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Dict
 from enum import Enum
 import uuid
@@ -57,36 +57,83 @@ class LayerSound:
 @dataclass
 class Effects:
     """Represents the audio effects configuration"""
+    @dataclass
     class Normalize:
         enabled: bool = False
+        
+        def to_dict(self) -> Dict:
+            return {
+                "enabled": self.enabled
+            }
 
+    @dataclass
     class Fades:
         fade_in_duration: int = 0
         crossfade_duration: int = 0
+        
+        def to_dict(self) -> Dict:
+            return {
+                "fadeInDuration": self.fade_in_duration,
+                "crossfadeDuration": self.crossfade_duration
+            }
 
+    @dataclass
     class Filters:
+        @dataclass
         class HighPass:
             frequency: float = 0.0
+            
+            def to_dict(self) -> Dict:
+                return {
+                    "frequency": self.frequency
+                }
 
+        @dataclass
         class LowPass:
             frequency: float = 20000.0
+            
+            def to_dict(self) -> Dict:
+                return {
+                    "frequency": self.frequency
+                }
 
+        @dataclass
         class DampenSpeechRange:
             amount: float = 0.0
+            
+            def to_dict(self) -> Dict:
+                return {
+                    "amount": self.amount
+                }
 
-        high_pass: HighPass = HighPass()
-        low_pass: LowPass = LowPass()
-        dampen_speech_range: DampenSpeechRange = DampenSpeechRange()
+        high_pass: HighPass = field(default_factory=lambda: Effects.Filters.HighPass())
+        low_pass: LowPass = field(default_factory=lambda: Effects.Filters.LowPass())
+        dampen_speech_range: DampenSpeechRange = field(default_factory=lambda: Effects.Filters.DampenSpeechRange())
+        
+        def to_dict(self) -> Dict:
+            return {
+                "highPass": self.high_pass.to_dict(),
+                "lowPass": self.low_pass.to_dict(),
+                "dampenSpeechRange": self.dampen_speech_range.to_dict()
+            }
 
+    @dataclass
     class Compressor:
         low_threshold: float = -60.0
         high_threshold: float = -12.0
         ratio: float = 2.0
+        
+        def to_dict(self) -> Dict:
+            return {
+                "lowThreshold": self.low_threshold,
+                "highThreshold": self.high_threshold,
+                "ratio": self.ratio
+            }
 
-    normalize: Normalize = Normalize()
-    fades: Fades = Fades()
-    filters: Filters = Filters()
-    compressor: Compressor = Compressor()
+    normalize: Normalize = field(default_factory=lambda: Effects.Normalize())
+    fades: Fades = field(default_factory=lambda: Effects.Fades())
+    filters: Filters = field(default_factory=lambda: Effects.Filters())
+    compressor: Compressor = field(default_factory=lambda: Effects.Compressor())
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'Effects':
@@ -117,6 +164,15 @@ class Effects:
             effects.compressor.ratio = comp['ratio']
 
         return effects
+
+    def to_dict(self) -> Dict:
+        """Convert to dictionary for serialization"""
+        return {
+            "normalize": self.normalize.to_dict(),
+            "fades": self.fades.to_dict(),
+            "filters": self.filters.to_dict(),
+            "compressor": self.compressor.to_dict()
+        }
 
 @dataclass
 class Layer:
@@ -156,7 +212,6 @@ class Environment:
     background_image: Optional[str] = None
     soundboard: List[str] = None  # List of sound IDs for quick playback
     active_preset_id: Optional[str] = None
-    effects: Optional[Effects] = None
     play_state: PlayState = PlayState.STOPPED
     
     # Runtime-only fields (not serialized)
@@ -221,7 +276,6 @@ class Environment:
             background_image=data.get('backgroundImage'),
             soundboard=data.get('soundboard', []),
             active_preset_id=data.get('activePresetId'),
-            effects=Effects.from_dict(data.get('effects', {})),
             play_state=PlayState(data.get('playState', PlayState.STOPPED.value))
         )
 
@@ -236,7 +290,6 @@ class Environment:
             'backgroundImage': self.background_image,
             'soundboard': self.soundboard,
             'activePresetId': self.active_preset_id,
-            'effects': self.effects.__dict__ if self.effects else None,
             'playState': self.play_state.value
         }
 
@@ -302,6 +355,7 @@ class AppState:
     environments: List[Environment]
     master_volume: float  # Global volume multiplier (0-1)
     soundboard: List[str]  # Global sound IDs available in all environments
+    effects: Effects = field(default_factory=Effects)  # Global effects configuration
 
     @property
     def active_environments(self) -> List[Environment]:
@@ -331,7 +385,8 @@ class AppState:
         return cls(
             environments=[Environment.from_dict(e) for e in data['environments']],
             master_volume=float(data['masterVolume']),
-            soundboard=data['soundboard']
+            soundboard=data['soundboard'],
+            effects=Effects.from_dict(data.get('effects', {}))
         )
 
     def to_dict(self) -> Dict:
@@ -339,5 +394,6 @@ class AppState:
         return {
             'environments': [env.to_dict() for env in self.environments],
             'masterVolume': self.master_volume,
-            'soundboard': self.soundboard
+            'soundboard': self.soundboard,
+            'effects': self.effects.to_dict()
         } 

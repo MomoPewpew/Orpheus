@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import logging
+from audio_processing.models.audio import AppState, Environment, PlayState
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -14,17 +15,16 @@ workspace_bp = Blueprint('workspace', __name__)
 DATA_DIR = Path(__file__).parent.parent / 'data'
 CONFIG_FILE = DATA_DIR / 'config.json'
 
-def load_workspace() -> dict:
+def load_workspace() -> AppState:
     """Load the workspace configuration."""
     try:
         if not CONFIG_FILE.exists():
             logger.debug("Config file not found, creating default")
-            return {
-                "files": [],
-                "environments": [],
-                "masterVolume": 1,
-                "soundboard": [],
-                "effects": {
+            return AppState(
+                environments=[],
+                master_volume=1.0,
+                soundboard=[],
+                effects={
                     "normalize": { "enabled": True },
                     "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
                     "filters": {
@@ -38,36 +38,20 @@ def load_workspace() -> dict:
                         "ratio": 1
                     }
                 }
-            }
+            )
         with open(CONFIG_FILE, 'r') as f:
             config = json.load(f)
             logger.debug(f"Loaded config: {config}")
-            return {
-                "environments": config.get("environments", []),
-                "masterVolume": config.get("masterVolume", 1),
-                "soundboard": config.get("soundboard", []),
-                "effects": config.get("effects", {
-                    "normalize": { "enabled": True },
-                    "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
-                    "filters": {
-                        "highPass": { "frequency": 400 },
-                        "lowPass": { "frequency": 10000 },
-                        "dampenSpeechRange": { "amount": 0 }
-                    },
-                    "compressor": {
-                        "lowThreshold": -40,
-                        "highThreshold": 0,
-                        "ratio": 1
-                    }
-                })
-            }
+            app_state = AppState.from_dict(config)
+            logger.debug(f"Number of environments loaded: {len(app_state.environments)}")
+            return app_state
     except Exception as e:
         logger.error(f"Error loading config: {e}")
-        return {
-            "environments": [],
-            "masterVolume": 1,
-            "soundboard": [],
-            "effects": {
+        return AppState(
+            environments=[],
+            master_volume=1.0,
+            soundboard=[],
+            effects={
                 "normalize": { "enabled": True },
                 "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
                 "filters": {
@@ -81,12 +65,13 @@ def load_workspace() -> dict:
                     "ratio": 1
                 }
             }
-        }
+        )
 
-def save_workspace(workspace: dict):
+def save_workspace(app_state: AppState):
     """Save the workspace configuration."""
     try:
-        logger.debug(f"Saving workspace state: {workspace}")
+        logger.debug(f"Saving workspace state with {len(app_state.environments)} environments")
+        
         # Load existing config to preserve files data
         current_config = {}
         if CONFIG_FILE.exists():
@@ -95,41 +80,18 @@ def save_workspace(workspace: dict):
                     current_config = json.load(f)
                 except json.JSONDecodeError as e:
                     logger.error(f"Error reading existing config: {e}")
-                    # If config is corrupted, start fresh
                     current_config = {}
         
-        # Create a clean config with only the fields we need
-        new_config = {
-            "environments": workspace.get("environments", []),
-            "masterVolume": workspace.get("masterVolume", 1),
-            "soundboard": workspace.get("soundboard", []),
-            "files": current_config.get("files", []),
-            "effects": workspace.get("effects", {
-                "normalize": { "enabled": True },
-                "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
-                "filters": {
-                    "highPass": { "frequency": 400 },
-                    "lowPass": { "frequency": 10000 },
-                    "dampenSpeechRange": { "amount": 0 }
-                },
-                "compressor": {
-                    "lowThreshold": -40,
-                    "highThreshold": 0,
-                    "ratio": 1
-                }
-            })
-        }
+        # Convert AppState to dict and merge with existing files
+        new_config = app_state.to_dict()
+        new_config['files'] = current_config.get('files', [])
             
         # Write the new config
         with open(CONFIG_FILE, 'w') as f:
-            # Validate JSON first
-            try:
-                # Convert to string with pretty printing
-                json_str = json.dumps(new_config, indent=2, sort_keys=True)
-                f.write(json_str)
-            except Exception as e:
-                logger.error(f"Error serializing config: {e}")
-                raise
+            # Convert to string with pretty printing
+            json_str = json.dumps(new_config, indent=2, sort_keys=True)
+            f.write(json_str)
+            logger.debug(f"Saved config with {len(new_config['environments'])} environments")
     except Exception as e:
         logger.error(f"Error saving config: {e}")
         raise
@@ -140,23 +102,18 @@ def ensure_workspace_dir():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     
     # Reset all environment playStates to STOPPED on server startup
-    current_config = {}
     if CONFIG_FILE.exists():
         try:
-            with open(CONFIG_FILE, 'r') as f:
-                current_config = json.load(f)
+            app_state = load_workspace()
+            
+            # Update all environments to STOPPED state
+            for env in app_state.environments:
+                env.play_state = PlayState.STOPPED
                 
-            # Update all environments to STOPPED state while preserving other settings
-            if 'environments' in current_config:
-                for env in current_config['environments']:
-                    env['playState'] = 'STOPPED'
-        except json.JSONDecodeError:
-            logger.error("Error reading config file, starting fresh")
-            current_config = {}
-    
-    # Save the updated config
-    with open(CONFIG_FILE, 'w') as f:
-        json.dump(current_config, f, indent=2)
+            # Save the updated state
+            save_workspace(app_state)
+        except Exception as e:
+            logger.error(f"Error resetting play states: {e}")
 
 # Call this when the blueprint is created
 ensure_workspace_dir()
@@ -165,8 +122,8 @@ ensure_workspace_dir()
 def get_workspace():
     """Get the current workspace state."""
     try:
-        workspace = load_workspace()
-        return jsonify(workspace)
+        app_state = load_workspace()
+        return jsonify(app_state.to_dict())
     except Exception as e:
         logger.error(f"Error getting workspace: {e}")
         return jsonify({"error": str(e)}), 500
@@ -183,37 +140,22 @@ def update_workspace():
         logger.debug(f"First 200 chars: {raw_data[:200]}")
         logger.debug(f"Last 200 chars: {raw_data[-200:] if len(raw_data) > 200 else raw_data}")
         
-        # Try to parse JSON strictly
+        # Parse JSON and convert to AppState
         try:
-            # First try to parse with strict=False to see if it's valid JSON at all
-            workspace = json.loads(raw_data, strict=False)
-            logger.debug("Initial JSON parse successful")
-            
-            # Now try with strict=True to catch any formatting issues
-            workspace = json.loads(raw_data, strict=True)
-            logger.debug("Strict JSON parse successful")
+            data = json.loads(raw_data, strict=True)
+            logger.debug(f"Number of environments in incoming JSON: {len(data.get('environments', []))}")
+            app_state = AppState.from_dict(data)
+            logger.debug(f"Number of environments after parsing: {len(app_state.environments)}")
+            save_workspace(app_state)
+            return jsonify({"status": "success"})
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {str(e)}")
             logger.error(f"Error at position {e.pos}, line {e.lineno}, col {e.colno}")
-            # Get context around the error position
-            start = max(0, e.pos - 100)
-            end = min(len(raw_data), e.pos + 100)
-            context = raw_data[start:end]
-            logger.error(f"Context around error:\n{context}")
-            logger.error(f"Error position in context: {e.pos - start}")
-            return jsonify({"error": str(e)}), 400
+            return jsonify({"error": f"Invalid JSON: {str(e)}"}), 400
+        except Exception as e:
+            logger.error(f"Error processing workspace update: {e}")
+            return jsonify({"error": str(e)}), 500
             
-        if not isinstance(workspace, dict):
-            return jsonify({"error": f"Expected dict, got {type(workspace)}"}), 400
-            
-        # Validate required fields
-        required_fields = {'environments', 'files', 'masterVolume', 'soundboard', 'effects'}
-        missing_fields = required_fields - set(workspace.keys())
-        if missing_fields:
-            return jsonify({"error": f"Missing required fields: {missing_fields}"}), 400
-            
-        save_workspace(workspace)
-        return jsonify({"status": "success"})
     except Exception as e:
-        logger.error(f"Error updating workspace: {str(e)}", exc_info=True)
+        logger.error(f"Error updating workspace: {e}")
         return jsonify({"error": str(e)}), 500 
