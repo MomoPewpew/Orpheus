@@ -245,14 +245,27 @@ class Environment:
         # Invert progress for fade out (when state is STOPPED)
         return progress if self.play_state == PlayState.PLAYING else (1.0 - progress)
 
-    def start_fade(self, fade_in: bool, duration_seconds: float):
-        """Start fading this environment in or out"""
+    def start_fade(self, fade_in: bool, duration_seconds: float, other_environments_playing: bool = False):
+        """Start fading this environment in or out
+        
+        Args:
+            fade_in: Whether to fade in (True) or out (False)
+            duration_seconds: Duration of the fade in seconds
+            other_environments_playing: Whether there are other environments currently playing
+        """
         import time
         current_time = time.time()
         
-        self._fade_start_time = current_time
-        self._fade_end_time = current_time + duration_seconds
-        self.play_state = PlayState.PLAYING if fade_in else PlayState.STOPPED
+        # Only apply fade-in timing if there are other environments playing
+        # Always apply fade-out timing to ensure smooth transitions
+        if fade_in and not other_environments_playing:
+            self._fade_start_time = None
+            self._fade_end_time = None
+            self.play_state = PlayState.PLAYING
+        else:
+            self._fade_start_time = current_time
+            self._fade_end_time = current_time + duration_seconds
+            self.play_state = PlayState.PLAYING if fade_in else PlayState.STOPPED
 
     def update_fade_state(self):
         """Update the fade state based on current time"""
@@ -362,6 +375,33 @@ class AppState:
         """Get all environments that are currently active (playing or fading)"""
         return [env for env in self.environments 
                 if env.play_state != PlayState.STOPPED]
+
+    def set_environment_play_state(self, env_id: str, should_play: bool, fade_duration_seconds: float = 4.0) -> None:
+        """Set the play state of an environment, handling fades appropriately.
+        
+        Args:
+            env_id: ID of the environment to update
+            should_play: Whether the environment should be playing
+            fade_duration_seconds: Duration of the fade in/out in seconds
+        """
+        # Find the target environment
+        env = next((e for e in self.environments if e.id == env_id), None)
+        if not env:
+            return
+            
+        # Check if there are other playing environments (excluding this one)
+        other_environments_playing = any(
+            e.play_state != PlayState.STOPPED 
+            for e in self.environments 
+            if e.id != env_id
+        )
+        
+        # Start the fade
+        env.start_fade(
+            fade_in=should_play,
+            duration_seconds=fade_duration_seconds,
+            other_environments_playing=other_environments_playing
+        )
 
     def get_environment_volume(self, env_id: str) -> float:
         """Get the effective volume for an environment including fade state"""
