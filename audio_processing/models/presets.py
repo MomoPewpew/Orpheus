@@ -19,6 +19,15 @@ class PresetSound:
             frequency=float(data['frequency']) if 'frequency' in data else None
         )
 
+    def to_dict(self) -> Dict:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'fileId': self.file_id,
+            'volume': self.volume,
+            'frequency': self.frequency
+        }
+
 @dataclass
 class PresetLayer:
     """Represents a layer override in a preset"""
@@ -42,6 +51,18 @@ class PresetLayer:
             sounds=[PresetSound.from_dict(s) for s in data['sounds']] if 'sounds' in data else None
         )
 
+    def to_dict(self) -> Dict:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'volume': self.volume,
+            'weight': self.weight,
+            'chance': self.chance,
+            'cooldownCycles': self.cooldown_cycles,
+            'mode': self.mode.value if self.mode else None,
+            'sounds': [s.to_dict() for s in self.sounds] if self.sounds else None
+        }
+
 @dataclass
 class Preset:
     """Represents a preset configuration for an environment"""
@@ -63,4 +84,14 @@ class Preset:
             max_weight=float(data['maxWeight']) if 'maxWeight' in data else None,
             layers=[PresetLayer.from_dict(l) for l in data['layers']],
             is_default=bool(data.get('isDefault', False))
-        ) 
+        )
+
+    def to_dict(self) -> Dict:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'maxWeight': self.max_weight,
+            'layers': [l.to_dict() for l in self.layers],
+            'isDefault': self.is_default
+        } 

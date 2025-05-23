@@ -53,6 +53,15 @@ class LayerSound:
             frequency=float(data['frequency']),
             volume=float(data['volume'])
         )
+        
+    def to_dict(self) -> Dict:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'fileId': self.file_id,
+            'frequency': self.frequency,
+            'volume': self.volume
+        }
 
 @dataclass
 class Effects:
@@ -201,6 +210,20 @@ class Layer:
             mode=LayerMode(data['mode'])
         )
 
+    def to_dict(self) -> Dict:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'sounds': [s.to_dict() for s in self.sounds],
+            'chance': self.chance,
+            'cooldownCycles': self.cooldown_cycles,
+            'loopLengthMs': self.loop_length_ms,
+            'weight': self.weight,
+            'volume': self.volume,
+            'mode': self.mode.value
+        }
+
 @dataclass
 class Environment:
     """Represents a complete audio environment"""
@@ -293,13 +316,13 @@ class Environment:
         )
 
     def to_dict(self) -> Dict:
-        """Convert to dictionary for serialization"""
+        """Convert to dictionary for JSON serialization"""
         return {
             'id': self.id,
             'name': self.name,
             'maxWeight': self.max_weight,
-            'layers': [layer.__dict__ for layer in self.layers],
-            'presets': [preset.__dict__ for preset in self.presets],
+            'layers': [l.to_dict() for l in self.layers],
+            'presets': [p.to_dict() for p in self.presets],
             'backgroundImage': self.background_image,
             'soundboard': self.soundboard,
             'activePresetId': self.active_preset_id,

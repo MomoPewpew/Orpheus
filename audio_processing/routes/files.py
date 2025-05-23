@@ -29,21 +29,72 @@ def load_config() -> dict:
     try:
         if not CONFIG_FILE.exists():
             logger.debug("Config file not found, creating default")
-            return {"files": []}
+            return {
+                "files": [],
+                "environments": [],
+                "masterVolume": 1.0,
+                "soundboard": [],
+                "effects": {
+                    "normalize": { "enabled": True },
+                    "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
+                    "filters": {
+                        "highPass": { "frequency": 400 },
+                        "lowPass": { "frequency": 10000 },
+                        "dampenSpeechRange": { "amount": 0 }
+                    },
+                    "compressor": {
+                        "lowThreshold": -40,
+                        "highThreshold": 0,
+                        "ratio": 1
+                    }
+                }
+            }
         with open(CONFIG_FILE, 'r') as f:
             config = json.load(f)
             logger.debug(f"Loaded config: {config}")
             return config
     except Exception as e:
         logger.error(f"Error loading config: {e}")
-        return {"files": []}
+        return {
+            "files": [],
+            "environments": [],
+            "masterVolume": 1.0,
+            "soundboard": [],
+            "effects": {
+                "normalize": { "enabled": True },
+                "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
+                "filters": {
+                    "highPass": { "frequency": 400 },
+                    "lowPass": { "frequency": 10000 },
+                    "dampenSpeechRange": { "amount": 0 }
+                },
+                "compressor": {
+                    "lowThreshold": -40,
+                    "highThreshold": 0,
+                    "ratio": 1
+                }
+            }
+        }
 
 def save_config(config: dict):
     """Save the config file."""
     try:
-        logger.debug(f"Saving config: {config}")
+        # Load existing config to preserve other state
+        current_config = {}
+        if CONFIG_FILE.exists():
+            try:
+                with open(CONFIG_FILE, 'r') as f:
+                    current_config = json.load(f)
+            except json.JSONDecodeError:
+                logger.error("Error reading existing config, starting fresh")
+                current_config = {}
+
+        # Update only the fields that were passed in, preserve the rest
+        merged_config = {**current_config, **config}
+        
+        logger.debug(f"Saving merged config: {merged_config}")
         with open(CONFIG_FILE, 'w') as f:
-            json.dump(config, f, indent=2)
+            json.dump(merged_config, f, indent=2)
     except Exception as e:
         logger.error(f"Error saving config: {e}")
         raise
@@ -57,7 +108,26 @@ def ensure_directories():
     # Create default config if it doesn't exist
     if not CONFIG_FILE.exists():
         logger.debug(f"Creating default config file at {CONFIG_FILE}")
-        save_config({"files": []})
+        save_config({
+            "files": [],
+            "environments": [],
+            "masterVolume": 1.0,
+            "soundboard": [],
+            "effects": {
+                "normalize": { "enabled": True },
+                "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
+                "filters": {
+                    "highPass": { "frequency": 400 },
+                    "lowPass": { "frequency": 10000 },
+                    "dampenSpeechRange": { "amount": 0 }
+                },
+                "compressor": {
+                    "lowThreshold": -40,
+                    "highThreshold": 0,
+                    "ratio": 1
+                }
+            }
+        })
 
 # Call this when the blueprint is created
 ensure_directories()
@@ -207,10 +277,10 @@ def upload_file():
             # Create SoundFile instance with metadata
             sound_file = SoundFile.from_upload(temp_path, name)
             
-            # Update config
+            # Update config, preserving other state
             config = load_config()
             config["files"] = config.get("files", []) + [sound_file.to_dict()]
-            save_config(config)
+            save_config({"files": config["files"]})  # Only update the files array
             
             return jsonify(sound_file.to_dict())
         except Exception as e:
