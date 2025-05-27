@@ -2,8 +2,10 @@ from flask import Flask
 from flask_cors import CORS
 from audio_processing.routes.workspace import workspace_bp, ensure_workspace_dir
 from audio_processing.routes.files import files_bp
+from audio_processing.models.bot_manager import BotManager, DiscordBotManager
 import os
 import logging
+import threading
 
 # Configure logging
 logging.basicConfig(
@@ -14,6 +16,19 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
+
+# Initialize the Discord bot manager
+bot_manager: BotManager = DiscordBotManager()
+
+# Start the bot in a separate thread
+def start_bot():
+    try:
+        bot_manager.start_bot()
+    except Exception as e:
+        logger.error(f"Failed to start Discord bot: {e}")
+
+bot_thread = threading.Thread(target=start_bot, daemon=True)
+bot_thread.start()
 
 # Reset play state on server startup
 ensure_workspace_dir()
@@ -27,7 +42,11 @@ app.register_blueprint(files_bp, url_prefix='/api')
 @app.route('/health')
 def health_check():
     """Health check endpoint"""
-    return {'status': 'ok'}
+    bot_status = "ok" if bot_manager.is_ready() else "not_ready"
+    return {
+        'status': 'ok',
+        'bot_status': bot_status
+    }
 
 if __name__ == '__main__':
     # Get host and port from environment or use defaults
