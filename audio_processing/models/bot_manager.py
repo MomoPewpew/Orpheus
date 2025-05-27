@@ -1,11 +1,11 @@
 import os
 import logging
 import discord
-from discord import app_commands
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import Optional, Any
 from abc import ABC, abstractmethod
+from .discord import create_bot
 
 # Set up logging
 logging.basicConfig(
@@ -81,38 +81,8 @@ class DiscordBotManager(BotManager):
         if token is None:
             raise ValueError("No DISCORD_TOKEN found in environment variables")
             
-        # Set up intents
-        intents = discord.Intents.default()
-        intents.message_content = True
-        intents.voice_states = True
-        intents.members = True
-        intents.presences = True
-        intents.guilds = True
-        
-        # Create bot instance
-        class OrpheusBot(discord.Client):
-            def __init__(self):
-                super().__init__(intents=intents)
-                self.tree = app_commands.CommandTree(self)
-                
-            async def setup_hook(self):
-                dev_guild_id = os.getenv('DISCORD_GUILD_ID')
-                if dev_guild_id:
-                    try:
-                        dev_guild = discord.Object(id=int(dev_guild_id))
-                        self.tree.copy_global_to(guild=dev_guild)
-                        await self.tree.sync(guild=dev_guild)
-                    except Exception as e:
-                        logger.error(f"Error during initial sync: {e}")
-                else:
-                    await self.tree.sync()
-                    
-        self.bot = OrpheusBot()
-        
-        # Set up basic event handlers
-        @self.bot.event
-        async def on_ready():
-            logger.info(f'{self.bot.user} has connected to Discord!')
+        # Create bot instance using the factory function
+        self.bot = create_bot()
             
     def get_bot(self) -> Optional[discord.Client]:
         """Get the Discord bot instance"""

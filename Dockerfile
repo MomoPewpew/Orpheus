@@ -20,6 +20,7 @@ WORKDIR /app
 # Create necessary directories
 RUN mkdir -p /app/audio_processing/static \
     /app/audio_processing/data/audio \
+    /app/discord_bot \
     /app/frontend && \
     chmod -R 777 /app/audio_processing/data  # Ensure directory is writable
 
@@ -27,12 +28,14 @@ RUN mkdir -p /app/audio_processing/static \
 RUN python3.11 -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
 
-# Copy backend requirements first
+# Copy requirements files first
 COPY audio_processing/requirements.txt /app/audio_processing/
+COPY discord_bot/requirements.txt /app/discord_bot/
 
 # Install Python dependencies in virtual environment
 RUN . /app/venv/bin/activate && \
-    pip install --no-cache-dir -r /app/audio_processing/requirements.txt
+    pip install --no-cache-dir -r /app/audio_processing/requirements.txt && \
+    pip install --no-cache-dir -r /app/discord_bot/requirements.txt
 
 # Set up frontend
 WORKDIR /app/frontend
@@ -59,6 +62,7 @@ RUN npm run build
 # Copy application code
 WORKDIR /app
 COPY audio_processing/ /app/audio_processing/
+COPY discord_bot/ /app/discord_bot/
 
 # Create startup script
 RUN echo '#!/bin/bash\n\
