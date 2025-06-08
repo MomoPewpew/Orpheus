@@ -4,6 +4,7 @@ import io
 from gtts import gTTS
 from pydub import AudioSegment
 from .audio import queue_audio
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -17,43 +18,68 @@ def register_commands(bot: discord.Client) -> None:
     @bot.tree.command(name="join", description="Join your voice channel")
     async def join(interaction: discord.Interaction):
         """Join the voice channel you're currently in."""
-        logger.info(f"Join command received from {interaction.user} in {interaction.guild.name}")
-        
-        # Check if user is in a voice channel
-        if not interaction.user.voice:
-            logger.warning(f"User {interaction.user} is not in a voice channel")
-            await interaction.response.send_message("You need to be in a voice channel to use this command.", ephemeral=True)
-            return
-
-        # Get the voice channel
-        channel = interaction.user.voice.channel
-        
         try:
-            logger.info(f"Joining channel {channel.name}")
-            await channel.connect()
-            await interaction.response.send_message(f"Joined {channel.name}", ephemeral=True)
+            # Send immediate response instead of deferring
+            await interaction.response.send_message("Connecting to voice channel...", ephemeral=True)
+            
+            logger.info(f"Join command received from {interaction.user} in {interaction.guild.name}")
+            
+            # Check if user is in a voice channel
+            if not interaction.user.voice:
+                logger.warning(f"User {interaction.user} is not in a voice channel")
+                await interaction.edit_original_response(content="You need to be in a voice channel to use this command.")
+                return
+
+            # Get the voice channel
+            channel = interaction.user.voice.channel
+            
+            try:
+                logger.info(f"Joining channel {channel.name}")
+                # Set a reasonable timeout for the connection attempt
+                try:
+                    await asyncio.wait_for(channel.connect(), timeout=10.0)
+                    # Store the guild ID when successfully connected
+                    bot.set_active_guild(interaction.guild_id)
+                    await interaction.edit_original_response(content=f"Joined {channel.name}")
+                except asyncio.TimeoutError:
+                    logger.error("Timed out while trying to join voice channel")
+                    await interaction.edit_original_response(content="Connection timed out. Please try again or check if the bot has proper permissions.")
+                except Exception as e:
+                    logger.error(f"Error joining channel: {e}")
+                    await interaction.edit_original_response(content="Failed to join the voice channel. Please check if the bot has proper permissions.")
+            except Exception as e:
+                logger.error(f"Unexpected error in join command: {e}")
+                await interaction.edit_original_response(content="An unexpected error occurred. Please try again later.")
         except Exception as e:
-            logger.error(f"Error joining channel: {e}")
-            await interaction.response.send_message("Failed to join the voice channel. Please try again.", ephemeral=True)
+            logger.error(f"Failed to handle join command: {e}")
+            # If we failed to send the initial response, try to respond with an error
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("Failed to process command. Please try again.", ephemeral=True)
+            except:
+                pass  # If this fails too, we can't do much more
 
     @bot.tree.command(name="leave", description="Leave the current voice channel")
     async def leave(interaction: discord.Interaction):
         """Leave the current voice channel."""
         logger.info(f"Leave command received from {interaction.user} in {interaction.guild.name}")
         
+        # Defer the response immediately
+        await interaction.response.defer(ephemeral=True)
+        
         # Check if bot is in a voice channel
         if not interaction.guild.voice_client:
             logger.warning("Bot is not in a voice channel")
-            await interaction.response.send_message("I'm not in a voice channel.", ephemeral=True)
+            await interaction.followup.send("I'm not in a voice channel.", ephemeral=True)
             return
 
         try:
             logger.info("Leaving voice channel")
             await interaction.guild.voice_client.disconnect()
-            await interaction.response.send_message("Left the voice channel", ephemeral=True)
+            await interaction.followup.send("Left the voice channel", ephemeral=True)
         except Exception as e:
             logger.error(f"Error leaving channel: {e}")
-            await interaction.response.send_message("Failed to leave the voice channel. Please try again.", ephemeral=True)
+            await interaction.followup.send("Failed to leave the voice channel. Please try again.", ephemeral=True)
 
     @bot.tree.command(name="test", description="Test audio streaming with TTS")
     async def test(interaction: discord.Interaction):

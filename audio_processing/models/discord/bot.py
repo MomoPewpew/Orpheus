@@ -13,9 +13,20 @@ class OrpheusBot(discord.Client):
         """Initialize the bot with the given intents."""
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
+        self.last_used_guild_id: Optional[int] = None  # Store the last guild ID where join was used
+        
+    @property
+    def active_guild_id(self) -> Optional[int]:
+        """Get the ID of the last guild where the bot was used, or None if not available."""
+        return self.last_used_guild_id
+        
+    def set_active_guild(self, guild_id: int) -> None:
+        """Set the active guild ID."""
+        self.last_used_guild_id = guild_id
+        logger.info(f"Set active guild ID to {guild_id}")
         
     async def setup_hook(self):
-        """Set up the bot's commands and sync them."""
+        """Set up the bot's commands and events."""
         from .commands import register_commands
         from .events import register_events
         
@@ -23,20 +34,6 @@ class OrpheusBot(discord.Client):
         register_commands(self)
         register_events(self)
         logger.info("Registered Discord commands and events")
-        
-        # Sync commands
-        dev_guild_id = os.getenv('DISCORD_GUILD_ID')
-        if dev_guild_id:
-            try:
-                dev_guild = discord.Object(id=int(dev_guild_id))
-                self.tree.copy_global_to(guild=dev_guild)
-                await self.tree.sync(guild=dev_guild)
-                logger.info(f"Synced commands with development guild: {dev_guild_id}")
-            except Exception as e:
-                logger.error(f"Error during initial sync: {e}")
-        else:
-            await self.tree.sync()
-            logger.info("Synced commands globally")
 
 def create_bot() -> OrpheusBot:
     """Create and configure a new bot instance."""

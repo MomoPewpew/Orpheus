@@ -9,6 +9,7 @@ import { SoundboardOverlay } from './components/overlays/SoundboardOverlay';
 import { generateId } from './utils/ids';
 import { saveWorkspace, loadWorkspace } from './services/workspaceService';
 import { listFiles } from './services/fileService';
+import { updateEnvironmentState } from './services/environmentService';
 
 const theme = createTheme({
   // You can customize your theme here
@@ -420,7 +421,7 @@ const App: React.FC = () => {
     setEffects(newEffects);
   };
 
-  const handlePlayStop = () => {
+  const handlePlayStop = async () => {
     if (!activeEnvironment) return;
     
     // Toggle the active environment's state
@@ -428,32 +429,45 @@ const App: React.FC = () => {
       PlayState.Stopped : 
       PlayState.Playing;
     
-    setEnvironments(prevEnvironments => {
-      const newEnvironments = prevEnvironments.map(env => {
-        if (env.id === activeEnvironment.id) {
-          // Update the target environment
-          return {
-            ...env,
-            playState: newState
-          };
-        } else if (newState === PlayState.Playing && env.playState === PlayState.Playing) {
-          // Stop any other playing environments when starting a new one
-          return {
-            ...env,
-            playState: PlayState.Stopped
-          };
+    // Create updated environment
+    const updatedEnvironment: Environment = {
+      ...activeEnvironment,
+      playState: newState
+    };
+    
+    try {
+      // Update the environment state in the backend first
+      const guildId = process.env.REACT_APP_DISCORD_GUILD_ID || '';
+      await updateEnvironmentState(guildId, updatedEnvironment);
+      
+      // If successful, update the local state
+      setEnvironments((prevEnvironments: Environment[]) => {
+        const newEnvironments = prevEnvironments.map((env: Environment) => {
+          if (env.id === activeEnvironment.id) {
+            // Update the target environment
+            return updatedEnvironment;
+          } else if (newState === PlayState.Playing && env.playState === PlayState.Playing) {
+            // Stop any other playing environments when starting a new one
+            return {
+              ...env,
+              playState: PlayState.Stopped
+            };
+          }
+          return env;
+        });
+
+        // Also update the active environment reference
+        const updatedActiveEnv = newEnvironments.find((env: Environment) => env.id === activeEnvironment.id);
+        if (updatedActiveEnv) {
+          setActiveEnvironment(updatedActiveEnv);
         }
-        return env;
+
+        return newEnvironments;
       });
-
-      // Also update the active environment reference
-      const updatedActiveEnv = newEnvironments.find(env => env.id === activeEnvironment.id);
-      if (updatedActiveEnv) {
-        setActiveEnvironment(updatedActiveEnv);
-      }
-
-      return newEnvironments;
-    });
+    } catch (error) {
+      console.error('Failed to update environment state:', error);
+      // TODO: Show error to user
+    }
   };
 
   if (isLoading) {

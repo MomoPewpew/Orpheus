@@ -1,11 +1,12 @@
 import os
 import logging
 import discord
+import asyncio
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import Optional, Any
 from abc import ABC, abstractmethod
-from .discord import create_bot
+from .discord import create_bot, OrpheusBot
 
 # Set up logging
 logging.basicConfig(
@@ -51,18 +52,18 @@ class DiscordBotManager(BotManager):
     
     _instance = None
     
-    def __new__(cls):
+    def __new__(cls, bot: Optional[OrpheusBot] = None):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
     
-    def __init__(self):
+    def __init__(self, bot: Optional[OrpheusBot] = None):
         if getattr(self, '_initialized', False):
             return
             
         self._initialized = True
-        self.bot = None
+        self.bot = bot
         self._setup_bot()
         
     def _setup_bot(self) -> None:
@@ -81,12 +82,29 @@ class DiscordBotManager(BotManager):
         if token is None:
             raise ValueError("No DISCORD_TOKEN found in environment variables")
             
-        # Create bot instance using the factory function
-        self.bot = create_bot()
+        # Create bot instance only if not provided
+        if self.bot is None:
+            logger.info("No bot instance provided, creating new one")
+            self.bot = create_bot()
             
     def get_bot(self) -> Optional[discord.Client]:
         """Get the Discord bot instance"""
         return self.bot
+        
+    async def _sync_commands(self) -> None:
+        """Sync commands with Discord."""
+        dev_guild_id = os.getenv('DISCORD_GUILD_ID')
+        if dev_guild_id:
+            try:
+                dev_guild = discord.Object(id=int(dev_guild_id))
+                self.bot.tree.copy_global_to(guild=dev_guild)
+                await self.bot.tree.sync(guild=dev_guild)
+                logger.info(f"Synced commands with development guild: {dev_guild_id}")
+            except Exception as e:
+                logger.error(f"Error during command sync: {e}")
+        else:
+            await self.bot.tree.sync()
+            logger.info("Synced commands globally")
         
     def start_bot(self) -> None:
         """Start the Discord bot"""
@@ -96,8 +114,16 @@ class DiscordBotManager(BotManager):
         token = os.getenv('DISCORD_TOKEN')
         if not token:
             raise ValueError("No DISCORD_TOKEN found in environment variables")
-            
-        self.bot.run(token)
+
+        # Create an event loop for the bot
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            # Run the bot
+            self.bot.run(token)
+        finally:
+            loop.close()
         
     def stop_bot(self) -> None:
         """Stop the Discord bot"""

@@ -1,6 +1,6 @@
 import logging
 import discord
-from .audio import cleanup_guild
+from .audio import cleanup_guild, _audio_streams
 
 logger = logging.getLogger(__name__)
 
