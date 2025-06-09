@@ -5,7 +5,6 @@ from math import log10
 from pathlib import Path
 from typing import List, Dict, Any
 from pydub import AudioSegment
-from .discord import queue_audio
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +99,7 @@ class AudioMixer:
             
             # Queue the mixed audio for playback
             logger.info("Queueing mixed audio for playback")
-            success = queue_audio(guild_id, buffer)
+            success = self.bot_manager.queue_audio(buffer)
             
             if success:
                 logger.info("Successfully queued mixed audio")

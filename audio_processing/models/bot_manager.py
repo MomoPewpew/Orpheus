@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional, Any
 from abc import ABC, abstractmethod
 from discord_bot.src import create_bot, OrpheusBot
+from io import BytesIO
 
 # Set up logging
 logging.basicConfig(
@@ -39,6 +40,11 @@ class BotManager(ABC):
     @abstractmethod
     def _setup_bot(self) -> None:
         """Initialize the bot with required configuration."""
+        pass
+
+    @abstractmethod
+    def queue_audio(self, audio_data: BytesIO) -> bool:
+        """Queue audio to the bot."""
         pass
 
 class DiscordBotManager(BotManager):
@@ -108,3 +114,9 @@ class DiscordBotManager(BotManager):
     def is_ready(self) -> bool:
         """Check if the Discord bot is ready and connected"""
         return bool(self.bot and self.bot.is_ready()) 
+    
+    def queue_audio(self, audio_data: BytesIO) -> bool:
+        """Queue audio to the Discord bot"""
+        if self.bot and self.guild_id:
+            return self.bot.queue_audio(self.guild_id, audio_data)
+        return False
