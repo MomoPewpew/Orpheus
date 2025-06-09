@@ -2,13 +2,10 @@ from flask import Flask
 from flask_cors import CORS
 from audio_processing.routes.workspace import workspace_bp, ensure_workspace_dir
 from audio_processing.routes.files import files_bp
-from audio_processing.routes.environment import environment_bp
 from audio_processing.models.bot_manager import BotManager, DiscordBotManager
-from .models.discord.bot import create_bot, OrpheusBot
 import os
 import logging
 import threading
-import sys
 
 # Configure logging
 logging.basicConfig(
@@ -36,7 +33,6 @@ def create_app() -> Flask:
         # Initialize the Discord bot manager with a new bot instance
         bot_manager: BotManager = DiscordBotManager()
         app.bot_manager = bot_manager
-        app.bot = bot_manager.get_bot()  # Get the bot instance from the manager
 
         # Start the bot in a separate thread
         def start_bot():
@@ -50,7 +46,6 @@ def create_app() -> Flask:
     else:
         logger.info("Skipping bot initialization in reloader process")
         app.bot_manager = None
-        app.bot = None
 
     # Reset play state on server startup
     ensure_workspace_dir()
@@ -61,7 +56,6 @@ def create_app() -> Flask:
     logger.info("Registering files blueprint with /api prefix")
     app.register_blueprint(files_bp, url_prefix='/api')
     logger.info("Registering environment blueprint with /api prefix")
-    app.register_blueprint(environment_bp, url_prefix='/api')
     
     @app.route('/health')
     def health_check():

@@ -1,12 +1,11 @@
 import os
 import logging
-import discord
 import asyncio
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import Optional, Any
 from abc import ABC, abstractmethod
-from .discord import create_bot, OrpheusBot
+from discord_bot.src import create_bot, OrpheusBot
 
 # Set up logging
 logging.basicConfig(
@@ -21,11 +20,6 @@ class BotManager(ABC):
     This class defines the interface that all bot managers must implement,
     regardless of the platform (Discord, Twitch, etc.).
     """
-    
-    @abstractmethod
-    def get_bot(self) -> Any:
-        """Get the bot instance."""
-        pass
         
     @abstractmethod
     def start_bot(self) -> None:
@@ -86,26 +80,7 @@ class DiscordBotManager(BotManager):
         if self.bot is None:
             logger.info("No bot instance provided, creating new one")
             self.bot = create_bot()
-            
-    def get_bot(self) -> Optional[discord.Client]:
-        """Get the Discord bot instance"""
-        return self.bot
-        
-    async def _sync_commands(self) -> None:
-        """Sync commands with Discord."""
-        dev_guild_id = os.getenv('DISCORD_GUILD_ID')
-        if dev_guild_id:
-            try:
-                dev_guild = discord.Object(id=int(dev_guild_id))
-                self.bot.tree.copy_global_to(guild=dev_guild)
-                await self.bot.tree.sync(guild=dev_guild)
-                logger.info(f"Synced commands with development guild: {dev_guild_id}")
-            except Exception as e:
-                logger.error(f"Error during command sync: {e}")
-        else:
-            await self.bot.tree.sync()
-            logger.info("Synced commands globally")
-        
+
     def start_bot(self) -> None:
         """Start the Discord bot"""
         if not self.bot:
