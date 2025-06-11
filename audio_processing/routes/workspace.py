@@ -1,9 +1,9 @@
 from flask import Blueprint, request, jsonify
 import json
-import os
 from pathlib import Path
 import logging
-from audio_processing.models.audio import AppState, Environment, PlayState
+from audio_processing.models.audio import AppState, PlayState
+from audio_processing.models.mixer import mixer
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -143,10 +143,17 @@ def update_workspace():
         # Parse JSON and convert to AppState
         try:
             data = json.loads(raw_data, strict=True)
-            logger.debug(f"Number of environments in incoming JSON: {len(data.get('environments', []))}")
-            app_state = AppState.from_dict(data)
-            logger.debug(f"Number of environments after parsing: {len(app_state.environments)}")
-            save_workspace(app_state)
+            new_app_state = AppState.from_dict(data)
+            
+            # Get the current state before updating
+            current_state = load_workspace()
+            
+            # Save the new workspace state
+            save_workspace(new_app_state)
+            
+            # Compare states and get required actions
+            compare_workspaces(current_state, new_app_state)
+            
             return jsonify({"status": "success"})
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {str(e)}")
@@ -158,4 +165,37 @@ def update_workspace():
             
     except Exception as e:
         logger.error(f"Error updating workspace: {e}")
-        return jsonify({"error": str(e)}), 500 
+        return jsonify({"error": str(e)}), 500
+
+def compare_workspaces(old_state: AppState, new_state: AppState) -> None:
+    """
+    Compare two workspace states and takes the necessary actions to update the workspace.
+    
+    Args:
+        old_state: The previous AppState
+        new_state: The new AppState
+        
+    Returns:
+        None
+    """
+    
+    # Convert environments to dictionaries for easier comparison
+    old_envs = {env.id: env for env in old_state.environments}
+    new_envs = {env.id: env for env in new_state.environments}
+    
+    # Check for environments that were previously playing
+    for env_id, old_env in old_envs.items():
+        if old_env.play_state == PlayState.PLAYING:
+            # If environment was removed or stopped playing, stop the audio
+            if env_id not in new_envs or new_envs[env_id].play_state != PlayState.PLAYING:
+                logger.info(f"Stopping playback for environment {env_id}")
+                mixer.stop_environment(env_id)
+    
+    # Check for environments that are now playing
+    for env_id, new_env in new_envs.items():
+        if new_env.play_state == PlayState.PLAYING:
+            # If environment is new or wasn't playing before, start the audio
+            if env_id not in old_envs or old_envs[env_id].play_state != PlayState.PLAYING:
+                logger.info(f"Starting playback for environment {env_id}")
+                environment_data = new_env.to_dict()  # Convert environment to dict for mixer
+                mixer.play_environment(env_id, environment_data)

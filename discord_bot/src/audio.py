@@ -28,7 +28,11 @@ def _get_voice_client(guild_id: int) -> Optional[discord.VoiceClient]:
     Returns:
         The voice client for the guild, or None if not found.
     """
-    bot = current_app.bot
+    if not current_app or not current_app.bot_manager:
+        logger.error("Bot manager not initialized")
+        return None
+        
+    bot = current_app.bot_manager.bot
     if not bot:
         logger.error("Bot not initialized")
         return None

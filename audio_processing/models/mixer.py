@@ -5,6 +5,7 @@ from math import log10
 from pathlib import Path
 from typing import List, Dict, Any
 from pydub import AudioSegment
+from flask import current_app
 
 logger = logging.getLogger(__name__)
 
@@ -16,20 +17,39 @@ class AudioMixer:
     
     def __init__(self):
         """Initialize the audio mixer."""
-        self._environments: Dict[int, Dict[str, Any]] = {}  # guild_id -> environment data
+        self._environments: Dict[str, Dict[str, Any]] = {}  # environment_id -> environment data
+        self._bot_manager = None
         
-    def play_environment(self, guild_id: int, environment_data: Dict[str, Any]) -> bool:
+    def set_bot_manager(self, bot_manager):
+        """Set the bot manager instance.
+        
+        Args:
+            bot_manager: The bot manager instance from the Flask app
+        """
+        self._bot_manager = bot_manager
+        logger.info("Bot manager set in AudioMixer")
+        
+    def play_environment(self, environment_id: str, environment_data: Dict[str, Any]) -> bool:
         """Mix and play all active layers in an environment.
         
         Args:
-            guild_id: The Discord guild ID to play the audio in
+            environment_id: The environment ID to play
             environment_data: The environment configuration containing layers
             
         Returns:
             bool: True if audio was queued successfully, False otherwise
         """
+        if self._bot_manager is None:
+            logger.error("Cannot play environment - bot manager not set")
+            return False
+            
+        guild_id = current_app.guild_id if current_app else None
+        if guild_id is None:
+            logger.error("Cannot play environment - guild ID not set in app")
+            return False
+            
         try:
-            logger.info(f"Playing environment in guild {guild_id}")
+            logger.info(f"Playing environment {environment_id} in guild {guild_id}")
             
             # Get all layers from the environment
             layers = environment_data.get('layers', [])
@@ -98,13 +118,13 @@ class AudioMixer:
             buffer.seek(0)
             
             # Queue the mixed audio for playback
-            logger.info("Queueing mixed audio for playback")
-            success = self.bot_manager.queue_audio(buffer)
+            logger.info(f"Queueing mixed audio for playback in guild {guild_id}")
+            success = self._bot_manager.queue_audio(buffer)
             
             if success:
                 logger.info("Successfully queued mixed audio")
                 # Store the environment state
-                self._environments[guild_id] = environment_data
+                self._environments[environment_id] = environment_data
             else:
                 logger.error("Failed to queue mixed audio - make sure the bot is connected to a voice channel")
                 
@@ -114,18 +134,18 @@ class AudioMixer:
             logger.error(f"Error playing environment: {e}", exc_info=True)
             return False
             
-    def stop_environment(self, guild_id: int) -> None:
-        """Stop playback for a guild's environment.
+    def stop_environment(self, environment_id: str) -> None:
+        """Stop playback for an environment.
         
         Args:
-            guild_id: The Discord guild ID to stop playback for
+            environment_id: The environment ID to stop playback for
         """
-        if guild_id in self._environments:
-            logger.info(f"Stopping environment playback for guild {guild_id}")
+        if environment_id in self._environments:
+            logger.info(f"Stopping environment playback for {environment_id}")
             # TODO: Implement proper stopping of audio playback
-            del self._environments[guild_id]
+            del self._environments[environment_id]
         else:
-            logger.debug(f"No active environment found for guild {guild_id}")
+            logger.debug(f"No active environment found for {environment_id}")
 
 # Create a global instance of the mixer
 mixer = AudioMixer() 

@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Optional, Any
 from abc import ABC, abstractmethod
 from discord_bot.src import create_bot, OrpheusBot
+from discord_bot.src.audio import queue_audio
 from io import BytesIO
+from flask import current_app
 
 # Set up logging
 logging.basicConfig(
@@ -117,6 +119,10 @@ class DiscordBotManager(BotManager):
     
     def queue_audio(self, audio_data: BytesIO) -> bool:
         """Queue audio to the Discord bot"""
-        if self.bot and self.guild_id:
-            return self.bot.queue_audio(self.guild_id, audio_data)
+        guild_id = current_app.guild_id if current_app else None
+        
+        if self.bot and guild_id:
+            return queue_audio(guild_id, audio_data)
+        if not guild_id:
+            logger.error("Cannot queue audio - guild ID not set in app")
         return False
