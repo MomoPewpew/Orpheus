@@ -142,7 +142,14 @@ class AudioMixer:
         """
         if environment_id in self._environments:
             logger.info(f"Stopping environment playback for {environment_id}")
-            # TODO: Implement proper stopping of audio playback
+            
+            # Get the guild ID from the app
+            guild_id = current_app.guild_id if current_app else None
+            if guild_id and self._bot_manager and hasattr(self._bot_manager, 'audio_manager'):
+                # Stop the audio playback
+                self._bot_manager.audio_manager.stop_playback(guild_id)
+                
+            # Remove the environment from our tracking
             del self._environments[environment_id]
         else:
             logger.debug(f"No active environment found for {environment_id}")

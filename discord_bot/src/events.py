@@ -1,6 +1,5 @@
 import logging
 import discord
-from .audio import cleanup_guild, _audio_streams
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +51,6 @@ def register_events(bot: discord.Client) -> None:
         """Handle voice state changes to cleanup resources when bot is disconnected."""
         if member.id == bot.user.id and before.channel and not after.channel:
             # Bot was disconnected from a voice channel
-            if before.channel.guild.id in _audio_streams:
+            if hasattr(bot, 'audio_manager'):
                 logger.info(f"Bot disconnected from voice in {before.channel.guild.name}, cleaning up")
-                cleanup_guild(before.channel.guild.id) 
+                bot.audio_manager.cleanup_guild(before.channel.guild.id) 

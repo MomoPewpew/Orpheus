@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, Any
 from abc import ABC, abstractmethod
 from discord_bot.src import create_bot, OrpheusBot
-from discord_bot.src.audio import queue_audio
+from discord_bot.src.audio import AudioManager
 from io import BytesIO
 from flask import current_app
 
@@ -66,6 +66,7 @@ class DiscordBotManager(BotManager):
             
         self._initialized = True
         self.bot = bot
+        self.audio_manager = None
         self._setup_bot()
         
     def _setup_bot(self) -> None:
@@ -88,7 +89,11 @@ class DiscordBotManager(BotManager):
         if self.bot is None:
             logger.info("No bot instance provided, creating new one")
             self.bot = create_bot()
-
+            
+        # Initialize audio manager
+        self.audio_manager = AudioManager(self.bot)
+        logger.info("Audio manager initialized")
+        
     def start_bot(self) -> None:
         """Start the Discord bot"""
         if not self.bot:
@@ -121,8 +126,8 @@ class DiscordBotManager(BotManager):
         """Queue audio to the Discord bot"""
         guild_id = current_app.guild_id if current_app else None
         
-        if self.bot and guild_id:
-            return queue_audio(guild_id, audio_data)
+        if self.audio_manager and guild_id:
+            return self.audio_manager.queue_audio(guild_id, audio_data)
         if not guild_id:
             logger.error("Cannot queue audio - guild ID not set in app")
         return False

@@ -3,6 +3,9 @@ from discord import app_commands
 import logging
 from typing import Optional
 import os
+from .audio import AudioManager
+from .commands import register_commands
+from .events import register_events
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +17,7 @@ class OrpheusBot(discord.Client):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
         self.last_used_guild_id: Optional[int] = None  # Store the last guild ID where join was used
+        self.audio_manager = None
         
     @property
     def active_guild_id(self) -> Optional[int]:
@@ -26,10 +30,9 @@ class OrpheusBot(discord.Client):
         logger.info(f"Set active guild ID to {guild_id}")
         
     async def setup_hook(self):
-        """Set up the bot's commands and events."""
-        from .commands import register_commands
-        from .events import register_events
-        
+        """Called when the bot is setting up."""
+        # Initialize the audio manager
+        self.audio_manager = AudioManager(self)
         # Register commands and events
         register_commands(self)
         register_events(self)

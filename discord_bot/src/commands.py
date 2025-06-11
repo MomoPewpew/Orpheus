@@ -3,7 +3,6 @@ import discord
 import io
 from gtts import gTTS
 from pydub import AudioSegment
-from .audio import queue_audio
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -38,8 +37,6 @@ def register_commands(bot: discord.Client) -> None:
                 # Set a reasonable timeout for the connection attempt
                 try:
                     await asyncio.wait_for(channel.connect(), timeout=10.0)
-                    # Store the guild ID when successfully connected
-                    bot.set_active_guild(interaction.guild_id)
                     await interaction.edit_original_response(content=f"Joined {channel.name}")
                 except asyncio.TimeoutError:
                     logger.error("Timed out while trying to join voice channel")
@@ -119,16 +116,20 @@ def register_commands(bot: discord.Client) -> None:
             ])
             pcm_buffer.seek(0)
             
-            # Queue the audio
+            # Queue the audio using the bot's audio manager
             logger.info("Queueing audio data")
-            success = await queue_audio(interaction.guild_id, pcm_buffer)
-            
-            if success:
-                logger.info("Audio queued successfully")
-                await interaction.followup.send("Test audio queued! You should hear it soon.", ephemeral=True)
+            if hasattr(bot, 'audio_manager'):
+                success = bot.audio_manager.queue_audio(interaction.guild_id, pcm_buffer)
+                
+                if success:
+                    logger.info("Audio queued successfully")
+                    await interaction.followup.send("Test audio queued! You should hear it soon.", ephemeral=True)
+                else:
+                    logger.error("Failed to queue audio")
+                    await interaction.followup.send("Failed to queue test audio. Please try using /join again.", ephemeral=True)
             else:
-                logger.error("Failed to queue audio")
-                await interaction.followup.send("Failed to queue test audio. Please try using /join again.", ephemeral=True)
+                logger.error("Bot does not have an audio manager")
+                await interaction.followup.send("Audio system not properly initialized.", ephemeral=True)
                 
         except Exception as e:
             logger.error(f"Error in test command: {e}", exc_info=True)
