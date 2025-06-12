@@ -31,9 +31,44 @@ class LayerInfo:
         # Convert float32 [-1.0, 1.0] to int16 PCM
         self.audio_data = (audio_data * 32767).astype(np.int16)
         self.loop_length_samples = int(AudioMixer.SAMPLE_RATE * (loop_length_ms / 1000))
+        # Ensure loop length doesn't exceed audio length
+        self.loop_length_samples = min(self.loop_length_samples, len(self.audio_data))
         self.volume = volume
         self._position = 0
         logger.debug(f"Initialized layer with {len(audio_data)} samples, loop length: {self.loop_length_samples} samples")
+        
+    def reset_position(self):
+        """Reset the playback position to the start of the audio."""
+        self._position = 0
+        logger.debug("Reset layer position to start")
+        
+    def _handle_loop_point(self, chunk_size: int) -> tuple[np.ndarray, int]:
+        """Handle what happens when we reach the end of a loop.
+        
+        This method is called when we need to wrap around to the start of the audio.
+        In the future, this is where we'll handle crossfading, loop point events, etc.
+        
+        Args:
+            chunk_size: Number of samples needed for this chunk
+            
+        Returns:
+            tuple containing:
+                - The audio chunk that spans the loop point
+                - The new position after handling the loop
+        """
+        # Calculate how much audio we need from each side of the loop point
+        first_part = self.audio_data[self._position:self.loop_length_samples]
+        samples_needed = chunk_size - len(first_part)
+        second_part = self.audio_data[:min(samples_needed, self.loop_length_samples)]
+        
+        # Create the chunk that spans the loop point
+        chunk = np.concatenate([first_part, second_part])
+        new_position = len(second_part)
+        
+        # Log the loop point event
+        logger.debug(f"Loop point reached at {self._position}, wrapped to {new_position}")
+        
+        return chunk, new_position
         
     def get_next_chunk(self, chunk_size: int, current_time_ms: float) -> np.ndarray:
         """Get the next chunk of audio data.
@@ -46,15 +81,11 @@ class LayerInfo:
             Numpy array of audio samples for this chunk
         """
         try:
-            # Handle loop wraparound
+            # Check if we need to handle a loop point
             if self._position + chunk_size > self.loop_length_samples:
-                # Need to wrap around
-                first_part = self.audio_data[self._position:self.loop_length_samples]
-                second_part = self.audio_data[:chunk_size - len(first_part)]
-                chunk = np.concatenate([first_part, second_part])
-                self._position = len(second_part)
+                chunk, self._position = self._handle_loop_point(chunk_size)
             else:
-                # Get chunk and update position
+                # Normal playback within the loop
                 chunk = self.audio_data[self._position:self._position + chunk_size]
                 self._position = (self._position + chunk_size) % self.loop_length_samples
             
@@ -200,6 +231,10 @@ class AudioMixer:
             # Log environment states
             for env in app_state.environments:
                 logger.debug(f"Environment {env.id} state: {env.play_state}")
+            
+            # Reset all layer positions
+            for layer in self._cached_layers.values():
+                layer.reset_position()
                 
             self._app_state = app_state
             
