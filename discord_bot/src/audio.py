@@ -255,4 +255,23 @@ class AudioManager:
         """
         return guild_id in self._audio_streams and self._audio_streams[guild_id]['voice_client'].is_playing()
 
+    def get_buffer_size(self, guild_id: int) -> Optional[int]:
+        """Get the number of 20ms chunks currently buffered for a guild.
+        
+        Args:
+            guild_id: The ID of the guild to get buffer size for.
+            
+        Returns:
+            The number of 20ms chunks in the buffer, or None if no stream exists.
+        """
+        if guild_id not in self._audio_streams:
+            return None
+            
+        stream_data = self._audio_streams[guild_id]
+        if 'audio_source' not in stream_data:
+            return None
+            
+        audio_source = stream_data['audio_source']
+        return len(audio_source.buffer) // audio_source.FRAME_LENGTH
+
 __all__ = ['AudioManager'] 

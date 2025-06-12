@@ -76,10 +76,12 @@ class AudioMixer:
     SAMPLE_RATE = 48000  # Hz
     CHANNELS = 2
     CHUNK_MS = 20        # Size of processing chunks in milliseconds
+    TARGET_BUFFER_MS = 100  # Target buffer size in Discord (in milliseconds)
     
     def __init__(self):
         """Initialize the audio mixer."""
         self.chunk_samples = int(self.SAMPLE_RATE * (self.CHUNK_MS / 1000))
+        self.target_buffer_chunks = self.TARGET_BUFFER_MS // self.CHUNK_MS
         self._lock = Lock()
         self._bot_manager = None
         self._is_running = False
@@ -87,30 +89,52 @@ class AudioMixer:
         self._guild_id: Optional[int] = None
         self._app_state: Optional[AppState] = None
         self._cached_layers: Dict[str, LayerInfo] = {}
+        self._last_chunk_time = 0
+        self._chunks_queued = 0
         
     def _process_audio(self):
         """Main audio processing loop."""
         try:
             logger.info("Starting main audio processing loop")
-            last_process_time = time.time()
-            frame_time = self.CHUNK_MS / 1000  # Convert to seconds
+            
+            # Initialize timing
+            frame_time_ns = int(self.CHUNK_MS * 1_000_000)  # Convert to nanoseconds
+            next_frame_time = time.time_ns()
             
             while self._is_running:
-                current_time = time.time()
-                process_time = current_time - last_process_time
+                current_time_ns = time.time_ns()
                 
-                if process_time < frame_time:
-                    # Wait until it's time for the next frame
-                    time.sleep(frame_time - process_time)
-                    current_time = time.time()
+                # Check if it's time for the next frame
+                if current_time_ns < next_frame_time:
+                    # Use a shorter sleep to be more precise
+                    sleep_time = (next_frame_time - current_time_ns) / 1_000_000_000  # Convert to seconds
+                    if sleep_time > 0.001:  # If we need to sleep more than 1ms
+                        time.sleep(sleep_time - 0.001)  # Sleep slightly less
+                    continue
+                
+                # If we're more than one frame behind, skip frames to catch up
+                frames_behind = (current_time_ns - next_frame_time) // frame_time_ns
+                if frames_behind > 0:
+                    logger.debug(f"Skipping {frames_behind} frames to catch up")
+                    next_frame_time += frame_time_ns * frames_behind
                 
                 with self._lock:
                     if not self._app_state or not self._guild_id:
+                        next_frame_time += frame_time_ns
                         continue
-                        
+                    
+                    # Check Discord's buffer status
+                    if hasattr(self._bot_manager, 'audio_manager'):
+                        buffer_size = self._bot_manager.audio_manager.get_buffer_size(self._guild_id)
+                        if buffer_size and buffer_size >= self.target_buffer_chunks:
+                            logger.debug(f"Buffer full ({buffer_size} chunks), waiting")
+                            next_frame_time += frame_time_ns
+                            continue
+                    
                     # Process each playing environment
                     playing_envs = [env for env in self._app_state.environments if env.play_state == PlayState.PLAYING]
                     if not playing_envs:
+                        next_frame_time += frame_time_ns
                         continue
                     
                     # Initialize mix buffer as int32 for headroom during mixing
@@ -153,13 +177,16 @@ class AudioMixer:
                         pcm_data = mixed_chunk.tobytes()
                         if self._bot_manager and hasattr(self._bot_manager, 'audio_manager'):
                             success = self._bot_manager.audio_manager.queue_audio(self._guild_id, pcm_data)
-                            if not success:
+                            if success:
+                                self._chunks_queued += 1
+                            else:
                                 logger.warning(f"Failed to queue audio data for guild {self._guild_id}")
-                
-                last_process_time = current_time
+                    
+                    # Update timing
+                    next_frame_time += frame_time_ns
                 
         except Exception as e:
-            logger.error(f"Main audio processing error: {e}")
+            logger.error(f"Main audio processing error: {e}", exc_info=True)
             self._is_running = False
 
     def start_processing(self, app_state: AppState) -> None:
