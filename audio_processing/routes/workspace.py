@@ -152,7 +152,7 @@ def update_workspace():
             save_workspace(new_app_state)
             
             # Compare states and get required actions
-            compare_workspaces(current_state, new_app_state)
+            compare_workspaces(new_app_state)
             
             return jsonify({"status": "success"})
         except json.JSONDecodeError as e:
@@ -167,35 +167,36 @@ def update_workspace():
         logger.error(f"Error updating workspace: {e}")
         return jsonify({"error": str(e)}), 500
 
-def compare_workspaces(old_state: AppState, new_state: AppState) -> None:
-    """
-    Compare two workspace states and takes the necessary actions to update the workspace.
+def compare_workspaces(app_state: AppState) -> None:
+    """Update the audio mixer based on the current app state.
+    
+    This function checks if any environments are playing and controls
+    the audio processing loop accordingly.
     
     Args:
-        old_state: The previous AppState
-        new_state: The new AppState
-        
-    Returns:
-        None
+        app_state: The current application state
     """
+    # Log environment states
+    for env in app_state.environments:
+        logger.debug(f"Environment {env.id} state: {env.play_state}")
     
-    # Convert environments to dictionaries for easier comparison
-    old_envs = {env.id: env for env in old_state.environments}
-    new_envs = {env.id: env for env in new_state.environments}
+    # Check if any environments should be playing
+    should_play = any(env.play_state == PlayState.PLAYING for env in app_state.environments)
+    logger.info(f"Should play audio: {should_play}")
     
-    # Check for environments that were previously playing
-    for env_id, old_env in old_envs.items():
-        if old_env.play_state == PlayState.PLAYING:
-            # If environment was removed or stopped playing, stop the audio
-            if env_id not in new_envs or new_envs[env_id].play_state != PlayState.PLAYING:
-                logger.info(f"Stopping playback for environment {env_id}")
-                mixer.stop_environment(env_id)
+    # Get current playing state
+    was_playing = mixer._is_running
+    logger.info(f"Was playing audio: {was_playing}")
     
-    # Check for environments that are now playing
-    for env_id, new_env in new_envs.items():
-        if new_env.play_state == PlayState.PLAYING:
-            # If environment is new or wasn't playing before, start the audio
-            if env_id not in old_envs or old_envs[env_id].play_state != PlayState.PLAYING:
-                logger.info(f"Starting playback for environment {env_id}")
-                environment_data = new_env.to_dict()  # Convert environment to dict for mixer
-                mixer.play_environment(env_id, environment_data)
+    # Start or stop processing based on state change
+    if should_play and not was_playing:
+        logger.info("Starting audio processing")
+        mixer.start_processing(app_state)
+    elif was_playing and not should_play:
+        logger.info("Stopping audio processing")
+        mixer.stop_processing()
+    else:
+        # Update app state if already running
+        logger.debug("Updating app state in mixer")
+        with mixer._lock:
+            mixer._app_state = app_state

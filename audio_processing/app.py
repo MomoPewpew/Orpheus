@@ -35,19 +35,20 @@ def create_app() -> Flask:
         bot_manager: BotManager = DiscordBotManager()
         app.bot_manager = bot_manager
         
-        # Set the bot manager in the mixer
-        mixer.set_bot_manager(bot_manager)
-        
         # Get guild ID from environment variable or use a default
         guild_id = int(os.environ.get('DISCORD_GUILD_ID', '0'))
         if guild_id:
-            # Store guild ID in the app
+            # Store guild ID in the app and mixer
             app.guild_id = guild_id
-            logger.info(f"Guild ID {guild_id} set in app")
+            mixer._guild_id = guild_id  # Set guild ID directly in mixer
+            logger.info(f"Guild ID {guild_id} set in app and mixer")
         else:
             app.guild_id = None
             logger.warning("No Discord guild ID provided - audio playback will be disabled")
-
+        
+        # Set the bot manager in the mixer
+        mixer.set_bot_manager(bot_manager)
+        
         # Start the bot in a separate thread
         def start_bot():
             try:
