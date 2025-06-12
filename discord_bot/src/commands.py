@@ -4,6 +4,7 @@ import io
 from gtts import gTTS
 from pydub import AudioSegment
 import asyncio
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -106,24 +107,24 @@ def register_commands(bot: discord.Client) -> None:
             logger.info("Converting audio to PCM format")
             audio = AudioSegment.from_mp3(mp3_buffer)
             
-            # Export as WAV (PCM) format with correct parameters for Discord
-            logger.info("Exporting as PCM")
-            pcm_buffer = io.BytesIO()
-            audio.export(pcm_buffer, format='wav', parameters=[
-                '-ar', '48000',  # Sample rate: 48kHz
-                '-ac', '2',      # Channels: 2 (stereo)
-                '-f', 's16le'    # Format: 16-bit little-endian PCM
-            ])
-            pcm_buffer.seek(0)
+            # Convert to proper format for Discord
+            logger.info("Converting to Discord format (48kHz, 16-bit stereo PCM)")
+            audio = audio.set_frame_rate(48000)
+            audio = audio.set_channels(2)
+            audio = audio.set_sample_width(2)  # 16-bit
+            
+            # Get raw PCM data
+            pcm_data = audio.raw_data
+            logger.info(f"Generated {len(pcm_data)} bytes of PCM data")
             
             # Queue the audio using the bot's audio manager
             logger.info("Queueing audio data")
             if hasattr(bot, 'audio_manager'):
-                success = bot.audio_manager.queue_audio(interaction.guild_id, pcm_buffer)
+                success = bot.audio_manager.queue_audio(interaction.guild_id, pcm_data)
                 
                 if success:
                     logger.info("Audio queued successfully")
-                    await interaction.followup.send("Test audio queued! You should hear it soon.", ephemeral=True)
+                    await interaction.followup.send("Test audio queued! You should hear a voice message soon.", ephemeral=True)
                 else:
                     logger.error("Failed to queue audio")
                     await interaction.followup.send("Failed to queue test audio. Please try using /join again.", ephemeral=True)
