@@ -11,94 +11,12 @@ from threading import Lock, Thread
 from pydub import AudioSegment
 from flask import current_app
 from audio_processing.models.audio import AppState, PlayState
+from audio_processing.models.layer_info import LayerInfo
 
 logger = logging.getLogger(__name__)
 
 # Define audio file directory
 AUDIO_DIR = Path(__file__).parent.parent / 'data' / 'audio'
-
-class LayerInfo:
-    """Represents a single audio layer in the streaming mix."""
-    
-    def __init__(self, audio_data: np.ndarray, loop_length_ms: float, volume: float = 1.0):
-        """Initialize a new audio layer.
-        
-        Args:
-            audio_data: Numpy array of audio samples (shape: [samples, channels])
-            loop_length_ms: Length of the loop in milliseconds
-            volume: Initial volume multiplier (0.0 to 1.0)
-        """
-        # Convert float32 [-1.0, 1.0] to int16 PCM
-        self.audio_data = (audio_data * 32767).astype(np.int16)
-        self.loop_length_samples = int(AudioMixer.SAMPLE_RATE * (loop_length_ms / 1000))
-        # Ensure loop length doesn't exceed audio length
-        self.loop_length_samples = min(self.loop_length_samples, len(self.audio_data))
-        self.volume = volume
-        self._position = 0
-        logger.debug(f"Initialized layer with {len(audio_data)} samples, loop length: {self.loop_length_samples} samples")
-        
-    def reset_position(self):
-        """Reset the playback position to the start of the audio."""
-        self._position = 0
-        logger.debug("Reset layer position to start")
-        
-    def _handle_loop_point(self, chunk_size: int) -> tuple[np.ndarray, int]:
-        """Handle what happens when we reach the end of a loop.
-        
-        This method is called when we need to wrap around to the start of the audio.
-        In the future, this is where we'll handle crossfading, loop point events, etc.
-        
-        Args:
-            chunk_size: Number of samples needed for this chunk
-            
-        Returns:
-            tuple containing:
-                - The audio chunk that spans the loop point
-                - The new position after handling the loop
-        """
-        # Calculate how much audio we need from each side of the loop point
-        first_part = self.audio_data[self._position:self.loop_length_samples]
-        samples_needed = chunk_size - len(first_part)
-        second_part = self.audio_data[:min(samples_needed, self.loop_length_samples)]
-        
-        # Create the chunk that spans the loop point
-        chunk = np.concatenate([first_part, second_part])
-        new_position = len(second_part)
-        
-        # Log the loop point event
-        logger.debug(f"Loop point reached at {self._position}, wrapped to {new_position}")
-        
-        return chunk, new_position
-        
-    def get_next_chunk(self, chunk_size: int, current_time_ms: float) -> np.ndarray:
-        """Get the next chunk of audio data.
-        
-        Args:
-            chunk_size: Number of samples to return
-            current_time_ms: Current stream time in milliseconds (unused, kept for compatibility)
-            
-        Returns:
-            Numpy array of audio samples for this chunk
-        """
-        try:
-            # Check if we need to handle a loop point
-            if self._position + chunk_size > self.loop_length_samples:
-                chunk, self._position = self._handle_loop_point(chunk_size)
-            else:
-                # Normal playback within the loop
-                chunk = self.audio_data[self._position:self._position + chunk_size]
-                self._position = (self._position + chunk_size) % self.loop_length_samples
-            
-            # Apply volume
-            if self.volume != 1.0:
-                # Convert back to float32, apply volume, then back to int16
-                chunk = (chunk.astype(np.float32) * self.volume).astype(np.int16)
-            
-            return chunk
-            
-        except Exception as e:
-            logger.error(f"Error getting next chunk: {e}")
-            return np.zeros((chunk_size, AudioMixer.CHANNELS), dtype=np.int16)
 
 class AudioMixer:
     """Handles mixing and streaming of audio layers."""
@@ -186,7 +104,7 @@ class AudioMixer:
                                 continue
                                 
                             # Get or load the layer
-                            layer_info = self._get_or_load_layer(file_id)
+                            layer_info = self._get_or_load_layer(file_id, layer)
                             if not layer_info:
                                 continue
                                 
@@ -295,8 +213,13 @@ class AudioMixer:
             logger.error(f"Error loading audio file {file_path}: {e}")
             raise
             
-    def _get_or_load_layer(self, file_id: str) -> Optional[LayerInfo]:
-        """Get a cached layer or load it if not cached."""
+    def _get_or_load_layer(self, file_id: str, layer_data: Optional[Dict] = None) -> Optional[LayerInfo]:
+        """Get a cached layer or load it if not cached.
+        
+        Args:
+            file_id: ID of the sound file to load
+            layer_data: Optional layer configuration data containing loop_length_ms
+        """
         if file_id not in self._cached_layers:
             try:
                 sound_path = AUDIO_DIR / f"{file_id}.mp3"
@@ -305,9 +228,16 @@ class AudioMixer:
                     return None
                     
                 audio_data = self._load_audio_file(sound_path)
+                
+                # Get loop length from layer configuration
+                loop_length_ms = 8000  # Default 8 seconds
+                if layer_data and 'loopLengthMs' in layer_data:
+                    loop_length_ms = float(layer_data['loopLengthMs'])
+                    logger.debug(f"Using configured loop length: {loop_length_ms}ms")
+                
                 self._cached_layers[file_id] = LayerInfo(
                     audio_data=audio_data,
-                    loop_length_ms=len(audio_data) * 1000 / self.SAMPLE_RATE,
+                    loop_length_ms=loop_length_ms,
                     volume=1.0  # Base volume, will be adjusted by environment settings
                 )
             except Exception as e:
