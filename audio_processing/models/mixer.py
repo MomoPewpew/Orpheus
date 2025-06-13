@@ -92,11 +92,8 @@ class AudioMixer:
                     
                     # Mix all active layers
                     for env in playing_envs:
-                        # Convert environment data to proper objects
-                        layer_data_list = env.to_dict().get('layers', [])
-                        for layer_data in layer_data_list:
-                            # Convert layer data to Layer object
-                            layer = Layer.from_dict(layer_data)
+                        # Use the actual Layer objects from the environment
+                        for layer in env.layers:
                             if not layer.sounds:
                                 continue
                                 
@@ -117,7 +114,7 @@ class AudioMixer:
                                 if layer.selected_sound_index >= len(layer.sounds):
                                     layer.selected_sound_index = 0
                                 selected_sound = layer.sounds[layer.selected_sound_index]
-                                layer_info = self._get_or_load_layer(selected_sound.file_id, layer_data)
+                                layer_info = self._get_or_load_layer(selected_sound.file_id, layer.to_dict())
                                 if not layer_info:
                                     continue
                                 current_file_id = selected_sound.file_id
@@ -138,7 +135,7 @@ class AudioMixer:
                                 cache_key = f"{layer.id}_{active_file_id}"
                                 if cache_key not in self._cached_layers:
                                     # Load the new sound's audio
-                                    new_layer_info = self._get_or_load_layer(active_file_id, layer_data)
+                                    new_layer_info = self._get_or_load_layer(active_file_id, layer.to_dict())
                                     if not new_layer_info:
                                         continue
                                     # Copy over the active index and position

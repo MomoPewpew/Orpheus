@@ -51,10 +51,26 @@ class PresetLayer:
     mode: Optional[LayerMode] = None
     sounds: Optional[List[PresetSound]] = None
 
+    # Runtime-only fields (not serialized)
+    _environment: Optional['Environment'] = None
+    _base_layer: Optional['Layer'] = None  # Reference to the base layer this preset overrides
+
+    def set_environment(self, environment: 'Environment') -> None:
+        """Set the environment reference for this preset layer"""
+        logger.debug(f"Setting environment {environment.id} on preset layer {self.id}")
+        self._environment = environment
+        # Find and store reference to base layer
+        self._base_layer = next((l for l in environment.layers if l.id == self.id), None)
+        if self._base_layer:
+            logger.debug(f"Found base layer {self._base_layer.id} for preset layer {self.id}")
+        else:
+            logger.warning(f"No base layer found for preset layer {self.id}")
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'PresetLayer':
         try:
-            return cls(
+            logger.debug(f"Creating PresetLayer from data: {json.dumps(data, indent=2)}")
+            preset_layer = cls(
                 id=data['id'],
                 volume=float(data['volume']) if 'volume' in data and data['volume'] is not None else None,
                 weight=float(data['weight']) if 'weight' in data and data['weight'] is not None else None,
@@ -63,6 +79,8 @@ class PresetLayer:
                 mode=LayerMode(data['mode']) if 'mode' in data and data['mode'] is not None else None,
                 sounds=[PresetSound.from_dict(s) for s in data.get('sounds', [])] if data.get('sounds') else None
             )
+            logger.debug(f"Created PresetLayer {preset_layer.id}")
+            return preset_layer
         except Exception as e:
             logger.error(f"Error creating PresetLayer from dict: {e}")
             # Return a minimal valid layer with just the ID
@@ -89,9 +107,26 @@ class Preset:
     layers: List[PresetLayer] = None
     is_default: bool = False
 
+    # Runtime-only fields (not serialized)
+    _environment: Optional['Environment'] = None
+
     def __post_init__(self):
         if self.layers is None:
             self.layers = []
+
+    def set_environment(self, environment: 'Environment') -> None:
+        """Set the environment reference for this preset and all its layers"""
+        logger.debug(f"Setting environment {environment.id} on preset {self.id}")
+        self._environment = environment
+        for layer in self.layers:
+            layer.set_environment(environment)
+            # Also set environment on the corresponding base layer
+            base_layer = next((l for l in environment.layers if l.id == layer.id), None)
+            if base_layer:
+                logger.debug(f"Setting environment on base layer {base_layer.id} from preset {self.id}")
+                base_layer.set_environment(environment)
+            else:
+                logger.warning(f"No base layer found for preset layer {layer.id} in preset {self.id}")
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'Preset':

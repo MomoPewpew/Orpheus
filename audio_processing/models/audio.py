@@ -99,16 +99,21 @@ class LayerSound:
         sound_volume = self.volume
         layer_volume = self._layer.volume
         
+        logger.debug(f"Sound volume: {sound_volume}")
+
         # Apply preset overrides if any
         preset_layer = self._layer.get_active_preset_layer()
         if preset_layer:
+            logger.debug(f"Preset layer: {preset_layer.id}")
             # Override layer volume if specified in preset
             if preset_layer.volume is not None:
+                logger.debug(f"Preset layer volume: {preset_layer.volume}")
                 layer_volume = preset_layer.volume
                 
             # Override sound volume if specified in preset
             preset_sound = self._get_preset_sound()
             if preset_sound and preset_sound.volume is not None:
+                logger.debug(f"Preset sound volume: {preset_sound.volume}")
                 sound_volume = preset_sound.volume
         
         # Apply volume normalization if enabled
@@ -279,26 +284,47 @@ class Layer:
 
     def __post_init__(self):
         # Set layer reference on all sounds
+        logger.debug(f"Layer {self.id} post_init called")
+        logger.debug(f"Layer details: name={self.name}, mode={self.mode}, sounds={len(self.sounds)}")
+        for sound in self.sounds:
+            sound._layer = self
+
+    def set_environment(self, environment: 'Environment') -> None:
+        """Set the environment reference for this layer"""
+        if self._environment is environment:
+            logger.debug(f"Environment {environment.id} already set on layer {self.id}")
+            return
+            
+        logger.debug(f"Setting environment {environment.id} on layer {self.id}")
+        logger.debug(f"Layer details: name={self.name}, mode={self.mode}, sounds={len(self.sounds)}")
+        self._environment = environment
+        # Make sure all sounds have their layer reference
         for sound in self.sounds:
             sound._layer = self
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'Layer':
-        layer = cls(
-            id=data['id'],
-            name=data['name'],
-            sounds=[LayerSound.from_dict(s) for s in data['sounds']],
-            chance=float(data['chance']),
-            cooldown_cycles=data.get('cooldownCycles'),
-            loop_length_ms=data.get('loopLengthMs'),
-            weight=float(data['weight']),
-            volume=float(data['volume']),
-            mode=LayerMode(data['mode']),
-            selected_sound_index=int(data.get('selectedSoundIndex', 0))
-        )
-        # Set layer reference on sounds after creation
-        layer.__post_init__()
-        return layer
+        logger.debug(f"Creating layer from data: {json.dumps(data, indent=2)}")
+        try:
+            layer = cls(
+                id=data['id'],
+                name=data['name'],
+                sounds=[LayerSound.from_dict(s) for s in data['sounds']],
+                chance=float(data['chance']),
+                cooldown_cycles=data.get('cooldownCycles'),
+                loop_length_ms=data.get('loopLengthMs'),
+                weight=float(data['weight']),
+                volume=float(data['volume']),
+                mode=LayerMode(data['mode']),
+                selected_sound_index=int(data.get('selectedSoundIndex', 0))
+            )
+            logger.debug(f"Created layer {layer.id} with {len(layer.sounds)} sounds")
+            # Set layer reference on sounds after creation
+            layer.__post_init__()
+            return layer
+        except Exception as e:
+            logger.error(f"Error creating layer from dict: {e}", exc_info=True)
+            raise
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
@@ -316,22 +342,32 @@ class Layer:
         }
 
     def get_active_preset_layer(self) -> Optional['PresetLayer']:
-        """Get the active preset layer override for this layer, if any.
+        """Get the active preset layer override for this layer, if any."""
+        logger.debug(f"Getting active preset layer for layer {self.id}")
+        logger.debug(f"Layer details: name={self.name}, mode={self.mode}, sounds={len(self.sounds)}")
+        logger.debug(f"Environment reference: {self._environment.id if self._environment else 'None'}")
         
-        Returns:
-            The active PresetLayer if one exists in the environment's active preset,
-            otherwise None.
-        """
         if not self._environment:
+            logger.debug(f"No environment found for layer {self.id}")
             return None
             
         # Get the active preset
         active_preset = self._environment.get_active_preset()
         if not active_preset:
+            logger.debug(f"No active preset found for layer {self.id}")
             return None
             
         # Find the preset layer with matching ID
-        return next((pl for pl in active_preset.layers if pl.id == self.id), None)
+        preset_layer = next((pl for pl in active_preset.layers if pl.id == self.id), None)
+        if preset_layer:
+            logger.debug(f"Found preset layer {preset_layer.id} for layer {self.id}")
+            # Verify the preset layer has the correct base layer reference
+            if preset_layer._base_layer is not self:
+                logger.debug(f"Setting base layer reference on preset layer {preset_layer.id}")
+                preset_layer._base_layer = self
+        else:
+            logger.debug(f"No preset layer found for layer {self.id}")
+        return preset_layer
     
     def get_effective_weight(self) -> float:
         """Get the effective weight for the layer, considering the layer weight and preset overrides."""
@@ -377,8 +413,24 @@ class Environment:
             self.soundboard = []
             
         # Set environment reference on all layers
+        logger.debug(f"Environment {self.id} post_init called")
+        logger.debug(f"Setting environment references on {len(self.layers)} layers")
         for layer in self.layers:
-            layer._environment = self
+            layer.set_environment(self)
+            
+        # Set environment reference on all presets
+        logger.debug(f"Setting environment references on {len(self.presets)} presets")
+        for preset in self.presets:
+            preset.set_environment(self)
+            
+        # Log active preset if any
+        if self.active_preset_id:
+            logger.debug(f"Active preset ID: {self.active_preset_id}")
+            active_preset = self.get_active_preset()
+            if active_preset:
+                logger.debug(f"Found active preset: {active_preset.name}")
+            else:
+                logger.warning(f"Active preset {self.active_preset_id} not found")
 
     @property
     def is_fading(self) -> bool:
@@ -442,7 +494,19 @@ class Environment:
             # Log incoming data
             logger.debug(f"Creating Environment from data: {json.dumps(data, indent=2)}")
             
-            # Extract presets first
+            # Create layers first
+            logger.debug(f"Processing {len(data.get('layers', []))} layers")
+            layers = []
+            for layer_data in data.get('layers', []):
+                try:
+                    layer = Layer.from_dict(layer_data)
+                    layers.append(layer)
+                    logger.debug(f"Created layer: {layer.id} - {layer.name}")
+                except Exception as e:
+                    logger.error(f"Error creating layer: {e}", exc_info=True)
+                    raise
+            
+            # Extract presets
             presets = []
             if 'presets' in data:
                 logger.debug(f"Processing {len(data['presets'])} presets")
@@ -451,44 +515,32 @@ class Environment:
                         logger.debug(f"Creating preset from data: {json.dumps(preset_data, indent=2)}")
                         preset = Preset.from_dict(preset_data)
                         presets.append(preset)
-                        logger.debug(f"Successfully created preset: {preset.id} - {preset.name}")
+                        logger.debug(f"Created preset: {preset.id} - {preset.name}")
                     except Exception as e:
                         logger.error(f"Error creating preset: {e}", exc_info=True)
-                        logger.error(f"Problematic preset data: {json.dumps(preset_data, indent=2)}")
-            else:
-                logger.debug("No presets found in environment data")
+                        raise
             
             # Create environment
             env = cls(
                 id=data['id'],
                 name=data['name'],
                 max_weight=float(data['maxWeight']),
-                layers=[Layer.from_dict(l) for l in data.get('layers', [])],
-                presets=presets,  # Use our processed presets
+                layers=layers,
+                presets=presets,
                 background_image=data.get('backgroundImage'),
                 soundboard=data.get('soundboard', []),
                 active_preset_id=data.get('activePresetId'),
                 play_state=PlayState(data.get('playState', PlayState.STOPPED.value))
             )
             
-            # Log created environment
-            logger.debug(f"Created environment {env.id} with {len(env.presets)} presets")
-            if env.active_preset_id:
-                logger.debug(f"Active preset ID: {env.active_preset_id}")
-                active_preset = env.get_active_preset()
-                if active_preset:
-                    logger.debug(f"Found active preset: {active_preset.name}")
-                else:
-                    logger.warning(f"Active preset {env.active_preset_id} not found in presets list")
+            # Post-init will set up all references
+            env.__post_init__()
             
-            # Verify presets were properly set
-            for preset in env.presets:
-                logger.debug(f"Verified preset in environment: {preset.id} - {preset.name}")
-            
+            logger.debug(f"Created environment {env.id} with {len(env.layers)} layers and {len(env.presets)} presets")
             return env
+            
         except Exception as e:
             logger.error(f"Error creating environment: {e}", exc_info=True)
-            logger.error(f"Problematic environment data: {json.dumps(data, indent=2)}")
             raise
 
     def to_dict(self) -> Dict:
@@ -507,9 +559,20 @@ class Environment:
 
     def get_active_preset(self) -> Optional['Preset']:
         """Get the currently active preset if any"""
+        logger.debug(f"Getting active preset for environment {self.id}")
+        logger.debug(f"Active preset ID: {self.active_preset_id}")
+        logger.debug(f"Available presets: {[(p.id, p.name) for p in self.presets]}")
+        
         if not self.active_preset_id:
+            logger.debug("No active preset ID set")
             return None
-        return next((p for p in self.presets if p.id == self.active_preset_id), None)
+            
+        preset = next((p for p in self.presets if p.id == self.active_preset_id), None)
+        if preset:
+            logger.debug(f"Found active preset: {preset.id} - {preset.name}")
+        else:
+            logger.debug(f"Active preset {self.active_preset_id} not found in presets list")
+        return preset
 
     def get_preset_layer(self, layer_id: str, preset: Optional['Preset'] = None) -> Optional['PresetLayer']:
         """Get preset layer override for a given layer ID"""
