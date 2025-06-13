@@ -36,6 +36,18 @@ class SoundFile:
             original_filename=data.get('original_filename'),
             usage_count=int(data.get('usageCount', 0))
         )
+        
+    def to_dict(self) -> Dict:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'path': self.path,
+            'peak_volume': self.peak_volume,
+            'duration_ms': self.duration_ms,
+            'original_filename': self.original_filename,
+            'usageCount': self.usage_count
+        }
 
 @dataclass
 class LayerSound:
