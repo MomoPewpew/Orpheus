@@ -971,8 +971,8 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             <Tooltip title={
               sounds.length <= 1 
                 ? "At least two sounds are required to adjust frequencies" 
-                : (getEffectiveValue('mode') as LayerMode) === LayerMode.Single 
-                  ? "Frequency adjustment is not available in Single mode"
+                : (getEffectiveValue('mode') as LayerMode) !== LayerMode.Shuffle
+                  ? "Frequency adjustment is only available in Shuffle mode"
                   : ""
             }>
               <Box>  {/* Wrapper needed because Tooltip can't be applied directly to disabled elements */}
@@ -989,7 +989,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
                     value: getMarkValue('frequency', selectedSound.id),
                     label: ''
                   }]}
-                  disabled={sounds.length === 0 || sounds.length === 1 || (getEffectiveValue('mode') as LayerMode) === LayerMode.Single}
+                  disabled={sounds.length === 0 || sounds.length === 1 || (getEffectiveValue('mode') as LayerMode) !== LayerMode.Shuffle}
                   sx={getDefaultValueStyle(
                     getDefaultValue('frequency', selectedSound.id),
                     0,
