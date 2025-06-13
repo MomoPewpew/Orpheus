@@ -10,7 +10,7 @@ from collections import deque
 from threading import Lock, Thread
 from pydub import AudioSegment
 from flask import current_app
-from audio_processing.models.audio import AppState, PlayState
+from audio_processing.models.audio import AppState, PlayState, Layer
 from audio_processing.models.layer_info import LayerInfo
 
 logger = logging.getLogger(__name__)
@@ -92,36 +92,35 @@ class AudioMixer:
                     
                     # Mix all active layers
                     for env in playing_envs:
-                        env_data = env.to_dict()
-                        for layer in env_data.get('layers', []):
-                            sounds = layer.get('sounds', [])
-                            if not sounds:
+                        # Convert environment data to proper objects
+                        layer_data_list = env.to_dict().get('layers', [])
+                        for layer_data in layer_data_list:
+                            # Convert layer data to Layer object
+                            layer = Layer.from_dict(layer_data)
+                            if not layer.sounds:
                                 continue
                                 
-                            layer_id = layer.get('id', '')
-                            
                             # First, try to find an existing LayerInfo for this layer
                             layer_info = None
                             current_file_id = None
                             for cache_key in list(self._cached_layers.keys()):
-                                if cache_key.startswith(f"{layer_id}_"):
+                                if cache_key.startswith(f"{layer.id}_"):
                                     layer_info = self._cached_layers[cache_key]
                                     # Get the current file ID from the cache key
                                     current_file_id = cache_key.split('_')[1]
-                                    # Update layer data
-                                    layer_info.layer_data = layer
+                                    # Update layer reference
+                                    layer_info.layer = layer
                                     break
                             
                             # If no LayerInfo exists, create one with the selected sound
                             if not layer_info:
-                                selected_index = layer.get('selectedSoundIndex', 0)
-                                if selected_index >= len(sounds):
-                                    selected_index = 0
-                                selected_sound = sounds[selected_index]
-                                layer_info = self._get_or_load_layer(selected_sound.get('fileId'), layer)
+                                if layer.selected_sound_index >= len(layer.sounds):
+                                    layer.selected_sound_index = 0
+                                selected_sound = layer.sounds[layer.selected_sound_index]
+                                layer_info = self._get_or_load_layer(selected_sound.file_id, layer_data)
                                 if not layer_info:
                                     continue
-                                current_file_id = selected_sound.get('fileId')
+                                current_file_id = selected_sound.file_id
                             
                             # Get the next chunk - this may trigger a loop point and update active_sound_index
                             chunk = layer_info.get_next_chunk(self.chunk_samples, 0)
@@ -131,15 +130,15 @@ class AudioMixer:
                             if not active_sound:
                                 continue
                                 
-                            active_file_id = active_sound.get('fileId')
-                            logger.debug(f"Layer {layer_id}: current_file={current_file_id}, active_file={active_file_id}, active_index={layer_info._active_sound_index}")
+                            active_file_id = active_sound.file_id
+                            #logger.debug(f"Layer {layer.id}: current_file={current_file_id}, active_file={active_file_id}, active_index={layer_info._active_sound_index}")
                             
                             # If the active sound is different from what we're currently playing
                             if active_file_id != current_file_id:
-                                cache_key = f"{layer_id}_{active_file_id}"
+                                cache_key = f"{layer.id}_{active_file_id}"
                                 if cache_key not in self._cached_layers:
                                     # Load the new sound's audio
-                                    new_layer_info = self._get_or_load_layer(active_file_id, layer)
+                                    new_layer_info = self._get_or_load_layer(active_file_id, layer_data)
                                     if not new_layer_info:
                                         continue
                                     # Copy over the active index and position
@@ -152,7 +151,7 @@ class AudioMixer:
                                 else:
                                     # Use the cached version
                                     layer_info = self._cached_layers[cache_key]
-                                    layer_info.layer_data = layer
+                                    layer_info.layer = layer
                                 # Get the first chunk from the new sound
                                 chunk = layer_info.get_next_chunk(self.chunk_samples, 0)
                             
@@ -271,8 +270,9 @@ class AudioMixer:
             cache_key = f"{layer_id}_{file_id}"
             
             if cache_key in self._cached_layers:
-                # Update the layer data reference for existing LayerInfo
-                self._cached_layers[cache_key].layer_data = layer_data
+                # Convert layer data to Layer object and update the reference
+                layer = Layer.from_dict(layer_data)
+                self._cached_layers[cache_key].layer = layer
                 return self._cached_layers[cache_key]
             
             # Load new layer
@@ -283,10 +283,13 @@ class AudioMixer:
                 
             audio_data = self._load_audio_file(sound_path)
             
+            # Convert layer data to Layer object
+            layer = Layer.from_dict(layer_data)
+            
             # Create new LayerInfo
             self._cached_layers[cache_key] = LayerInfo(
                 audio_data=audio_data,
-                layer_data=layer_data
+                layer=layer
             )
             return self._cached_layers[cache_key]
             

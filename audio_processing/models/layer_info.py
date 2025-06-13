@@ -1,8 +1,8 @@
 import logging
 import random
 import numpy as np
-from typing import Dict, Any
-from audio_processing.models.audio import LayerSound, LayerMode
+from typing import Dict, Any, Optional
+from audio_processing.models.audio import LayerSound, LayerMode, Layer
 
 logger = logging.getLogger(__name__)
 
@@ -13,83 +13,85 @@ class LayerInfo:
     SAMPLE_RATE = 48000  # Hz
     CHANNELS = 2
     
-    def __init__(self, audio_data: np.ndarray, layer_data: Dict[str, Any]):
+    def __init__(self, audio_data: np.ndarray, layer: Layer):
         """Initialize a new audio layer.
         
         Args:
             audio_data: Numpy array of audio samples (shape: [samples, channels])
-            layer_data: Reference to the layer configuration object from the workspace
+            layer: The Layer object containing configuration and sounds
         """
         # Convert float32 [-1.0, 1.0] to int16 PCM
         self.audio_data = (audio_data * 32767).astype(np.int16)
         self.audio_length_samples = len(self.audio_data)
-        self.layer_data = layer_data
+        self.layer = layer
         self._position = 0  # Position within the loop
         self._audio_position = 0  # Position within the audio data
         # Initialize active_sound_index to the selected sound index
-        self._active_sound_index = layer_data.get('selectedSoundIndex', 0)
+        self._active_sound_index = layer.selected_sound_index
         logger.debug(f"Initialized layer with audio length: {self.audio_length_samples} samples")
     
     @property
     def loop_length_samples(self) -> int:
         """Get the current loop length in samples, based on layer configuration."""
-        loop_length_ms = self.layer_data.get('loopLengthMs', 8000)  # Default 8 seconds
+        loop_length_ms = self.layer.loop_length_ms or 8000  # Default 8 seconds
         return int(self.SAMPLE_RATE * (loop_length_ms / 1000))
     
     @property
     def volume(self) -> float:
         """Get the current volume, based on layer and sound configuration."""
-        layer_volume = self.layer_data.get('volume', 1.0)
-        
-        # Get the selected sound's volume
-        sounds = self.layer_data.get('sounds', [])
-        if not sounds:
-            return layer_volume
+        if not self.layer.sounds:
+            return self.layer.volume
             
-        selected_index = self.layer_data.get('selectedSoundIndex', 0)
-        if selected_index >= len(sounds):
-            selected_index = 0  # Fallback to first sound if index is out of bounds
+        # Get the selected sound
+        sound = self.get_layer_sound()
+        if not sound:
+            return self.layer.volume
             
-        sound_volume = sounds[selected_index].get('volume', 1.0)
-        return layer_volume * sound_volume
+        return self.layer.volume * sound.get_effective_volume()
         
-    def get_layer_sound(self) -> LayerSound:
+    def get_layer_sound(self) -> Optional[LayerSound]:
         """Get the currently active LayerSound."""
-        sounds = self.layer_data.get('sounds', [])
-        if not sounds:
+        if not self.layer.sounds:
             return None
         
         # Ensure active_sound_index is within bounds
-        if self._active_sound_index >= len(sounds):
+        if self._active_sound_index >= len(self.layer.sounds):
             self._active_sound_index = 0
             
-        return sounds[self._active_sound_index]
+        return self.layer.sounds[self._active_sound_index]
 
     def update_active_sound_index(self):
         """Update the active sound index based on the layer mode when a loop completes."""
-        sounds = self.layer_data.get('sounds', [])
-        if not sounds:
+        if not self.layer.sounds:
             return
             
-        mode = self.layer_data.get('mode', LayerMode.SEQUENCE)
         old_index = self._active_sound_index
         
-        if mode == LayerMode.SINGLE:
+        if self.layer.mode == LayerMode.SINGLE:
             # In single mode, always use the selected sound
-            self._active_sound_index = self.layer_data.get('selectedSoundIndex', 0)
-        elif mode == LayerMode.SEQUENCE:
+            self._active_sound_index = self.layer.selected_sound_index
+        elif self.layer.mode == LayerMode.SEQUENCE:
             # In sequence mode, increment the index
-            self._active_sound_index = (self._active_sound_index + 1) % len(sounds)
-        elif mode == LayerMode.SHUFFLE:
-            # In shuffle mode, pick a random sound
+            self._active_sound_index = (self._active_sound_index + 1) % len(self.layer.sounds)
+        elif self.layer.mode == LayerMode.SHUFFLE:
+            # In shuffle mode, pick a random sound based on frequency weights
             import random
-            self._active_sound_index = random.randrange(len(sounds))
+            
+            # Get effective frequencies (considering preset overrides)
+            frequencies = [sound.get_effective_frequency() for sound in self.layer.sounds]
+            
+            # Use weighted choice based on frequencies
+            self._active_sound_index = random.choices(
+                range(len(self.layer.sounds)), 
+                weights=frequencies,
+                k=1
+            )[0]
             
         # Ensure the index is within bounds
-        if self._active_sound_index >= len(sounds):
+        if self._active_sound_index >= len(self.layer.sounds):
             self._active_sound_index = 0
             
-        logger.debug(f"Updated active sound index: mode={mode}, old_index={old_index}, new_index={self._active_sound_index}, num_sounds={len(sounds)}")
+        logger.debug(f"Updated active sound index: mode={self.layer.mode}, old_index={old_index}, new_index={self._active_sound_index}, num_sounds={len(self.layer.sounds)}")
 
     def reset_position(self):
         """Reset the playback position to the start of the audio."""
