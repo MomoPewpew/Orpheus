@@ -47,7 +47,7 @@ class LayerInfo:
         if not sound:
             return self.layer.volume
             
-        return self.layer.volume * sound.get_effective_volume()
+        return sound.get_effective_volume()
         
     def get_layer_sound(self) -> Optional[LayerSound]:
         """Get the currently active LayerSound."""

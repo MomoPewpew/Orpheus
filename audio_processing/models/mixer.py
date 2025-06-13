@@ -155,6 +155,11 @@ class AudioMixer:
                                 # Get the first chunk from the new sound
                                 chunk = layer_info.get_next_chunk(self.chunk_samples, 0)
                             
+                            # Apply effective volume (considering layer volume, sound volume, and preset overrides)
+                            volume = layer_info.volume
+                            if volume != 1.0:
+                                chunk = (chunk.astype(np.float32) * volume).astype(np.int16)
+                            
                             # Mix this layer
                             mixed_chunk += chunk.astype(np.int32)
                             active_layers += 1
