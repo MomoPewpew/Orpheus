@@ -195,6 +195,7 @@ class Layer:
     weight: float = 1.0  # How much this layer contributes to the total environment weight
     volume: float = 1.0  # Layer-level volume multiplier (0-1)
     mode: LayerMode = LayerMode.SHUFFLE
+    selected_sound_index: int = 0  # Index of the currently selected sound in the sounds array
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'Layer':
@@ -207,7 +208,8 @@ class Layer:
             loop_length_ms=data.get('loopLengthMs'),
             weight=float(data['weight']),
             volume=float(data['volume']),
-            mode=LayerMode(data['mode'])
+            mode=LayerMode(data['mode']),
+            selected_sound_index=int(data.get('selectedSoundIndex', 0))
         )
 
     def to_dict(self) -> Dict:
@@ -221,7 +223,8 @@ class Layer:
             'loopLengthMs': self.loop_length_ms,
             'weight': self.weight,
             'volume': self.volume,
-            'mode': self.mode.value
+            'mode': self.mode.value,
+            'selectedSoundIndex': self.selected_sound_index
         }
 
 @dataclass

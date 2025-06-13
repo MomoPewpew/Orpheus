@@ -148,7 +148,8 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
       loopLengthMs: loopLengthMs ?? selectedFile.duration_ms,
       weight: 1,
       volume: 1,
-      mode: LayerMode.Shuffle
+      mode: LayerMode.Shuffle,
+      selectedSoundIndex: 0  // Always start with the first sound selected
     };
     onAdd(newLayer);
     resetAndClose();
@@ -184,7 +185,8 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
         loopLengthMs: loopLengthMs ?? uploadedFile.duration_ms,
         weight: 1,
         volume: 1,
-        mode: LayerMode.Shuffle
+        mode: LayerMode.Shuffle,
+        selectedSoundIndex: 0  // Always start with the first sound selected
       };
 
       // Add the new file to the soundFiles list

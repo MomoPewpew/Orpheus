@@ -32,7 +32,7 @@ class PCMStreamSource(discord.AudioSource):
             # Only add data if we have room
             if len(self.buffer) < self.MAX_BUFFER_SIZE:
                 self.buffer.extend(pcm_data)
-                logger.debug(f"Added {len(pcm_data)} bytes to buffer, total size: {len(self.buffer)}")
+                #logger.debug(f"Added {len(pcm_data)} bytes to buffer, total size: {len(self.buffer)}")
             else:
                 logger.warning("Buffer full, dropping audio data")
         except Exception as e:
@@ -183,7 +183,7 @@ class AudioManager:
             
             # Log the state after queueing
             stream_data = self._audio_streams[guild_id]
-            logger.info(f"Audio queued. Voice client playing: {voice_client.is_playing()}, Buffer size: {len(stream_data['audio_source'].buffer)} bytes")
+            #logger.info(f"Audio queued. Voice client playing: {voice_client.is_playing()}, Buffer size: {len(stream_data['audio_source'].buffer)} bytes")
             
             return True
             

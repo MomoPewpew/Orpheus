@@ -1,6 +1,8 @@
 import logging
+import random
 import numpy as np
 from typing import Dict, Any
+from audio_processing.models.audio import LayerSound, LayerMode
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,8 @@ class LayerInfo:
         self.layer_data = layer_data
         self._position = 0  # Position within the loop
         self._audio_position = 0  # Position within the audio data
+        # Initialize active_sound_index to the selected sound index
+        self._active_sound_index = layer_data.get('selectedSoundIndex', 0)
         logger.debug(f"Initialized layer with audio length: {self.audio_length_samples} samples")
     
     @property
@@ -36,11 +40,57 @@ class LayerInfo:
     def volume(self) -> float:
         """Get the current volume, based on layer and sound configuration."""
         layer_volume = self.layer_data.get('volume', 1.0)
-        # Assuming first sound in the layer for now
+        
+        # Get the selected sound's volume
         sounds = self.layer_data.get('sounds', [])
-        sound_volume = sounds[0].get('volume', 1.0) if sounds else 1.0
+        if not sounds:
+            return layer_volume
+            
+        selected_index = self.layer_data.get('selectedSoundIndex', 0)
+        if selected_index >= len(sounds):
+            selected_index = 0  # Fallback to first sound if index is out of bounds
+            
+        sound_volume = sounds[selected_index].get('volume', 1.0)
         return layer_volume * sound_volume
         
+    def get_layer_sound(self) -> LayerSound:
+        """Get the currently active LayerSound."""
+        sounds = self.layer_data.get('sounds', [])
+        if not sounds:
+            return None
+        
+        # Ensure active_sound_index is within bounds
+        if self._active_sound_index >= len(sounds):
+            self._active_sound_index = 0
+            
+        return sounds[self._active_sound_index]
+
+    def update_active_sound_index(self):
+        """Update the active sound index based on the layer mode when a loop completes."""
+        sounds = self.layer_data.get('sounds', [])
+        if not sounds:
+            return
+            
+        mode = self.layer_data.get('mode', LayerMode.SEQUENCE)
+        old_index = self._active_sound_index
+        
+        if mode == LayerMode.SINGLE:
+            # In single mode, always use the selected sound
+            self._active_sound_index = self.layer_data.get('selectedSoundIndex', 0)
+        elif mode == LayerMode.SEQUENCE:
+            # In sequence mode, increment the index
+            self._active_sound_index = (self._active_sound_index + 1) % len(sounds)
+        elif mode == LayerMode.SHUFFLE:
+            # In shuffle mode, pick a random sound
+            import random
+            self._active_sound_index = random.randrange(len(sounds))
+            
+        # Ensure the index is within bounds
+        if self._active_sound_index >= len(sounds):
+            self._active_sound_index = 0
+            
+        logger.debug(f"Updated active sound index: mode={mode}, old_index={old_index}, new_index={self._active_sound_index}, num_sounds={len(sounds)}")
+
     def reset_position(self):
         """Reset the playback position to the start of the audio."""
         self._position = 0
@@ -90,7 +140,10 @@ class LayerInfo:
                     self._position = 0
                     self._audio_position = 0  # Reset audio position only at loop points
                     samples_remaining -= samples_until_loop
-                    logger.debug(f"Loop point reached, reset positions. Remaining samples: {samples_remaining}")
+                    
+                    # Update the active sound index at the loop point
+                    self.update_active_sound_index()
+                    logger.debug(f"Loop point reached, reset positions and updated active sound. Remaining samples: {samples_remaining}")
                 else:
                     # Normal playback - determine how many samples to process in this iteration
                     samples_this_iteration = min(samples_remaining, 

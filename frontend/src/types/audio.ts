@@ -45,6 +45,7 @@ export interface Layer {
   weight: number;      // How much this layer contributes to the total environment weight
   volume: number;      // Layer-level volume multiplier (0-1)
   mode: LayerMode;     // Playback mode of the layer
+  selectedSoundIndex: number; // Index of the currently selected sound in the sounds array
 }
 
 /**
@@ -164,7 +165,10 @@ export function isLayer(obj: any): obj is Layer {
     typeof obj.weight === 'number' &&
     typeof obj.volume === 'number' &&
     typeof obj.mode === 'string' &&
-    Object.values(LayerMode).includes(obj.mode)
+    Object.values(LayerMode).includes(obj.mode) &&
+    typeof obj.selectedSoundIndex === 'number' &&
+    obj.selectedSoundIndex >= 0 &&
+    (!obj.sounds.length || obj.selectedSoundIndex < obj.sounds.length)
   );
 }
 

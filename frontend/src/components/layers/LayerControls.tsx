@@ -151,7 +151,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
 }) => {
   const sounds = layer.sounds || [];
   const defaultSounds = defaultLayer?.sounds || sounds;
-  const [selectedSoundIndex, setSelectedSoundIndex] = useState(0);
+  const [selectedSoundIndex, setSelectedSoundIndex] = useState(layer.selectedSoundIndex || 0);
   const [isAddingSoundOpen, setIsAddingSoundOpen] = useState(false);
   const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
   const [isConfigureOpen, setIsConfigureOpen] = useState(false);
@@ -292,10 +292,12 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   const handleAddSound = (newLayer: Layer) => {
     // Extract the first sound from the new layer and add it to our layer
     if (newLayer.sounds.length > 0) {
+      const newIndex = sounds.length;  // The new sound will be added at the end
       updateLayer({ 
-        sounds: [...sounds, newLayer.sounds[0]]
+        sounds: [...sounds, newLayer.sounds[0]],
+        selectedSoundIndex: newIndex  // Include the new index in the update
       });
-      setSelectedSoundIndex(sounds.length);
+      setSelectedSoundIndex(newIndex);
     }
     setIsAddingSoundOpen(false);
   };
@@ -826,6 +828,21 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
     } as React.CSSProperties;
   };
 
+  // Update the sound selector handler
+  const handleSoundSelect = (value: string | number) => {
+    if (value === 'add') {
+      setIsAddingSoundOpen(true);
+    } else {
+      const newIndex = value as number;
+      setSelectedSoundIndex(newIndex);
+      // Update the layer with the new selected index
+      onLayerUpdate({
+        ...layer,
+        selectedSoundIndex: newIndex
+      });
+    }
+  };
+
   return (
     <Paper sx={{ p: 2 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -896,14 +913,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
           {/* Sound selector */}
           <Select
             value={sounds.length === 0 ? 'add' : selectedSoundIndex}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === 'add') {
-                setIsAddingSoundOpen(true);
-              } else {
-                setSelectedSoundIndex(value as number);
-              }
-            }}
+            onChange={(e) => handleSoundSelect(e.target.value)}
             size="small"
             fullWidth
           >

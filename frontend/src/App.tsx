@@ -202,7 +202,8 @@ const App: React.FC = () => {
             ...l,
             mode: updatedLayer.mode,
             name: updatedLayer.name,
-            loopLengthMs: updatedLayer.loopLengthMs
+            loopLengthMs: updatedLayer.loopLengthMs,
+            selectedSoundIndex: updatedLayer.selectedSoundIndex
           } : l
         )
       };
@@ -274,7 +275,10 @@ const App: React.FC = () => {
       const updatedEnvironment = {
         ...activeEnvironment,
         layers: activeEnvironment.layers.map((l: Layer) =>
-          l.id === updatedLayer.id ? updatedLayer : l
+          l.id === updatedLayer.id ? {
+            ...l,
+            ...updatedLayer  // This ensures all properties are copied, including selectedSoundIndex
+          } : l
         )
       };
       handleEnvironmentUpdate(updatedEnvironment);
