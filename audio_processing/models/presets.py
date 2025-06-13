@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from typing import List, Optional, Dict
 from .audio import LayerMode
+import logging
+import json
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class PresetSound:
@@ -12,12 +16,20 @@ class PresetSound:
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'PresetSound':
-        return cls(
-            id=data['id'],
-            file_id=data['fileId'],
-            volume=float(data['volume']) if 'volume' in data else None,
-            frequency=float(data['frequency']) if 'frequency' in data else None
-        )
+        try:
+            return cls(
+                id=data['id'],
+                file_id=data['fileId'],
+                volume=float(data['volume']) if 'volume' in data and data['volume'] is not None else None,
+                frequency=float(data['frequency']) if 'frequency' in data and data['frequency'] is not None else None
+            )
+        except Exception as e:
+            logger.error(f"Error creating PresetSound from dict: {e}")
+            # Return a minimal valid sound with just the ID and file_id
+            return cls(
+                id=data.get('id', 'error'),
+                file_id=data.get('fileId', 'error')
+            )
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
@@ -41,15 +53,20 @@ class PresetLayer:
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'PresetLayer':
-        return cls(
-            id=data['id'],
-            volume=float(data['volume']) if 'volume' in data else None,
-            weight=float(data['weight']) if 'weight' in data else None,
-            chance=float(data['chance']) if 'chance' in data else None,
-            cooldown_cycles=int(data['cooldownCycles']) if 'cooldownCycles' in data else None,
-            mode=LayerMode(data['mode']) if 'mode' in data else None,
-            sounds=[PresetSound.from_dict(s) for s in data['sounds']] if 'sounds' in data else None
-        )
+        try:
+            return cls(
+                id=data['id'],
+                volume=float(data['volume']) if 'volume' in data and data['volume'] is not None else None,
+                weight=float(data['weight']) if 'weight' in data and data['weight'] is not None else None,
+                chance=float(data['chance']) if 'chance' in data and data['chance'] is not None else None,
+                cooldown_cycles=int(data['cooldownCycles']) if 'cooldownCycles' in data and data['cooldownCycles'] is not None else None,
+                mode=LayerMode(data['mode']) if 'mode' in data and data['mode'] is not None else None,
+                sounds=[PresetSound.from_dict(s) for s in data.get('sounds', [])] if data.get('sounds') else None
+            )
+        except Exception as e:
+            logger.error(f"Error creating PresetLayer from dict: {e}")
+            # Return a minimal valid layer with just the ID
+            return cls(id=data.get('id', 'error'))
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
@@ -78,13 +95,51 @@ class Preset:
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'Preset':
-        return cls(
-            id=data['id'],
-            name=data['name'],
-            max_weight=float(data['maxWeight']) if 'maxWeight' in data else None,
-            layers=[PresetLayer.from_dict(l) for l in data['layers']],
-            is_default=bool(data.get('isDefault', False))
-        )
+        try:
+            logger.debug(f"Creating Preset from data: {json.dumps(data, indent=2)}")
+            
+            # Extract and validate required fields
+            if 'id' not in data:
+                raise ValueError("Missing required field: id")
+            if 'name' not in data:
+                raise ValueError("Missing required field: name")
+            
+            # Process layers
+            layers = []
+            if 'layers' in data:
+                logger.debug(f"Processing {len(data['layers'])} preset layers")
+                for layer_data in data['layers']:
+                    try:
+                        layer = PresetLayer.from_dict(layer_data)
+                        layers.append(layer)
+                        logger.debug(f"Added preset layer: {layer.id}")
+                    except Exception as e:
+                        logger.error(f"Error creating preset layer: {e}", exc_info=True)
+            
+            # Handle maxWeight - only convert to float if it exists and is not None
+            max_weight = None
+            if 'maxWeight' in data and data['maxWeight'] is not None:
+                try:
+                    max_weight = float(data['maxWeight'])
+                except (TypeError, ValueError) as e:
+                    logger.error(f"Invalid maxWeight value: {data['maxWeight']}")
+                    max_weight = None
+            
+            # Create preset
+            preset = cls(
+                id=data['id'],
+                name=data['name'],
+                max_weight=max_weight,
+                layers=layers,
+                is_default=bool(data.get('isDefault', False))
+            )
+            
+            logger.debug(f"Created preset {preset.id} - {preset.name} with {len(preset.layers)} layers")
+            return preset
+            
+        except Exception as e:
+            logger.error(f"Error creating preset: {e}", exc_info=True)
+            raise
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""

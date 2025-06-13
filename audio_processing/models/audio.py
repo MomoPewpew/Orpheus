@@ -2,6 +2,10 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Dict
 from enum import Enum
 import uuid
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class LayerMode(str, Enum):
     """Represents the playback mode of a layer"""
@@ -224,26 +228,26 @@ class Effects:
             return effects
 
         if 'normalize' in data:
-            effects.normalize.enabled = data['normalize']['enabled']
+            effects.normalize.enabled = bool(data['normalize'].get('enabled', False))
 
         if 'fades' in data:
-            effects.fades.fade_in_duration = data['fades']['fadeInDuration']
-            effects.fades.crossfade_duration = data['fades']['crossfadeDuration']
+            effects.fades.fade_in_duration = int(data['fades'].get('fadeInDuration', 0))
+            effects.fades.crossfade_duration = int(data['fades'].get('crossfadeDuration', 0))
 
         if 'filters' in data:
             filters = data['filters']
             if 'highPass' in filters:
-                effects.filters.high_pass.frequency = filters['highPass']['frequency']
+                effects.filters.high_pass.frequency = float(filters['highPass'].get('frequency', 0.0))
             if 'lowPass' in filters:
-                effects.filters.low_pass.frequency = filters['lowPass']['frequency']
+                effects.filters.low_pass.frequency = float(filters['lowPass'].get('frequency', 20000.0))
             if 'dampenSpeechRange' in filters:
-                effects.filters.dampen_speech_range.amount = filters['dampenSpeechRange']['amount']
+                effects.filters.dampen_speech_range.amount = float(filters['dampenSpeechRange'].get('amount', 0.0))
 
         if 'compressor' in data:
             comp = data['compressor']
-            effects.compressor.low_threshold = comp['lowThreshold']
-            effects.compressor.high_threshold = comp['highThreshold']
-            effects.compressor.ratio = comp['ratio']
+            effects.compressor.low_threshold = float(comp.get('lowThreshold', -60.0))
+            effects.compressor.high_threshold = float(comp.get('highThreshold', -12.0))
+            effects.compressor.ratio = float(comp.get('ratio', 2.0))
 
         return effects
 
@@ -434,17 +438,58 @@ class Environment:
     @classmethod
     def from_dict(cls, data: Dict) -> 'Environment':
         from .presets import Preset  # Import here to avoid circular dependency
-        return cls(
-            id=data['id'],
-            name=data['name'],
-            max_weight=float(data['maxWeight']),
-            layers=[Layer.from_dict(l) for l in data['layers']],
-            presets=[Preset.from_dict(p) for p in data.get('presets', [])],
-            background_image=data.get('backgroundImage'),
-            soundboard=data.get('soundboard', []),
-            active_preset_id=data.get('activePresetId'),
-            play_state=PlayState(data.get('playState', PlayState.STOPPED.value))
-        )
+        try:
+            # Log incoming data
+            logger.debug(f"Creating Environment from data: {json.dumps(data, indent=2)}")
+            
+            # Extract presets first
+            presets = []
+            if 'presets' in data:
+                logger.debug(f"Processing {len(data['presets'])} presets")
+                for preset_data in data['presets']:
+                    try:
+                        logger.debug(f"Creating preset from data: {json.dumps(preset_data, indent=2)}")
+                        preset = Preset.from_dict(preset_data)
+                        presets.append(preset)
+                        logger.debug(f"Successfully created preset: {preset.id} - {preset.name}")
+                    except Exception as e:
+                        logger.error(f"Error creating preset: {e}", exc_info=True)
+                        logger.error(f"Problematic preset data: {json.dumps(preset_data, indent=2)}")
+            else:
+                logger.debug("No presets found in environment data")
+            
+            # Create environment
+            env = cls(
+                id=data['id'],
+                name=data['name'],
+                max_weight=float(data['maxWeight']),
+                layers=[Layer.from_dict(l) for l in data.get('layers', [])],
+                presets=presets,  # Use our processed presets
+                background_image=data.get('backgroundImage'),
+                soundboard=data.get('soundboard', []),
+                active_preset_id=data.get('activePresetId'),
+                play_state=PlayState(data.get('playState', PlayState.STOPPED.value))
+            )
+            
+            # Log created environment
+            logger.debug(f"Created environment {env.id} with {len(env.presets)} presets")
+            if env.active_preset_id:
+                logger.debug(f"Active preset ID: {env.active_preset_id}")
+                active_preset = env.get_active_preset()
+                if active_preset:
+                    logger.debug(f"Found active preset: {active_preset.name}")
+                else:
+                    logger.warning(f"Active preset {env.active_preset_id} not found in presets list")
+            
+            # Verify presets were properly set
+            for preset in env.presets:
+                logger.debug(f"Verified preset in environment: {preset.id} - {preset.name}")
+            
+            return env
+        except Exception as e:
+            logger.error(f"Error creating environment: {e}", exc_info=True)
+            logger.error(f"Problematic environment data: {json.dumps(data, indent=2)}")
+            raise
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
@@ -582,16 +627,38 @@ class AppState:
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'AppState':
-        app_state = cls(
-            environments=[Environment.from_dict(e) for e in data['environments']],
-            master_volume=float(data['masterVolume']),
-            soundboard=data['soundboard'],
-            effects=Effects.from_dict(data.get('effects', {})),
-            sound_files=[SoundFile.from_dict(f) for f in data.get('files', [])]
-        )
-        # Set app_state reference
-        app_state.__post_init__()
-        return app_state
+        try:
+            # Log incoming data
+            logger.debug(f"Creating AppState from data with {len(data.get('environments', []))} environments")
+            
+            # Process environments first
+            environments = []
+            if 'environments' in data:
+                for env_data in data['environments']:
+                    try:
+                        env = Environment.from_dict(env_data)
+                        environments.append(env)
+                        logger.debug(f"Added environment: {env.id} - {env.name}")
+                    except Exception as e:
+                        logger.error(f"Error creating environment: {e}", exc_info=True)
+            
+            # Create app state
+            app_state = cls(
+                environments=environments,
+                master_volume=float(data['masterVolume']),
+                soundboard=data['soundboard'],
+                effects=Effects.from_dict(data.get('effects', {})),
+                sound_files=[SoundFile.from_dict(f) for f in data.get('files', [])]
+            )
+            
+            # Set app_state reference and log
+            app_state.__post_init__()
+            logger.debug(f"Created AppState with {len(app_state.environments)} environments")
+            
+            return app_state
+        except Exception as e:
+            logger.error(f"Error creating AppState: {e}", exc_info=True)
+            raise
 
     def to_dict(self) -> Dict:
         """Convert the AppState to a dictionary"""
