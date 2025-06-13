@@ -12,6 +12,7 @@ from pydub import AudioSegment
 from flask import current_app
 from audio_processing.models.audio import AppState, PlayState, Layer
 from audio_processing.models.layer_info import LayerInfo
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,7 @@ class AudioMixer:
                                 if layer.selected_sound_index >= len(layer.sounds):
                                     layer.selected_sound_index = 0
                                 selected_sound = layer.sounds[layer.selected_sound_index]
-                                layer_info = self._get_or_load_layer(selected_sound.file_id, layer.to_dict())
+                                layer_info = self._get_or_load_layer(selected_sound.file_id, layer)
                                 if not layer_info:
                                     continue
                                 current_file_id = selected_sound.file_id
@@ -135,7 +136,7 @@ class AudioMixer:
                                 cache_key = f"{layer.id}_{active_file_id}"
                                 if cache_key not in self._cached_layers:
                                     # Load the new sound's audio
-                                    new_layer_info = self._get_or_load_layer(active_file_id, layer.to_dict())
+                                    new_layer_info = self._get_or_load_layer(active_file_id, layer)
                                     if not new_layer_info:
                                         continue
                                     # Copy over the active index and position
@@ -256,24 +257,36 @@ class AudioMixer:
             logger.error(f"Error loading audio file {file_path}: {e}")
             raise
             
-    def _get_or_load_layer(self, file_id: str, layer_data: Optional[Dict] = None) -> Optional[LayerInfo]:
+    def _get_or_load_layer(self, file_id: str, layer: Optional[Layer] = None) -> Optional[LayerInfo]:
         """Get a cached layer or load it if not cached.
         
         Args:
             file_id: ID of the sound file to load
-            layer_data: Layer configuration data from the workspace
+            layer: The Layer object containing configuration
         """
         try:
-            if layer_data is None:
-                layer_data = {'loopLengthMs': 8000}  # Default 8 seconds if no layer data
+            if layer is None:
+                # Create a minimal layer for standalone sounds
+                from audio_processing.models.audio import Layer, LayerSound
+                layer = Layer(
+                    id=str(uuid.uuid4()),
+                    name="Standalone Sound",
+                    sounds=[LayerSound(
+                        id=str(uuid.uuid4()),
+                        file_id=file_id,
+                        frequency=1.0,
+                        volume=1.0
+                    )],
+                    chance=1.0,
+                    loop_length_ms=8000,  # Default 8 seconds
+                    mode=LayerMode.SINGLE
+                )
             
             # Create a cache key that includes both the layer ID and the file ID
-            layer_id = layer_data.get('id', '')
-            cache_key = f"{layer_id}_{file_id}"
+            cache_key = f"{layer.id}_{file_id}"
             
             if cache_key in self._cached_layers:
-                # Convert layer data to Layer object and update the reference
-                layer = Layer.from_dict(layer_data)
+                # Update the layer reference
                 self._cached_layers[cache_key].layer = layer
                 return self._cached_layers[cache_key]
             
@@ -284,9 +297,6 @@ class AudioMixer:
                 return None
                 
             audio_data = self._load_audio_file(sound_path)
-            
-            # Convert layer data to Layer object
-            layer = Layer.from_dict(layer_data)
             
             # Create new LayerInfo
             self._cached_layers[cache_key] = LayerInfo(
