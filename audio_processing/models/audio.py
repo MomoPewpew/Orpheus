@@ -44,6 +44,9 @@ class LayerSound:
     file_id: str  # Reference to a SoundFile
     frequency: float  # Frequency of selection within the layer
     volume: float  # Sound-specific volume adjustment
+    
+    # Runtime-only fields (not serialized)
+    _layer: Optional['Layer'] = None
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'LayerSound':
@@ -62,6 +65,64 @@ class LayerSound:
             'frequency': self.frequency,
             'volume': self.volume
         }
+    
+    def _get_preset_sound(self) -> Optional['PresetSound']:
+        """Get the preset sound override for this sound, if any."""
+        preset_layer = self._layer.get_active_preset_layer()
+        if preset_layer and preset_layer.sounds:
+            return next((ps for ps in preset_layer.sounds if ps.id == self.id), None)
+        return None
+    
+    def get_effective_volume(self) -> float:
+        """Get the effective volume for the sound, considering:
+        1. Base sound volume or preset override
+        2. Volume normalization (if enabled)
+        3. Layer volume or preset override
+        """
+        # Get the base sound volume, potentially overridden by preset
+        sound_volume = self.volume
+        layer_volume = self._layer.volume
+        
+        # Apply preset overrides if any
+        preset_layer = self._layer.get_active_preset_layer()
+        if preset_layer:
+            # Override layer volume if specified in preset
+            if preset_layer.volume is not None:
+                layer_volume = preset_layer.volume
+                
+            # Override sound volume if specified in preset
+            preset_sound = self._get_preset_sound()
+            if preset_sound and preset_sound.volume is not None:
+                sound_volume = preset_sound.volume
+        
+        # Apply volume normalization if enabled
+        if (self._layer._environment and 
+            self._layer._environment._app_state and 
+            self._layer._environment._app_state.effects.normalize.enabled):
+            # Find the sound file to get its peak volume
+            sound_file = next(
+                (sf for sf in self._layer._environment._app_state.sound_files 
+                 if sf.id == self.file_id), 
+                None
+            )
+            if sound_file and sound_file.peak_volume > 0:
+                # Normalize by applying the inverse of the peak volume
+                # This makes all sounds peak at the same level
+                sound_volume /= sound_file.peak_volume
+        
+        return layer_volume * sound_volume
+    
+    def get_effective_frequency(self) -> float:
+        """Get the effective frequency for the sound, considering preset overrides."""
+        # Start with base sound frequency
+        sound_frequency = self.frequency
+        
+        # Override with preset value if specified
+        preset_sound = self._get_preset_sound()
+        if preset_sound and preset_sound.frequency is not None:
+            sound_frequency = preset_sound.frequency
+
+        return sound_frequency
 
 @dataclass
 class Effects:
@@ -190,16 +251,24 @@ class Layer:
     name: str
     sounds: List[LayerSound]
     chance: float  # Probability of playing (0-1)
-    cooldown_cycles: Optional[int] = None
-    loop_length_ms: Optional[int] = None
+    cooldown_cycles: int = None
+    loop_length_ms: int = None
     weight: float = 1.0  # How much this layer contributes to the total environment weight
     volume: float = 1.0  # Layer-level volume multiplier (0-1)
     mode: LayerMode = LayerMode.SHUFFLE
     selected_sound_index: int = 0  # Index of the currently selected sound in the sounds array
+    
+    # Runtime-only fields (not serialized)
+    _environment: Optional['Environment'] = None
+
+    def __post_init__(self):
+        # Set layer reference on all sounds
+        for sound in self.sounds:
+            sound._layer = self
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'Layer':
-        return cls(
+        layer = cls(
             id=data['id'],
             name=data['name'],
             sounds=[LayerSound.from_dict(s) for s in data['sounds']],
@@ -211,6 +280,9 @@ class Layer:
             mode=LayerMode(data['mode']),
             selected_sound_index=int(data.get('selectedSoundIndex', 0))
         )
+        # Set layer reference on sounds after creation
+        layer.__post_init__()
+        return layer
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
@@ -226,6 +298,45 @@ class Layer:
             'mode': self.mode.value,
             'selectedSoundIndex': self.selected_sound_index
         }
+
+    def get_active_preset_layer(self) -> Optional['PresetLayer']:
+        """Get the active preset layer override for this layer, if any.
+        
+        Returns:
+            The active PresetLayer if one exists in the environment's active preset,
+            otherwise None.
+        """
+        if not self._environment:
+            return None
+            
+        # Get the active preset
+        active_preset = self._environment.get_active_preset()
+        if not active_preset:
+            return None
+            
+        # Find the preset layer with matching ID
+        return next((pl for pl in active_preset.layers if pl.id == self.id), None)
+    
+    def get_effective_weight(self) -> float:
+        """Get the effective weight for the layer, considering the layer weight and preset overrides."""
+        preset_layer = self.get_active_preset_layer()
+        if preset_layer:
+            return preset_layer.weight
+        return self.weight
+    
+    def get_effective_chance(self) -> float:
+        """Get the effective chance for the layer, considering the layer chance and preset overrides."""
+        preset_layer = self.get_active_preset_layer()
+        if preset_layer:
+            return preset_layer.chance
+        return self.chance
+    
+    def get_effective_cooldown_cycles(self) -> int:
+        """Get the effective cooldown cycles for the layer, considering the layer cooldown cycles and preset overrides."""
+        preset_layer = self.get_active_preset_layer()
+        if preset_layer:
+            return preset_layer.cooldown_cycles
+        return self.cooldown_cycles
 
 @dataclass
 class Environment:
@@ -243,10 +354,15 @@ class Environment:
     # Runtime-only fields (not serialized)
     _fade_start_time: Optional[float] = None
     _fade_end_time: Optional[float] = None
+    _app_state: Optional['AppState'] = None
 
     def __post_init__(self):
         if self.soundboard is None:
             self.soundboard = []
+            
+        # Set environment reference on all layers
+        for layer in self.layers:
+            layer._environment = self
 
     @property
     def is_fading(self) -> bool:
@@ -395,6 +511,12 @@ class AppState:
     master_volume: float  # Global volume multiplier (0-1)
     soundboard: List[str]  # Global sound IDs available in all environments
     effects: Effects = field(default_factory=Effects)  # Global effects configuration
+    sound_files: List[SoundFile] = field(default_factory=list)  # All available sound files
+
+    def __post_init__(self):
+        # Set app_state reference on all environments
+        for env in self.environments:
+            env._app_state = self
 
     @property
     def active_environments(self) -> List[Environment]:
@@ -448,12 +570,16 @@ class AppState:
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'AppState':
-        return cls(
+        app_state = cls(
             environments=[Environment.from_dict(e) for e in data['environments']],
             master_volume=float(data['masterVolume']),
             soundboard=data['soundboard'],
-            effects=Effects.from_dict(data.get('effects', {}))
+            effects=Effects.from_dict(data.get('effects', {})),
+            sound_files=[SoundFile.from_dict(f) for f in data.get('files', [])]
         )
+        # Set app_state reference
+        app_state.__post_init__()
+        return app_state
 
     def to_dict(self) -> Dict:
         """Convert the AppState to a dictionary"""
@@ -461,5 +587,6 @@ class AppState:
             'environments': [env.to_dict() for env in self.environments],
             'masterVolume': self.master_volume,
             'soundboard': self.soundboard,
-            'effects': self.effects.to_dict()
+            'effects': self.effects.to_dict(),
+            'files': [sf.to_dict() for sf in self.sound_files]
         } 
