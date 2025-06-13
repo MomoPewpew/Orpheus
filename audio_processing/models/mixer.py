@@ -111,7 +111,7 @@ class AudioMixer:
                             # Calculate layer volume
                             sound_volume = first_sound.get('volume', 1.0)
                             layer_volume = layer.get('volume', 1.0)
-                            layer_info.volume = sound_volume * layer_volume
+                            # layer_info.volume = sound_volume * layer_volume
                             
                             # Mix this layer
                             chunk = layer_info.get_next_chunk(self.chunk_samples, 0)
@@ -218,33 +218,35 @@ class AudioMixer:
         
         Args:
             file_id: ID of the sound file to load
-            layer_data: Optional layer configuration data containing loop_length_ms
+            layer_data: Layer configuration data from the workspace
         """
-        if file_id not in self._cached_layers:
-            try:
-                sound_path = AUDIO_DIR / f"{file_id}.mp3"
-                if not sound_path.exists():
-                    logger.warning(f"Audio file not found: {sound_path}")
-                    return None
-                    
-                audio_data = self._load_audio_file(sound_path)
-                
-                # Get loop length from layer configuration
-                loop_length_ms = 8000  # Default 8 seconds
-                if layer_data and 'loopLengthMs' in layer_data:
-                    loop_length_ms = float(layer_data['loopLengthMs'])
-                    logger.debug(f"Using configured loop length: {loop_length_ms}ms")
-                
-                self._cached_layers[file_id] = LayerInfo(
-                    audio_data=audio_data,
-                    loop_length_ms=loop_length_ms,
-                    volume=1.0  # Base volume, will be adjusted by environment settings
-                )
-            except Exception as e:
-                logger.error(f"Error loading layer {file_id}: {e}")
+        try:
+            if layer_data is None:
+                layer_data = {'loopLengthMs': 8000}  # Default 8 seconds if no layer data
+            
+            if file_id in self._cached_layers:
+                # Update the layer data reference for existing LayerInfo
+                self._cached_layers[file_id].layer_data = layer_data
+                return self._cached_layers[file_id]
+            
+            # Load new layer
+            sound_path = AUDIO_DIR / f"{file_id}.mp3"
+            if not sound_path.exists():
+                logger.warning(f"Audio file not found: {sound_path}")
                 return None
                 
-        return self._cached_layers[file_id]
+            audio_data = self._load_audio_file(sound_path)
+            
+            # Create new LayerInfo
+            self._cached_layers[file_id] = LayerInfo(
+                audio_data=audio_data,
+                layer_data=layer_data
+            )
+            return self._cached_layers[file_id]
+            
+        except Exception as e:
+            logger.error(f"Error loading layer {file_id}: {e}")
+            return None
 
 # Create a global instance of the mixer
 mixer = AudioMixer() 

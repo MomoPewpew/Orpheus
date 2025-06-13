@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -10,22 +11,35 @@ class LayerInfo:
     SAMPLE_RATE = 48000  # Hz
     CHANNELS = 2
     
-    def __init__(self, audio_data: np.ndarray, loop_length_ms: float, volume: float = 1.0):
+    def __init__(self, audio_data: np.ndarray, layer_data: Dict[str, Any]):
         """Initialize a new audio layer.
         
         Args:
             audio_data: Numpy array of audio samples (shape: [samples, channels])
-            loop_length_ms: Length of the loop in milliseconds
-            volume: Initial volume multiplier (0.0 to 1.0)
+            layer_data: Reference to the layer configuration object from the workspace
         """
         # Convert float32 [-1.0, 1.0] to int16 PCM
         self.audio_data = (audio_data * 32767).astype(np.int16)
-        self.loop_length_samples = int(self.SAMPLE_RATE * (loop_length_ms / 1000))
         self.audio_length_samples = len(self.audio_data)
-        self.volume = volume
+        self.layer_data = layer_data
         self._position = 0  # Position within the loop
         self._audio_position = 0  # Position within the audio data
-        logger.debug(f"Initialized layer with loop length: {self.loop_length_samples} samples, audio length: {self.audio_length_samples} samples")
+        logger.debug(f"Initialized layer with audio length: {self.audio_length_samples} samples")
+    
+    @property
+    def loop_length_samples(self) -> int:
+        """Get the current loop length in samples, based on layer configuration."""
+        loop_length_ms = self.layer_data.get('loopLengthMs', 8000)  # Default 8 seconds
+        return int(self.SAMPLE_RATE * (loop_length_ms / 1000))
+    
+    @property
+    def volume(self) -> float:
+        """Get the current volume, based on layer and sound configuration."""
+        layer_volume = self.layer_data.get('volume', 1.0)
+        # Assuming first sound in the layer for now
+        sounds = self.layer_data.get('sounds', [])
+        sound_volume = sounds[0].get('volume', 1.0) if sounds else 1.0
+        return layer_volume * sound_volume
         
     def reset_position(self):
         """Reset the playback position to the start of the audio."""
@@ -100,8 +114,9 @@ class LayerInfo:
                     samples_remaining -= samples_this_iteration
             
             # Apply volume
-            if self.volume != 1.0:
-                chunk = (chunk.astype(np.float32) * self.volume).astype(np.int16)
+            current_volume = self.volume
+            if current_volume != 1.0:
+                chunk = (chunk.astype(np.float32) * current_volume).astype(np.int16)
             
             return chunk
             
