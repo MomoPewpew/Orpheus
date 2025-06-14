@@ -10,35 +10,34 @@ logger = logging.getLogger(__name__)
 class PresetSound:
     """Represents a sound override in a preset"""
     id: str        # Must match the original sound ID
-    file_id: str   # Must match the original sound's fileId
     volume: Optional[float] = None
     frequency: Optional[float] = None
+    file_id: Optional[str] = None   # Only used internally, not serialized
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'PresetSound':
         try:
             return cls(
                 id=data['id'],
-                file_id=data['fileId'],
                 volume=float(data['volume']) if 'volume' in data and data['volume'] is not None else None,
                 frequency=float(data['frequency']) if 'frequency' in data and data['frequency'] is not None else None
             )
         except Exception as e:
             logger.error(f"Error creating PresetSound from dict: {e}")
-            # Return a minimal valid sound with just the ID and file_id
-            return cls(
-                id=data.get('id', 'error'),
-                file_id=data.get('fileId', 'error')
-            )
+            # Return a minimal valid sound with just the ID
+            return cls(id=data.get('id', 'error'))
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
-        return {
-            'id': self.id,
-            'fileId': self.file_id,
-            'volume': self.volume,
-            'frequency': self.frequency
-        }
+        result = {'id': self.id}
+        
+        # Only include fields that have values
+        if self.volume is not None:
+            result['volume'] = self.volume
+        if self.frequency is not None:
+            result['frequency'] = self.frequency
+            
+        return result
 
 @dataclass
 class PresetLayer:
@@ -83,15 +82,21 @@ class PresetLayer:
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
-        return {
-            'id': self.id,
-            'volume': self.volume,
-            'weight': self.weight,
-            'chance': self.chance,
-            'cooldownCycles': self.cooldown_cycles,
-            'mode': self.mode.value if self.mode else None,
-            'sounds': [s.to_dict() for s in self.sounds] if self.sounds else None
-        }
+        result = {'id': self.id}
+        
+        # Only include fields that have values
+        if self.volume is not None:
+            result['volume'] = self.volume
+        if self.weight is not None:
+            result['weight'] = self.weight
+        if self.chance is not None:
+            result['chance'] = self.chance
+        if self.cooldown_cycles is not None:
+            result['cooldownCycles'] = self.cooldown_cycles
+        if self.sounds:
+            result['sounds'] = [s.to_dict() for s in self.sounds]
+            
+        return result
 
 @dataclass
 class Preset:
@@ -154,8 +159,7 @@ class Preset:
                 id=data['id'],
                 name=data['name'],
                 max_weight=max_weight,
-                layers=layers,
-                is_default=bool(data.get('isDefault', False))
+                layers=layers
             )
             
             return preset
@@ -166,10 +170,14 @@ class Preset:
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
-        return {
+        result = {
             'id': self.id,
             'name': self.name,
-            'maxWeight': self.max_weight,
-            'layers': [l.to_dict() for l in self.layers],
-            'isDefault': self.is_default
-        } 
+            # Only include layers that have overrides (more than just an ID)
+            'layers': [l.to_dict() for l in self.layers if len(l.to_dict()) > 1]
+        }
+        
+        if self.max_weight is not None:
+            result['maxWeight'] = self.max_weight
+            
+        return result 

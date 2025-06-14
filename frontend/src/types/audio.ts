@@ -259,7 +259,6 @@ export interface Preset {
   name: string;
   maxWeight?: number;   // Optional override for environment's maxWeight
   layers: PresetLayer[];  // Layer-specific overrides
-  isDefault?: boolean;  // Whether this is the default preset
 }
 
 /**
@@ -301,8 +300,7 @@ export function isPreset(obj: any): obj is Preset {
     typeof obj.name === 'string' &&
     (obj.maxWeight === undefined || typeof obj.maxWeight === 'number') &&
     Array.isArray(obj.layers) &&
-    obj.layers.every(isPresetLayer) &&
-    (obj.isDefault === undefined || typeof obj.isDefault === 'boolean')
+    obj.layers.every(isPresetLayer)
   );
 }
 

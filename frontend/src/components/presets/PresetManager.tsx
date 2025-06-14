@@ -35,8 +35,7 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
     const newPreset: Preset = {
       id: generateId(),
       name: newPresetName.trim(),
-      layers: [],
-      isDefault: false
+      layers: []
     };
 
     onPresetCreate(newPreset);
