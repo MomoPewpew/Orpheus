@@ -30,6 +30,9 @@ class LayerInfo:
         self._active_sound_index = layer.selected_sound_index
         # Initialize chance state - don't roll yet, wait for first cycle
         self._should_play = False
+        # Initialize cooldown state
+        self._cooldown_cycles_elapsed = 0  # Number of cycles since last play
+        self._in_cooldown = False  # Whether we're in a cooldown period
     
     @property
     def loop_length_samples(self) -> int:
@@ -96,9 +99,15 @@ class LayerInfo:
         """Reset the playback position to the start of the audio."""
         self._position = 0
         self._audio_position = 0
+        # Reset cooldown state
+        self._cooldown_cycles_elapsed = 0
+        self._in_cooldown = False
         # Roll chance when resetting position (starting a new cycle)
-        self._should_play = random.random() <= self.layer.get_effective_chance()
-        logger.debug(f"Layer {self.layer.id} reset position, rolled chance: {self._should_play}")
+        chance = self.layer.get_effective_chance()
+        if chance is None:
+            chance = 1.0  # Default to always play if no chance set
+        self._should_play = random.random() <= chance
+        logger.debug(f"Layer {self.layer.id} reset position, cooldown elapsed: {self._cooldown_cycles_elapsed}, in cooldown: {self._in_cooldown}, chance: {chance}, rolled: {self._should_play}")
         
     def get_next_chunk(self, chunk_size: int, current_time_ms: float) -> np.ndarray:
         """Get the next chunk of audio data.
@@ -149,9 +158,37 @@ class LayerInfo:
                     
                     # Update the active sound index at the loop point
                     self.update_active_sound_index()
-                    # Roll chance at the loop point
-                    self._should_play = random.random() <= self.layer.get_effective_chance()
-                    logger.debug(f"Layer {self.layer.id} completed cycle, rolled new chance: {self._should_play}")
+                    
+                    # Handle cooldown cycles at the loop point
+                    cooldown_cycles = self.layer.get_effective_cooldown_cycles()
+                    if cooldown_cycles is None:
+                        cooldown_cycles = 0  # Default to no cooldown if not set
+                        
+                    if self._should_play:
+                        # If we played this cycle, start cooldown
+                        self._in_cooldown = True
+                        self._cooldown_cycles_elapsed = 0
+                        logger.debug(f"Layer {self.layer.id} played, starting cooldown (need {cooldown_cycles} cycles)")
+                    elif self._in_cooldown:
+                        # If we're in cooldown, increment the counter
+                        self._cooldown_cycles_elapsed += 1
+                        # Check if we've completed the cooldown
+                        if self._cooldown_cycles_elapsed >= cooldown_cycles:
+                            self._in_cooldown = False
+                            logger.debug(f"Layer {self.layer.id} cooldown complete after {self._cooldown_cycles_elapsed} cycles")
+                        else:
+                            logger.debug(f"Layer {self.layer.id} cooldown cycle {self._cooldown_cycles_elapsed} of {cooldown_cycles}")
+                    
+                    # Roll chance at the loop point - only if not in cooldown
+                    if self._in_cooldown:
+                        self._should_play = False
+                        logger.debug(f"Layer {self.layer.id} in cooldown ({self._cooldown_cycles_elapsed} of {cooldown_cycles}), forced not to play")
+                    else:
+                        chance = self.layer.get_effective_chance()
+                        if chance is None:
+                            chance = 1.0  # Default to always play if no chance set
+                        self._should_play = random.random() <= chance
+                        logger.debug(f"Layer {self.layer.id} completed cycle, chance: {chance}, rolled: {self._should_play}")
                 else:
                     # Normal playback - determine how many samples to process in this iteration
                     samples_this_iteration = min(samples_remaining, 

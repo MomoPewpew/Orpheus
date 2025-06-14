@@ -191,9 +191,18 @@ class AudioMixer:
         with self._lock:
             logger.info("Starting audio processing with new app state")
 
-            # Reset all layer positions (this will also roll initial chances)
-            for layer in self._cached_layers.values():
-                layer.reset_position()
+            # Reset all layer positions and cooldowns
+            for layer_info in self._cached_layers.values():
+                layer_info.reset_position()  # This also resets cooldown state
+                
+            # Clear any stale layer caches for environments that are no longer present
+            current_layer_ids = {layer.id for env in app_state.environments for layer in env.layers}
+            stale_cache_keys = [
+                key for key in list(self._cached_layers.keys())
+                if key.split('_')[0] not in current_layer_ids
+            ]
+            for key in stale_cache_keys:
+                del self._cached_layers[key]
                 
             self._app_state = app_state
             
