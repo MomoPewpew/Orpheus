@@ -186,7 +186,8 @@ export async function loadWorkspace(): Promise<WorkspaceState> {
     // Ensure environments have soundboard property and playState
     const environments = (data.environments || []).map((env: Environment) => ({
       ...env,
-      soundboard: env.soundboard || [] // Add soundboard if missing
+      soundboard: env.soundboard || [], // Add soundboard if missing
+      activePresetId: env.activePresetId === null ? undefined : env.activePresetId // Ensure null is converted to undefined
     }));
 
     // Default effects if not present

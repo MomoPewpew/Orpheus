@@ -122,7 +122,8 @@ const App: React.FC = () => {
       soundboard: [],
       presets: [],
       maxWeight: 2,
-      playState: PlayState.Stopped
+      playState: PlayState.Stopped,
+      activePresetId: undefined
     };
 
     setEnvironments((prevEnvironments: Environment[]) => [...prevEnvironments, newEnvironment]);
