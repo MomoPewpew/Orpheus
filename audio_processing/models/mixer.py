@@ -129,7 +129,6 @@ class AudioMixer:
                                 continue
                                 
                             active_file_id = active_sound.file_id
-                            #logger.debug(f"Layer {layer.id}: current_file={current_file_id}, active_file={active_file_id}, active_index={layer_info._active_sound_index}")
                             
                             # If the active sound is different from what we're currently playing
                             if active_file_id != current_file_id:
@@ -190,10 +189,7 @@ class AudioMixer:
         """
         with self._lock:
             logger.info("Starting audio processing with new app state")
-            # Log environment states
-            for env in app_state.environments:
-                logger.debug(f"Environment {env.id} state: {env.play_state}")
-            
+
             # Reset all layer positions
             for layer in self._cached_layers.values():
                 layer.reset_position()

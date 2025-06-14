@@ -51,7 +51,6 @@ def load_config() -> dict:
             }
         with open(CONFIG_FILE, 'r') as f:
             config = json.load(f)
-            logger.debug(f"Loaded config: {config}")
             return config
     except Exception as e:
         logger.error(f"Error loading config: {e}")
@@ -91,8 +90,7 @@ def save_config(config: dict):
 
         # Update only the fields that were passed in, preserve the rest
         merged_config = {**current_config, **config}
-        
-        logger.debug(f"Saving merged config: {merged_config}")
+
         with open(CONFIG_FILE, 'w') as f:
             json.dump(merged_config, f, indent=2)
     except Exception as e:
@@ -101,7 +99,6 @@ def save_config(config: dict):
 
 def ensure_directories():
     """Create necessary directories if they don't exist."""
-    logger.debug(f"Ensuring directories exist: {DATA_DIR}, {AUDIO_DIR}")
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     
@@ -270,7 +267,6 @@ def upload_file():
         # Save uploaded file temporarily
         filename = secure_filename(file.filename)
         temp_path = str(AUDIO_DIR / filename)
-        logger.debug(f"Saving uploaded file to: {temp_path}")
         file.save(temp_path)
         
         try:

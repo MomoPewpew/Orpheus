@@ -28,7 +28,6 @@ class LayerInfo:
         self._audio_position = 0  # Position within the audio data
         # Initialize active_sound_index to the selected sound index
         self._active_sound_index = layer.selected_sound_index
-        logger.debug(f"Initialized layer with audio length: {self.audio_length_samples} samples")
     
     @property
     def loop_length_samples(self) -> int:
@@ -91,13 +90,10 @@ class LayerInfo:
         if self._active_sound_index >= len(self.layer.sounds):
             self._active_sound_index = 0
             
-        logger.debug(f"Updated active sound index: mode={self.layer.mode}, old_index={old_index}, new_index={self._active_sound_index}, num_sounds={len(self.layer.sounds)}")
-
     def reset_position(self):
         """Reset the playback position to the start of the audio."""
         self._position = 0
         self._audio_position = 0
-        logger.debug("Reset layer position to start")
         
     def get_next_chunk(self, chunk_size: int, current_time_ms: float) -> np.ndarray:
         """Get the next chunk of audio data.
@@ -145,7 +141,6 @@ class LayerInfo:
                     
                     # Update the active sound index at the loop point
                     self.update_active_sound_index()
-                    logger.debug(f"Loop point reached, reset positions and updated active sound. Remaining samples: {samples_remaining}")
                 else:
                     # Normal playback - determine how many samples to process in this iteration
                     samples_this_iteration = min(samples_remaining, 

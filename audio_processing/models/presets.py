@@ -57,19 +57,15 @@ class PresetLayer:
 
     def set_environment(self, environment: 'Environment') -> None:
         """Set the environment reference for this preset layer"""
-        logger.debug(f"Setting environment {environment.id} on preset layer {self.id}")
         self._environment = environment
         # Find and store reference to base layer
         self._base_layer = next((l for l in environment.layers if l.id == self.id), None)
-        if self._base_layer:
-            logger.debug(f"Found base layer {self._base_layer.id} for preset layer {self.id}")
-        else:
+        if not self._base_layer:
             logger.warning(f"No base layer found for preset layer {self.id}")
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'PresetLayer':
         try:
-            logger.debug(f"Creating PresetLayer from data: {json.dumps(data, indent=2)}")
             preset_layer = cls(
                 id=data['id'],
                 volume=float(data['volume']) if 'volume' in data and data['volume'] is not None else None,
@@ -79,7 +75,6 @@ class PresetLayer:
                 mode=LayerMode(data['mode']) if 'mode' in data and data['mode'] is not None else None,
                 sounds=[PresetSound.from_dict(s) for s in data.get('sounds', [])] if data.get('sounds') else None
             )
-            logger.debug(f"Created PresetLayer {preset_layer.id}")
             return preset_layer
         except Exception as e:
             logger.error(f"Error creating PresetLayer from dict: {e}")
@@ -116,14 +111,12 @@ class Preset:
 
     def set_environment(self, environment: 'Environment') -> None:
         """Set the environment reference for this preset and all its layers"""
-        logger.debug(f"Setting environment {environment.id} on preset {self.id}")
         self._environment = environment
         for layer in self.layers:
             layer.set_environment(environment)
             # Also set environment on the corresponding base layer
             base_layer = next((l for l in environment.layers if l.id == layer.id), None)
             if base_layer:
-                logger.debug(f"Setting environment on base layer {base_layer.id} from preset {self.id}")
                 base_layer.set_environment(environment)
             else:
                 logger.warning(f"No base layer found for preset layer {layer.id} in preset {self.id}")
@@ -131,8 +124,6 @@ class Preset:
     @classmethod
     def from_dict(cls, data: Dict) -> 'Preset':
         try:
-            logger.debug(f"Creating Preset from data: {json.dumps(data, indent=2)}")
-            
             # Extract and validate required fields
             if 'id' not in data:
                 raise ValueError("Missing required field: id")
@@ -142,12 +133,10 @@ class Preset:
             # Process layers
             layers = []
             if 'layers' in data:
-                logger.debug(f"Processing {len(data['layers'])} preset layers")
                 for layer_data in data['layers']:
                     try:
                         layer = PresetLayer.from_dict(layer_data)
                         layers.append(layer)
-                        logger.debug(f"Added preset layer: {layer.id}")
                     except Exception as e:
                         logger.error(f"Error creating preset layer: {e}", exc_info=True)
             
@@ -169,7 +158,6 @@ class Preset:
                 is_default=bool(data.get('isDefault', False))
             )
             
-            logger.debug(f"Created preset {preset.id} - {preset.name} with {len(preset.layers)} layers")
             return preset
             
         except Exception as e:
