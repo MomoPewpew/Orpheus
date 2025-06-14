@@ -6,6 +6,9 @@ from models.sound_file import SoundFile
 from typing import List, Optional
 import json
 import logging
+import fcntl
+import time
+from contextlib import contextmanager
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -17,114 +20,170 @@ files_bp = Blueprint('files', __name__)
 DATA_DIR = Path(__file__).parent.parent / 'data'
 AUDIO_DIR = DATA_DIR / 'audio'
 CONFIG_FILE = DATA_DIR / 'config.json'
+LOCK_FILE = DATA_DIR / 'config.lock'
 
 # Allowed audio file extensions
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg'}
 
+@contextmanager
+def file_lock():
+    """Context manager for file locking to prevent race conditions."""
+    lock_file = None
+    try:
+        # Open the lock file in append mode (create if doesn't exist)
+        lock_file = open(LOCK_FILE, 'a')
+        
+        # Try to acquire lock, wait up to 5 seconds
+        start_time = time.time()
+        while True:
+            try:
+                # Try to acquire an exclusive lock
+                fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except IOError:
+                if time.time() - start_time > 5:
+                    raise TimeoutError("Could not acquire lock after 5 seconds")
+                time.sleep(0.1)
+        
+        yield
+    finally:
+        if lock_file:
+            # Release the lock and close the file
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+            lock_file.close()
+
 def allowed_file(filename: str) -> bool:
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def load_config() -> dict:
-    """Load the config file."""
-    try:
-        if not CONFIG_FILE.exists():
-            logger.debug("Config file not found, creating default")
-            return {
-                "files": [],
-                "environments": [],
-                "masterVolume": 1.0,
-                "soundboard": [],
-                "effects": {
-                    "normalize": { "enabled": True },
-                    "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
-                    "filters": {
-                        "highPass": { "frequency": 400 },
-                        "lowPass": { "frequency": 10000 },
-                        "dampenSpeechRange": { "amount": 0 }
-                    },
-                    "compressor": {
-                        "lowThreshold": -40,
-                        "highThreshold": 0,
-                        "ratio": 1
-                    }
-                }
-            }
-        with open(CONFIG_FILE, 'r') as f:
-            config = json.load(f)
-            return config
-    except Exception as e:
-        logger.error(f"Error loading config: {e}")
-        return {
-            "files": [],
-            "environments": [],
-            "masterVolume": 1.0,
-            "soundboard": [],
-            "effects": {
-                "normalize": { "enabled": True },
-                "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
-                "filters": {
-                    "highPass": { "frequency": 400 },
-                    "lowPass": { "frequency": 10000 },
-                    "dampenSpeechRange": { "amount": 0 }
-                },
-                "compressor": {
-                    "lowThreshold": -40,
-                    "highThreshold": 0,
-                    "ratio": 1
-                }
+def get_default_config():
+    """Get the default configuration."""
+    return {
+        "files": [],
+        "environments": [],
+        "masterVolume": 1.0,
+        "soundboard": [],
+        "effects": {
+            "normalize": { "enabled": True },
+            "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
+            "filters": {
+                "highPass": { "frequency": 400 },
+                "lowPass": { "frequency": 10000 },
+                "dampenSpeechRange": { "amount": 0 }
+            },
+            "compressor": {
+                "lowThreshold": -40,
+                "highThreshold": 0,
+                "ratio": 1
             }
         }
+    }
+
+def load_config() -> dict:
+    """Load the config file with file locking."""
+    try:
+        with file_lock():
+            if not CONFIG_FILE.exists():
+                logger.debug("Config file not found, creating default")
+                default_config = get_default_config()
+                # Write the default config to file
+                with open(CONFIG_FILE, 'w') as f:
+                    json.dump(default_config, f, indent=2)
+                return default_config
+
+            # Read the file content first to check if it's empty
+            with open(CONFIG_FILE, 'r') as f:
+                content = f.read().strip()
+                
+            if not content:
+                logger.warning("Config file exists but is empty, creating default")
+                default_config = get_default_config()
+                # Write the default config to file
+                with open(CONFIG_FILE, 'w') as f:
+                    json.dump(default_config, f, indent=2)
+                return default_config
+                
+            try:
+                # Try to parse the content as JSON
+                config = json.loads(content)
+                
+                # Validate required fields
+                if not isinstance(config, dict):
+                    raise ValueError("Config must be a JSON object")
+                    
+                # Ensure required sections exist
+                config.setdefault("files", [])
+                config.setdefault("environments", [])
+                config.setdefault("masterVolume", 1.0)
+                config.setdefault("soundboard", [])
+                config.setdefault("effects", get_default_config()["effects"])
+                
+                return config
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Config file contains invalid JSON: {e}")
+                logger.error(f"Content: {content[:100]}...")  # Log first 100 chars of content
+                
+                # Backup the corrupted file
+                backup_path = CONFIG_FILE.with_suffix(f'.bak.{int(time.time())}')
+                logger.warning(f"Backing up corrupted config to {backup_path}")
+                with open(backup_path, 'w') as f:
+                    f.write(content)
+                
+                # Return default config and write it
+                default_config = get_default_config()
+                with open(CONFIG_FILE, 'w') as f:
+                    json.dump(default_config, f, indent=2)
+                return default_config
+                
+    except Exception as e:
+        logger.error(f"Error loading config: {e}", exc_info=True)
+        return get_default_config()
 
 def save_config(config: dict):
-    """Save the config file."""
+    """Save the config file with file locking."""
     try:
-        # Load existing config to preserve other state
-        current_config = {}
-        if CONFIG_FILE.exists():
-            try:
-                with open(CONFIG_FILE, 'r') as f:
-                    current_config = json.load(f)
-            except json.JSONDecodeError:
-                logger.error("Error reading existing config, starting fresh")
-                current_config = {}
+        with file_lock():
+            # Load existing config to preserve other state
+            current_config = {}
+            if CONFIG_FILE.exists():
+                try:
+                    with open(CONFIG_FILE, 'r') as f:
+                        content = f.read().strip()
+                        if content:
+                            current_config = json.loads(content)
+                except json.JSONDecodeError:
+                    logger.error("Error reading existing config, starting fresh")
+                    current_config = {}
 
-        # Update only the fields that were passed in, preserve the rest
-        merged_config = {**current_config, **config}
+            # Update only the fields that were passed in, preserve the rest
+            merged_config = {**current_config, **config}
 
-        with open(CONFIG_FILE, 'w') as f:
-            json.dump(merged_config, f, indent=2)
+            # Write atomically by writing to temp file first
+            temp_file = CONFIG_FILE.with_suffix('.tmp')
+            with open(temp_file, 'w') as f:
+                json.dump(merged_config, f, indent=2)
+            
+            # Rename temp file to actual config file (atomic operation)
+            os.replace(temp_file, CONFIG_FILE)
+            
     except Exception as e:
-        logger.error(f"Error saving config: {e}")
+        logger.error(f"Error saving config: {e}", exc_info=True)
         raise
 
 def ensure_directories():
     """Create necessary directories if they don't exist."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
-    
-    # Create default config if it doesn't exist
-    if not CONFIG_FILE.exists():
-        logger.debug(f"Creating default config file at {CONFIG_FILE}")
-        save_config({
-            "files": [],
-            "environments": [],
-            "masterVolume": 1.0,
-            "soundboard": [],
-            "effects": {
-                "normalize": { "enabled": True },
-                "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
-                "filters": {
-                    "highPass": { "frequency": 400 },
-                    "lowPass": { "frequency": 10000 },
-                    "dampenSpeechRange": { "amount": 0 }
-                },
-                "compressor": {
-                    "lowThreshold": -40,
-                    "highThreshold": 0,
-                    "ratio": 1
-                }
-            }
-        })
+    try:
+        with file_lock():
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+            
+            # Create default config if it doesn't exist
+            if not CONFIG_FILE.exists():
+                logger.debug(f"Creating default config file at {CONFIG_FILE}")
+                save_config(get_default_config())
+    except Exception as e:
+        logger.error(f"Error ensuring directories: {e}", exc_info=True)
+        raise
 
 # Call this when the blueprint is created
 ensure_directories()

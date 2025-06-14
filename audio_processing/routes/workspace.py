@@ -4,6 +4,8 @@ from pathlib import Path
 import logging
 from audio_processing.models.audio import AppState, PlayState, Effects
 from audio_processing.models.mixer import mixer
+from audio_processing.routes.files import file_lock, get_default_config
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -18,32 +20,27 @@ CONFIG_FILE = DATA_DIR / 'config.json'
 def load_workspace() -> AppState:
     """Load the workspace configuration."""
     try:
-        if not CONFIG_FILE.exists():
-            logger.debug("Config file not found, creating default")
-            default_effects_dict = {
-                "normalize": { "enabled": True },
-                "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
-                "filters": {
-                    "highPass": { "frequency": 400 },
-                    "lowPass": { "frequency": 10000 },
-                    "dampenSpeechRange": { "amount": 0 }
-                },
-                "compressor": {
-                    "lowThreshold": -40,
-                    "highThreshold": 0,
-                    "ratio": 1
-                }
-            }
-            return AppState(
-                environments=[],
-                master_volume=1.0,
-                soundboard=[],
-                effects=Effects.from_dict(default_effects_dict)
-            )
-            
-        with open(CONFIG_FILE, 'r') as f:
+        with file_lock():
+            if not CONFIG_FILE.exists():
+                logger.debug("Config file not found, creating default")
+                default_config = get_default_config()
+                with open(CONFIG_FILE, 'w') as f:
+                    json.dump(default_config, f, indent=2)
+                return AppState.from_dict(default_config)
+                
+            # Read the file content first to check if it's empty
+            with open(CONFIG_FILE, 'r') as f:
+                content = f.read().strip()
+                
+            if not content:
+                logger.debug("Config file empty, creating default")
+                default_config = get_default_config()
+                with open(CONFIG_FILE, 'w') as f:
+                    json.dump(default_config, f, indent=2)
+                return AppState.from_dict(default_config)
+                
             try:
-                config = json.load(f)
+                config = json.loads(content)
                 
                 # Create AppState
                 app_state = AppState.from_dict(config)
@@ -52,89 +49,103 @@ def load_workspace() -> AppState:
                 
             except json.JSONDecodeError as e:
                 logger.error(f"Error decoding config JSON: {e}", exc_info=True)
-                raise
-            except Exception as e:
-                logger.error(f"Error creating AppState from config: {e}", exc_info=True)
-                raise
+                
+                # Backup corrupted file
+                import time
+                backup_path = CONFIG_FILE.with_suffix(f'.bak.{int(time.time())}')
+                logger.warning(f"Backing up corrupted config to {backup_path}")
+                with open(backup_path, 'w') as f:
+                    f.write(content)
+                
+                # Create new default config
+                default_config = get_default_config()
+                with open(CONFIG_FILE, 'w') as f:
+                    json.dump(default_config, f, indent=2)
+                return AppState.from_dict(default_config)
                 
     except Exception as e:
         logger.error(f"Error loading config: {e}", exc_info=True)
-        default_effects_dict = {
-            "normalize": { "enabled": True },
-            "fades": { "fadeInDuration": 4000, "crossfadeDuration": 4000 },
-            "filters": {
-                "highPass": { "frequency": 400 },
-                "lowPass": { "frequency": 10000 },
-                "dampenSpeechRange": { "amount": 0 }
-            },
-            "compressor": {
-                "lowThreshold": -40,
-                "highThreshold": 0,
-                "ratio": 1
-            }
-        }
-        return AppState(
-            environments=[],
-            master_volume=1.0,
-            soundboard=[],
-            effects=Effects.from_dict(default_effects_dict)
-        )
+        return AppState.from_dict(get_default_config())
 
 def save_workspace(app_state: AppState):
     """Save the workspace configuration."""
-    try:        
-        # Convert AppState to dict
-        new_config = app_state.to_dict()
-        
-        # Load existing config to preserve files
-        current_config = {}
-        if CONFIG_FILE.exists():
-            with open(CONFIG_FILE, 'r') as f:
-                try:
-                    current_config = json.load(f)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Error reading existing config: {e}")
-                    current_config = {}
-        
-        # Only update the files from current config, preserve everything else from new config
-        new_config['files'] = current_config.get('files', [])
+    try:
+        with file_lock():
+            # Convert AppState to dict
+            new_config = app_state.to_dict()
             
-        # Write the new config
-        with open(CONFIG_FILE, 'w') as f:
-            # Convert to string with pretty printing
-            json_str = json.dumps(new_config, indent=2, sort_keys=True)
-            f.write(json_str)
+            # Load existing config to preserve files
+            current_config = {}
+            if CONFIG_FILE.exists():
+                with open(CONFIG_FILE, 'r') as f:
+                    content = f.read().strip()
+                    if content:
+                        try:
+                            current_config = json.loads(content)
+                        except json.JSONDecodeError as e:
+                            logger.error(f"Error reading existing config: {e}")
+                            current_config = {}
+            
+            # Only update the files from current config, preserve everything else from new config
+            new_config['files'] = current_config.get('files', [])
+                
+            # Write atomically using a temp file
+            temp_file = CONFIG_FILE.with_suffix('.tmp')
+            with open(temp_file, 'w') as f:
+                json_str = json.dumps(new_config, indent=2, sort_keys=True)
+                f.write(json_str)
+                
+            # Atomic rename
+            os.replace(temp_file, CONFIG_FILE)
+            
     except Exception as e:
         logger.error(f"Error saving config: {e}", exc_info=True)
         raise
 
 def ensure_workspace_dir():
     """Create necessary directories and files if they don't exist."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    
-    # Reset all environment playStates to STOPPED on server startup
-    if CONFIG_FILE.exists():
-        try:
-            # Load current config directly to preserve all data
-            with open(CONFIG_FILE, 'r') as f:
-                config = json.load(f)
+    try:
+        with file_lock():
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
             
-            # Only update play states in the config, being careful to preserve presets
-            for env in config.get('environments', []):
-                env_id = env.get('id')
-                active_preset_id = env.get('activePresetId')
-                presets = env.get('presets', [])
+            # Reset all environment playStates to STOPPED on server startup
+            if CONFIG_FILE.exists():
+                # Load current config directly to preserve all data
+                with open(CONFIG_FILE, 'r') as f:
+                    content = f.read().strip()
+                    if not content:
+                        config = get_default_config()
+                    else:
+                        try:
+                            config = json.loads(content)
+                        except json.JSONDecodeError:
+                            logger.error("Error reading config, using default")
+                            config = get_default_config()
                 
-                # Update play state
-                env['playState'] = 'STOPPED'
+                # Only update play states in the config, being careful to preserve presets
+                for env in config.get('environments', []):
+                    env_id = env.get('id')
+                    active_preset_id = env.get('activePresetId')
+                    presets = env.get('presets', [])
+                    
+                    # Update play state
+                    env['playState'] = 'STOPPED'
 
-            # Write the updated config back
-            with open(CONFIG_FILE, 'w') as f:
-                json_str = json.dumps(config, indent=2, sort_keys=True)
-                f.write(json_str)
-                
-        except Exception as e:
-            logger.error(f"Error resetting play states: {e}", exc_info=True)
+                # Write the updated config back atomically
+                temp_file = CONFIG_FILE.with_suffix('.tmp')
+                with open(temp_file, 'w') as f:
+                    json_str = json.dumps(config, indent=2, sort_keys=True)
+                    f.write(json_str)
+                    
+                # Atomic rename
+                os.replace(temp_file, CONFIG_FILE)
+            else:
+                # Create default config if it doesn't exist
+                with open(CONFIG_FILE, 'w') as f:
+                    json.dump(get_default_config(), f, indent=2)
+                    
+    except Exception as e:
+        logger.error(f"Error ensuring workspace directory: {e}", exc_info=True)
 
 # Call this when the blueprint is created
 ensure_workspace_dir()

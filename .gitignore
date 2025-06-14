@@ -70,4 +70,8 @@ out/
 *.ogg
 *.flac
 *.m4a
-*.aac 
+*.aac
+
+# Lock files
+*.lock
+config.lock 
