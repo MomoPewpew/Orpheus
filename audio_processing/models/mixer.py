@@ -13,6 +13,7 @@ from flask import current_app
 from audio_processing.models.audio import AppState, PlayState, Layer
 from audio_processing.models.layer_info import LayerInfo
 import uuid
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +191,7 @@ class AudioMixer:
         with self._lock:
             logger.info("Starting audio processing with new app state")
 
-            # Reset all layer positions
+            # Reset all layer positions (this will also roll initial chances)
             for layer in self._cached_layers.values():
                 layer.reset_position()
                 

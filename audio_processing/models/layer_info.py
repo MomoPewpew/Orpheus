@@ -28,6 +28,8 @@ class LayerInfo:
         self._audio_position = 0  # Position within the audio data
         # Initialize active_sound_index to the selected sound index
         self._active_sound_index = layer.selected_sound_index
+        # Initialize chance state - don't roll yet, wait for first cycle
+        self._should_play = False
     
     @property
     def loop_length_samples(self) -> int:
@@ -94,6 +96,9 @@ class LayerInfo:
         """Reset the playback position to the start of the audio."""
         self._position = 0
         self._audio_position = 0
+        # Roll chance when resetting position (starting a new cycle)
+        self._should_play = random.random() <= self.layer.get_effective_chance()
+        logger.debug(f"Layer {self.layer.id} reset position, rolled chance: {self._should_play}")
         
     def get_next_chunk(self, chunk_size: int, current_time_ms: float) -> np.ndarray:
         """Get the next chunk of audio data.
@@ -116,8 +121,8 @@ class LayerInfo:
                     # Handle the loop point
                     samples_until_loop = self.loop_length_samples - self._position
                     
-                    # Get samples until the loop point
-                    if samples_until_loop > 0:
+                    # Get samples until the loop point if we should play
+                    if samples_until_loop > 0 and self._should_play:
                         # If we still have audio data, use it
                         if self._audio_position < self.audio_length_samples:
                             audio_samples = min(samples_until_loop, 
@@ -133,6 +138,9 @@ class LayerInfo:
                         
                         # Always increment position by samples_until_loop, even if we ran out of audio
                         self._position += samples_until_loop
+                    else:
+                        # If not playing, just update position
+                        self._position += samples_until_loop
                     
                     # Reset positions at loop point
                     self._position = 0
@@ -141,13 +149,16 @@ class LayerInfo:
                     
                     # Update the active sound index at the loop point
                     self.update_active_sound_index()
+                    # Roll chance at the loop point
+                    self._should_play = random.random() <= self.layer.get_effective_chance()
+                    logger.debug(f"Layer {self.layer.id} completed cycle, rolled new chance: {self._should_play}")
                 else:
                     # Normal playback - determine how many samples to process in this iteration
                     samples_this_iteration = min(samples_remaining, 
                                               self.loop_length_samples - self._position)
                     
-                    # If we still have audio data, use it
-                    if self._audio_position < self.audio_length_samples:
+                    # If we should play and still have audio data, use it
+                    if self._should_play and self._audio_position < self.audio_length_samples:
                         audio_samples = min(samples_this_iteration,
                                          self.audio_length_samples - self._audio_position)
                         
@@ -163,10 +174,11 @@ class LayerInfo:
                     self._position += samples_this_iteration
                     samples_remaining -= samples_this_iteration
             
-            # Apply volume
-            current_volume = self.volume
-            if current_volume != 1.0:
-                chunk = (chunk.astype(np.float32) * current_volume).astype(np.int16)
+            # Apply volume if we're playing
+            if self._should_play:
+                current_volume = self.volume
+                if current_volume != 1.0:
+                    chunk = (chunk.astype(np.float32) * current_volume).astype(np.int16)
             
             return chunk
             
