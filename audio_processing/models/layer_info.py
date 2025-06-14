@@ -1,7 +1,7 @@
 import logging
 import random
 import numpy as np
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from audio_processing.models.audio import LayerSound, LayerMode, Layer
 
 logger = logging.getLogger(__name__)
@@ -23,16 +23,45 @@ class LayerInfo:
         # Convert float32 [-1.0, 1.0] to int16 PCM
         self.audio_data = (audio_data * 32767).astype(np.int16)
         self.audio_length_samples = len(self.audio_data)
-        self.layer = layer
+        self._layer = None  # Initialize as None
+        self.layer = layer  # Use the setter
         self._position = 0  # Position within the loop
         self._audio_position = 0  # Position within the audio data
         # Initialize active_sound_index to the selected sound index
         self._active_sound_index = layer.selected_sound_index
         # Initialize chance state - don't roll yet, wait for first cycle
         self._should_play = False
+        self._will_play_next = False  # Track if approved for next cycle
+        self._checked_for_next = False  # Track if we've been checked for next cycle
         # Initialize cooldown state
         self._cooldown_cycles_elapsed = 0  # Number of cycles since last play
         self._in_cooldown = False  # Whether we're in a cooldown period
+    
+    @property
+    def layer(self) -> Layer:
+        """Get the layer."""
+        return self._layer
+        
+    @layer.setter
+    def layer(self, value: Layer):
+        """Set the layer, ensuring we use the same environment reference."""
+        if self._layer is value:
+            return
+            
+        # If we already have a layer and it's from the same environment,
+        # use the layer from that environment to ensure we share the same reference
+        if self._layer and self._layer._environment and value._environment:
+            if self._layer._environment is not value._environment:
+                # Find the layer in the current environment
+                existing_layer = next(
+                    (l for l in value._environment.layers if l.id == value.id),
+                    None
+                )
+                if existing_layer:
+                    self._layer = existing_layer
+                    return
+                    
+        self._layer = value
     
     @property
     def loop_length_samples(self) -> int:
@@ -102,13 +131,95 @@ class LayerInfo:
         # Reset cooldown state
         self._cooldown_cycles_elapsed = 0
         self._in_cooldown = False
-        # Roll chance when resetting position (starting a new cycle)
+        # Don't check weights here, just reset state
+        self._should_play = False
+        self._will_play_next = False
+        self._checked_for_next = False
+        logger.debug(f"Layer {self.layer.id} reset position, cooldown elapsed: {self._cooldown_cycles_elapsed}, in cooldown: {self._in_cooldown}")
+
+    @staticmethod
+    def check_initial_weights(layers: List['LayerInfo']) -> None:
+        """Check initial weights for a list of layers.
+        
+        Args:
+            layers: List of LayerInfo instances to check
+        """
+        logger.debug(f"Starting initial weight checks for {len(layers)} layers")
+        
+        # Reset checked state for all layers
+        for layer_info in layers:
+            layer_info._checked_for_next = False
+            layer_info._will_play_next = False
+            logger.debug(f"Reset state for layer {layer_info.layer.id}")
+        
+        # Check all layers in sequence, accumulating weight
+        current_weight = 0
+        for layer_info in layers:
+            logger.debug(f"Checking layer {layer_info.layer.id} with current weight {current_weight}")
+            if layer_info.check_and_prepare_next_cycle(current_weight):
+                current_weight += layer_info.layer.get_effective_weight()
+                logger.debug(f"Layer {layer_info.layer.id} passed checks, new weight: {current_weight}")
+                
+        # Apply the decisions
+        for layer_info in layers:
+            layer_info._should_play = layer_info._will_play_next
+            if not layer_info._should_play and layer_info._in_cooldown:
+                logger.debug(f"Layer {layer_info.layer.id} in cooldown ({layer_info._cooldown_cycles_elapsed} cycles), forced not to play")
+            elif layer_info._should_play:
+                logger.debug(f"Layer {layer_info.layer.id} will play initially")
+            else:
+                logger.debug(f"Layer {layer_info.layer.id} will not play initially")
+
+    def _check_chance_and_cooldown(self) -> bool:
+        """Check if the layer should play based on chance and cooldown."""
+        # First check cooldown
+        if self._in_cooldown:
+            logger.debug(f"Layer {self.layer.id} is in cooldown")
+            return False
+            
+        # Check chance
         chance = self.layer.get_effective_chance()
         if chance is None:
             chance = 1.0  # Default to always play if no chance set
-        self._should_play = random.random() <= chance
-        logger.debug(f"Layer {self.layer.id} reset position, cooldown elapsed: {self._cooldown_cycles_elapsed}, in cooldown: {self._in_cooldown}, chance: {chance}, rolled: {self._should_play}")
+        if random.random() > chance:
+            logger.debug(f"Layer {self.layer.id} failed chance roll ({chance})")
+            return False
+            
+        logger.debug(f"Layer {self.layer.id} passed chance roll ({chance})")
+        return True
+
+    def _check_weight_limits(self, current_weight: float) -> bool:
+        """Check if the layer can play based on weight limits."""
+        env = self.layer._environment
+        if not env:
+            return True
+            
+        max_weight = env.get_effective_max_weight()
+        layer_weight = self.layer.get_effective_weight()
         
+        if current_weight + layer_weight > max_weight:
+            logger.debug(f"Layer {self.layer.id} skipped due to weight limit (current: {current_weight}, max: {max_weight}, layer weight: {layer_weight})")
+            return False
+            
+        logger.debug(f"Layer {self.layer.id} weight check passed (current: {current_weight}, max: {max_weight}, layer weight: {layer_weight})")
+        return True
+
+    def check_and_prepare_next_cycle(self, current_weight: float = 0) -> bool:
+        """Check if this layer should play in the next cycle."""
+        if not self._check_chance_and_cooldown():
+            self._will_play_next = False
+            self._checked_for_next = True
+            return False
+            
+        if not self._check_weight_limits(current_weight):
+            self._will_play_next = False
+            self._checked_for_next = True
+            return False
+            
+        self._will_play_next = True
+        self._checked_for_next = True
+        return True
+
     def get_next_chunk(self, chunk_size: int, current_time_ms: float) -> np.ndarray:
         """Get the next chunk of audio data.
         
@@ -179,16 +290,25 @@ class LayerInfo:
                         else:
                             logger.debug(f"Layer {self.layer.id} cooldown cycle {self._cooldown_cycles_elapsed} of {cooldown_cycles}")
                     
-                    # Roll chance at the loop point - only if not in cooldown
-                    if self._in_cooldown:
-                        self._should_play = False
-                        logger.debug(f"Layer {self.layer.id} in cooldown ({self._cooldown_cycles_elapsed} of {cooldown_cycles}), forced not to play")
-                    else:
-                        chance = self.layer.get_effective_chance()
-                        if chance is None:
-                            chance = 1.0  # Default to always play if no chance set
-                        self._should_play = random.random() <= chance
-                        logger.debug(f"Layer {self.layer.id} completed cycle, chance: {chance}, rolled: {self._should_play}")
+                    # First phase: Check all layers in environment
+                    if self.layer._environment:
+                        # Get all LayerInfo instances for this environment's layers
+                        env_layers = []
+                        for layer in self.layer._environment.layers:
+                            if not layer.sounds:
+                                continue
+                            # Find the LayerInfo for the current sound
+                            current_sound = layer.sounds[layer.selected_sound_index]
+                            cache_key = f"{layer.id}_{current_sound.file_id}"
+                            # Look in the mixer's cache for the LayerInfo
+                            from audio_processing.models.mixer import mixer
+                            if cache_key in mixer._cached_layers:
+                                env_layers.append(mixer._cached_layers[cache_key])
+                        
+                        # Check weights for this environment's layers
+                        if env_layers:
+                            logger.debug(f"Checking cycle-end weights for environment with {len(env_layers)} layers")
+                            LayerInfo.check_initial_weights(env_layers)
                 else:
                     # Normal playback - determine how many samples to process in this iteration
                     samples_this_iteration = min(samples_remaining, 

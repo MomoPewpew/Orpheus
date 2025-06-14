@@ -191,9 +191,22 @@ class AudioMixer:
         with self._lock:
             logger.info("Starting audio processing with new app state")
 
+            # First, ensure all layers are loaded
+            for env in app_state.environments:
+                for layer in env.layers:
+                    if not layer.sounds:
+                        continue
+                    # Load the selected sound for this layer
+                    if layer.selected_sound_index >= len(layer.sounds):
+                        layer.selected_sound_index = 0
+                    selected_sound = layer.sounds[layer.selected_sound_index]
+                    layer_info = self._get_or_load_layer(selected_sound.file_id, layer)
+                    if layer_info:
+                        logger.debug(f"Loaded layer {layer.id} with sound {selected_sound.file_id}")
+
             # Reset all layer positions and cooldowns
             for layer_info in self._cached_layers.values():
-                layer_info.reset_position()  # This also resets cooldown state
+                layer_info.reset_position()  # This resets cooldown state
                 
             # Clear any stale layer caches for environments that are no longer present
             current_layer_ids = {layer.id for env in app_state.environments for layer in env.layers}
@@ -205,6 +218,27 @@ class AudioMixer:
                 del self._cached_layers[key]
                 
             self._app_state = app_state
+            
+            # Do initial weight checks for each environment
+            for env in app_state.environments:
+                if env.play_state != PlayState.PLAYING:
+                    continue
+                    
+                # Get all LayerInfo instances for this environment's layers
+                env_layers = []
+                for layer in env.layers:
+                    if not layer.sounds:
+                        continue
+                    # Find the LayerInfo for the current sound
+                    current_sound = layer.sounds[layer.selected_sound_index]
+                    cache_key = f"{layer.id}_{current_sound.file_id}"
+                    if cache_key in self._cached_layers:
+                        env_layers.append(self._cached_layers[cache_key])
+                
+                # Check weights for this environment's layers
+                if env_layers:
+                    logger.debug(f"Checking initial weights for environment with {len(env_layers)} layers")
+                    LayerInfo.check_initial_weights(env_layers)
             
             if not self._is_running:
                 self._is_running = True

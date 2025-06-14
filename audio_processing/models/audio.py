@@ -351,21 +351,21 @@ class Layer:
     def get_effective_weight(self) -> float:
         """Get the effective weight for the layer, considering the layer weight and preset overrides."""
         preset_layer = self.get_active_preset_layer()
-        if preset_layer:
+        if preset_layer and preset_layer.weight is not None:
             return preset_layer.weight
         return self.weight
     
     def get_effective_chance(self) -> float:
         """Get the effective chance for the layer, considering the layer chance and preset overrides."""
         preset_layer = self.get_active_preset_layer()
-        if preset_layer:
+        if preset_layer and preset_layer.chance is not None:
             return preset_layer.chance
         return self.chance
     
     def get_effective_cooldown_cycles(self) -> int:
         """Get the effective cooldown cycles for the layer, considering the layer cooldown cycles and preset overrides."""
         preset_layer = self.get_active_preset_layer()
-        if preset_layer:
+        if preset_layer and preset_layer.cooldown_cycles is not None:
             return preset_layer.cooldown_cycles
         return self.cooldown_cycles
 
@@ -525,31 +525,13 @@ class Environment:
         if not preset:
             return None
         return next((pl for pl in preset.layers if pl.id == layer_id), None)
-
-    def get_effective_values(self) -> 'EffectiveEnvironment':
-        """Get effective values with any active preset applied"""
-        from .effective import EffectiveEnvironment, EffectiveLayer
-        
-        # Get active preset if any
+    
+    def get_effective_max_weight(self) -> float:
+        """Get the effective max weight for the environment, considering the preset overrides."""
         preset = self.get_active_preset()
-        
-        # Get effective max weight
-        max_weight = preset.max_weight if preset and preset.max_weight is not None else self.max_weight
-        
-        # Get effective layers
-        effective_layers = []
-        for layer in self.layers:
-            preset_layer = self.get_preset_layer(layer.id, preset)
-            effective_layers.append(EffectiveLayer.from_layer(layer, preset_layer))
-            
-        return EffectiveEnvironment(
-            id=self.id,
-            name=self.name,
-            max_weight=max_weight,
-            layers=effective_layers,
-            effects=self.effects,  # Effects aren't preset-overridable yet
-            soundboard=self.soundboard  # Soundboard isn't preset-overridable yet
-        )
+        if preset and preset.max_weight is not None:
+            return preset.max_weight
+        return self.max_weight
 
 @dataclass
 class ActiveEnvironment:
