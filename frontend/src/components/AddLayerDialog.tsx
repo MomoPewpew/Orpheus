@@ -245,8 +245,11 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
               margin="dense"
               label="Loop Length (ms)"
               fullWidth
-              value={loopLengthMs ?? ''}
-              onChange={(e) => setLoopLengthMs(e.target.value ? Number(e.target.value) : null)}
+              value={loopLengthMs === null ? '' : loopLengthMs}
+              onChange={(e) => {
+                const value = e.target.value;
+                setLoopLengthMs(value === '' ? null : Number(value));
+              }}
               sx={{ mb: 2 }}
               helperText={`Default: ${
                 defaultDurationMs !== null

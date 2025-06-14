@@ -127,10 +127,10 @@ export const MainContent: React.FC<MainContentProps> = ({
 
   // Get the effective maxWeight (preset override or environment default)
   const getEffectiveMaxWeight = () => {
-    if (activePreset?.maxWeight !== undefined) {
+    if (activePreset?.maxWeight !== undefined && activePreset.maxWeight !== null) {
       return activePreset.maxWeight;
     }
-    return environment.maxWeight;
+    return environment.maxWeight ?? 1.0; // Default to 1.0 if maxWeight is null or undefined
   };
 
   // Check if maxWeight has a preset override
