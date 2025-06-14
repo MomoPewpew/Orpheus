@@ -283,12 +283,13 @@ class LayerInfo:
                     elif self._in_cooldown:
                         # If we're in cooldown, increment the counter
                         self._cooldown_cycles_elapsed += 1
-                        # Check if we've completed the cooldown
-                        if self._cooldown_cycles_elapsed >= cooldown_cycles:
-                            self._in_cooldown = False
-                            logger.debug(f"Layer {self.layer.id} cooldown complete after {self._cooldown_cycles_elapsed} cycles")
-                        else:
-                            logger.debug(f"Layer {self.layer.id} cooldown cycle {self._cooldown_cycles_elapsed} of {cooldown_cycles}")
+                        
+                    # Check if we've completed the cooldown
+                    if self._cooldown_cycles_elapsed >= cooldown_cycles:
+                        self._in_cooldown = False
+                        logger.debug(f"Layer {self.layer.id} cooldown complete after {self._cooldown_cycles_elapsed} cycles")
+                    else:
+                        logger.debug(f"Layer {self.layer.id} cooldown cycle {self._cooldown_cycles_elapsed} of {cooldown_cycles}")
                     
                     # First phase: Check all layers in environment
                     if self.layer._environment:
