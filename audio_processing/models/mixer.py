@@ -444,7 +444,7 @@ class AudioMixer:
                                 current_file_id = selected_sound.file_id
                             
                             # Get the next chunk - this may trigger a loop point and update active_sound_index
-                            chunk = layer_info.get_next_chunk(self.chunk_samples, 0)
+                            chunk = layer_info.get_next_chunk(self.chunk_samples)
                             if chunk is None:
                                 continue
                             

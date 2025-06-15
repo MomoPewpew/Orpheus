@@ -21,6 +21,7 @@ class LayerInfo:
             layer: The Layer object containing configuration and sounds
         """
         # Convert float32 [-1.0, 1.0] to int16 PCM
+        self._is_finished = False
         self.audio_data = (audio_data * 32767).astype(np.int16)
         self.audio_length_samples = len(self.audio_data)
         self._layer = None  # Initialize as None
@@ -45,7 +46,7 @@ class LayerInfo:
         if self._layer is value:
             return
             
-        # If we already have a layer and it's from the same environment,
+        # If we already have a layer, and it's from the same environment,
         # use the layer from that environment to ensure we share the same reference
         if self._layer and self._layer._environment and value._environment:
             if self._layer._environment is not value._environment:
@@ -94,9 +95,7 @@ class LayerInfo:
         """Update the active sound index based on the layer mode when a loop completes."""
         if not self.layer.sounds:
             return
-            
-        old_index = self._active_sound_index
-        
+
         if self.layer.mode == LayerMode.SINGLE:
             # In single mode, always use the selected sound
             self._active_sound_index = self.layer.selected_sound_index
@@ -127,27 +126,8 @@ class LayerInfo:
         self._audio_position = 0
         # Reset cooldown state
         self._cooldown_cycles_elapsed = 0
-        # Don't check weights here, just reset state
-        self._will_play_next = False
-        self._checked_for_next = False
 
-    def check_and_prepare_next_cycle(self, current_weight: float = 0) -> bool:
-        """Check if this layer should play in the next cycle."""
-        if not self._check_chance_and_cooldown():
-            self._will_play_next = False
-            self._checked_for_next = True
-            return False
-            
-        if not self._check_weight_limits(current_weight):
-            self._will_play_next = False
-            self._checked_for_next = True
-            return False
-            
-        self._will_play_next = True
-        self._checked_for_next = True
-        return True
-
-    def get_next_chunk(self, chunk_size: int, current_time_ms: float) -> Optional[np.ndarray]:
+    def get_next_chunk(self, chunk_size: int) -> Optional[np.ndarray]:
         """Get the next chunk of audio data.
         
         Args:
