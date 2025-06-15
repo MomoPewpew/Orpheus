@@ -159,6 +159,7 @@ export const MainContent: React.FC<MainContentProps> = ({
     if (!environment.activePresetId) return layer;
     const preset = environment.presets.find(p => p.id === environment.activePresetId);
     if (!preset) return layer;
+    if (!preset.layers) preset.layers = [];
     const presetLayer = preset.layers.find(p => p.id === layer.id);
     if (!presetLayer) return layer;
     return {
