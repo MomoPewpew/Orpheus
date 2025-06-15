@@ -121,10 +121,15 @@ class AudioMixer:
         if not self._app_state:
             return chunk
             
+        # Get compressor ratio
+        ratio = self._app_state.effects.compressor.ratio
+
+        if ratio == 1.0:
+            return chunk
+    
         # Get compressor settings
         low_threshold = self._app_state.effects.compressor.lowThreshold
         high_threshold = self._app_state.effects.compressor.highThreshold
-        ratio = self._app_state.effects.compressor.ratio
         
         # Initialize state if needed
         if not hasattr(self, '_compressor_state'):
