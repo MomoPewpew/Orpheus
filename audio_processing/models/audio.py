@@ -94,6 +94,7 @@ class LayerSound:
         1. Base sound volume or preset override
         2. Volume normalization (if enabled)
         3. Layer volume or preset override
+        4. Master volume from app state
         """
         # Get the base sound volume, potentially overridden by preset
         sound_volume = self.volume
@@ -126,7 +127,13 @@ class LayerSound:
                 # This makes all sounds peak at the same level
                 sound_volume /= sound_file.peak_volume
         
-        return layer_volume * sound_volume
+        # Apply master volume if available
+        master_volume = 1.0
+        if (self._layer._environment and 
+            self._layer._environment._app_state):
+            master_volume = self._layer._environment._app_state.master_volume
+        
+        return layer_volume * sound_volume * master_volume
     
     def get_effective_frequency(self) -> float:
         """Get the effective frequency for the sound, considering preset overrides."""
