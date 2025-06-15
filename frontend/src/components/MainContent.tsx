@@ -225,8 +225,8 @@ export const MainContent: React.FC<MainContentProps> = ({
       // Clean up presets by removing any references to this layer
       presets: environment.presets.map(preset => ({
         ...preset,
-        // Remove the layer from each preset's layers array
-        layers: preset.layers.filter(l => l.id !== layerId)
+        // Remove the layer from each preset's layers array, defaulting to empty array if undefined
+        layers: (preset.layers || []).filter(l => l.id !== layerId)
       }))
     };
     onEnvironmentUpdate(updatedEnvironment);
