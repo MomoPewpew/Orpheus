@@ -15,6 +15,7 @@ import {
   Divider,
   Paper,
   DialogActions,
+  Tooltip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { SoundFile, Environment, Effects } from '../../types/audio';
@@ -24,6 +25,7 @@ import ExportDialog, { ExportSelection } from '../dialogs/ExportDialog';
 import ImportDialog, { EnvironmentImportMode, ImportSelection } from '../dialogs/ImportDialog';
 import JSZip from 'jszip';
 import { generateId } from '../../utils/ids';
+import InfoIcon from '@mui/icons-material/Info';
 
 interface CompressorVisualizerProps {
   lowThreshold: number;
@@ -953,11 +955,14 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
               {/* Speech Range Dampening */}
               <Box>
                 <Typography gutterBottom>
-                  Speech Range Dampening: {Math.round(dampenSpeechRange * 100)}%
+                  Speech Range Dampening
+                  <Tooltip title="This feature is currently disabled as Discord's API does not provide reliable voice activity detection.">
+                    <InfoIcon sx={{ ml: 1, fontSize: '1rem', verticalAlign: 'middle', color: 'text.secondary' }} />
+                  </Tooltip>
                 </Typography>
                 <Slider
-                  value={dampenSpeechRange}
-                  onChange={(_, value) => setDampenSpeechRange(value as number)}
+                  value={0}
+                  disabled
                   min={0}
                   max={1}
                   step={0.05}
