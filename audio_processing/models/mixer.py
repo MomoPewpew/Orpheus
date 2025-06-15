@@ -30,6 +30,10 @@ class AudioMixer:
     CHUNK_MS = 20        # Size of processing chunks in milliseconds
     TARGET_BUFFER_MS = 100  # Target buffer size in Discord (in milliseconds)
     
+    # Speech range configuration
+    SPEECH_CENTER_FREQ = 1250.0  # Center frequency (Hz) - middle of speech range 500-2000 Hz
+    SPEECH_BANDWIDTH = 1500.0    # Width of the affected range (Hz)
+    
     def __init__(self):
         """Initialize the audio mixer."""
         self.chunk_samples = int(self.SAMPLE_RATE * (self.CHUNK_MS / 1000))
@@ -185,6 +189,99 @@ class AudioMixer:
             self._compressor_state['prev_gain'][ch] = current_gain
         
         return np.clip(compressed, -1.0, 1.0)
+
+    def _apply_speech_dampening(self, chunk: np.ndarray) -> np.ndarray:
+        """Apply speech range dampening when voice is detected.
+        
+        Args:
+            chunk: Audio chunk as float32 numpy array in range [-1.0, 1.0]
+            
+        Returns:
+            Processed audio chunk as float32 numpy array
+        """
+        if not self._app_state or not self._bot_manager:
+            return chunk
+            
+        # Get dampening settings
+        dampen = self._app_state.effects.filters.dampen_speech_range
+        if dampen.amount == 0.0:
+            return chunk
+
+        # Check for voice activity using our guild_id
+        if not self._bot_manager.has_voice_activity(self._guild_id):
+            return chunk
+                        
+        try:
+            # Create three bandpass filters to cover different parts of the speech range
+            nyquist = self.SAMPLE_RATE / 2
+            
+            # Low speech range (fundamental frequencies)
+            low_speech = (100/nyquist, 600/nyquist)
+            # Mid speech range (vowels)
+            mid_speech = (600/nyquist, 2000/nyquist)
+            # High speech range (consonants)
+            high_speech = (2000/nyquist, 4000/nyquist)
+            
+            # Initialize filter states if needed
+            if not hasattr(self, '_speech_filter_states'):
+                self._speech_filter_states = {
+                    'low': [np.zeros(4) for _ in range(self.CHANNELS)],
+                    'mid': [np.zeros(4) for _ in range(self.CHANNELS)],
+                    'high': [np.zeros(4) for _ in range(self.CHANNELS)]
+                }
+            
+            # Create filters
+            b_low, a_low = signal.butter(2, low_speech, btype='band')
+            b_mid, a_mid = signal.butter(2, mid_speech, btype='band')
+            b_high, a_high = signal.butter(2, high_speech, btype='band')
+            
+            # Apply filters to isolate different frequency ranges
+            speech_range = np.zeros_like(chunk)
+            
+            for ch in range(self.CHANNELS):
+                # Process each frequency range
+                low_filtered, self._speech_filter_states['low'][ch] = signal.lfilter(
+                    b_low, a_low, chunk[:, ch], zi=self._speech_filter_states['low'][ch]
+                )
+                mid_filtered, self._speech_filter_states['mid'][ch] = signal.lfilter(
+                    b_mid, a_mid, chunk[:, ch], zi=self._speech_filter_states['mid'][ch]
+                )
+                high_filtered, self._speech_filter_states['high'][ch] = signal.lfilter(
+                    b_high, a_high, chunk[:, ch], zi=self._speech_filter_states['high'][ch]
+                )
+                
+                # Combine the filtered ranges with different weights
+                speech_range[:, ch] = (low_filtered * 1.0 + 
+                                     mid_filtered * 1.5 +  # Emphasize mid range
+                                     high_filtered * 0.5)  # De-emphasize high range
+            
+            # Check for NaN values
+            if np.any(np.isnan(speech_range)):
+                logger.warning("NaN values detected in speech range, resetting filter states")
+                self._speech_filter_states = {
+                    'low': [np.zeros(4) for _ in range(self.CHANNELS)],
+                    'mid': [np.zeros(4) for _ in range(self.CHANNELS)],
+                    'high': [np.zeros(4) for _ in range(self.CHANNELS)]
+                }
+                return chunk
+            
+            # Calculate attenuation in dB
+            attenuation_db = -24.0 * dampen.amount
+            attenuation_factor = 10 ** (attenuation_db / 20)
+
+            # Apply attenuation and mix back
+            result = chunk - (speech_range * (1.0 - attenuation_factor))
+            
+            # Ensure we're not getting any NaN values
+            if np.any(np.isnan(result)):
+                logger.warning("NaN values detected in result, using original audio")
+                return chunk
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in speech dampening: {e}")
+            return chunk
 
     def _process_audio(self):
         """Main audio processing loop."""
@@ -348,6 +445,9 @@ class AudioMixer:
                         
                         # Apply compression
                         mixed_chunk_float = self._apply_compressor(mixed_chunk_float)
+                        
+                        # Apply speech range dampening
+                        mixed_chunk_float = self._apply_speech_dampening(mixed_chunk_float)
                         
                         # Apply master volume
                         if self._app_state:

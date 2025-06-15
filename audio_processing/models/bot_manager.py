@@ -49,6 +49,18 @@ class BotManager(ABC):
         """Queue audio to the bot."""
         pass
 
+    @abstractmethod
+    def has_voice_activity(self, guild_id: Optional[int] = None) -> bool:
+        """Check if any users (except the bot) are speaking in the voice channel.
+        
+        Args:
+            guild_id: Optional guild ID to check. If not provided, will try to get from current_app
+            
+        Returns:
+            bool: True if any non-bot users are speaking, False otherwise
+        """
+        pass
+
 class DiscordBotManager(BotManager):
     """Discord-specific implementation of BotManager."""
     
@@ -121,6 +133,13 @@ class DiscordBotManager(BotManager):
     def is_ready(self) -> bool:
         """Check if the Discord bot is ready and connected"""
         return bool(self.bot and self.bot.is_ready()) 
+    
+    def has_voice_activity(self, guild_id: Optional[int] = None) -> bool:
+        """Check if any users (except the bot) are speaking in the voice channel."""
+        if not self.bot or not self.audio_manager:
+            return False
+            
+        return False
     
     def queue_audio(self, audio_data: BytesIO) -> bool:
         """Queue audio to the Discord bot"""

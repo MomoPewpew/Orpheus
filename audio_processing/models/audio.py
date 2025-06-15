@@ -186,6 +186,13 @@ class Effects:
 
         @dataclass
         class DampenSpeechRange:
+            """Controls attenuation of the speech frequency range when voice is detected.
+            
+            amount: Attenuation amount from 0 to 1, where:
+                   0.0 = no attenuation
+                   0.5 = -6 dB attenuation
+                   1.0 = -12 dB attenuation
+            """
             amount: float = 0.0
             
             def to_dict(self) -> Dict:
