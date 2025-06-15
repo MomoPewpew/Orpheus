@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import time
 from typing import List, Optional, Dict
 from enum import Enum
 import uuid
@@ -409,7 +410,7 @@ class Environment:
     @property
     def is_fading(self) -> bool:
         """Check if the environment is currently fading"""
-        return bool(self._fade_start_time and self._fade_end_time)
+        return bool(self._fade_start_time and self._fade_end_time and self._fade_start_time < time.time())
 
     @property
     def fade_progress(self) -> float:
@@ -429,27 +430,13 @@ class Environment:
         # Invert progress for fade out (when state is STOPPED)
         return progress if self.play_state == PlayState.PLAYING else (1.0 - progress)
 
-    def start_fade(self, fade_in: bool, duration_seconds: float, other_environments_playing: bool = False):
-        """Start fading this environment in or out
-        
-        Args:
-            fade_in: Whether to fade in (True) or out (False)
-            duration_seconds: Duration of the fade in seconds
-            other_environments_playing: Whether there are other environments currently playing
-        """
-        import time
+    def start_fade(self) -> None:
+        """Start a fade in or out based on the current play state."""
         current_time = time.time()
-        
-        # Only apply fade-in timing if there are other environments playing
-        # Always apply fade-out timing to ensure smooth transitions
-        if fade_in and not other_environments_playing:
-            self._fade_start_time = None
-            self._fade_end_time = None
-            self.play_state = PlayState.PLAYING
-        else:
-            self._fade_start_time = current_time
-            self._fade_end_time = current_time + duration_seconds
-            self.play_state = PlayState.PLAYING if fade_in else PlayState.STOPPED
+        fade_duration = self._app_state.effects.fades.crossfade_duration / 1000  # Convert to seconds
+        self._fade_start_time = current_time
+        self._fade_end_time = current_time + fade_duration
+        logger.info(f"Starting fade {'in' if self.play_state == PlayState.PLAYING else 'out'} for environment {self.id} over {fade_duration}s")
 
     def update_fade_state(self):
         """Update the fade state based on current time"""
@@ -599,11 +586,7 @@ class AppState:
         )
         
         # Start the fade
-        env.start_fade(
-            fade_in=should_play,
-            duration_seconds=fade_duration_seconds,
-            other_environments_playing=other_environments_playing
-        )
+        env.start_fade()
 
     def get_environment_volume(self, env_id: str) -> float:
         """Get the effective volume for an environment including fade state"""

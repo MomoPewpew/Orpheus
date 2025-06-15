@@ -220,7 +220,12 @@ def update_workspace():
             current_state = None
             if CONFIG_FILE.exists():
                 with open(CONFIG_FILE, 'r') as f:
-                    current_state = json.load(f)
+                    current_config = json.load(f)
+                    # We'll use this state only for preset recovery
+                    config_state = AppState.from_dict(current_config)
+            
+            # Get the actual previous state from the mixer for state comparison
+            current_state = mixer._app_state if mixer._app_state else config_state
             
             # Log and validate environment details before processing
             environments = data.get('environments', [])
@@ -231,19 +236,19 @@ def update_workspace():
                 # If we have an activePresetId but no matching preset, try to recover it
                 if active_preset_id and not any(p.get('id') == active_preset_id for p in presets):
                     logger.warning(f"Environment {env['id']} has activePresetId {active_preset_id} but no matching preset")
-                    if current_state:
+                    if config_state:  # Use config_state for preset recovery
                         # Find the environment in current state
-                        current_env = next((e for e in current_state.get('environments', []) 
-                                          if e.get('id') == env['id']), None)
+                        current_env = next((e for e in config_state.environments 
+                                          if e.id == env['id']), None)
                         if current_env:
                             # Find the missing preset
-                            missing_preset = next((p for p in current_env.get('presets', [])
-                                                 if p.get('id') == active_preset_id), None)
+                            missing_preset = next((p for p in current_env.presets
+                                                 if p.id == active_preset_id), None)
                             if missing_preset:
                                 logger.info(f"Recovered preset {active_preset_id} from current state")
                                 if 'presets' not in env:
                                     env['presets'] = []
-                                env['presets'].append(missing_preset)
+                                env['presets'].append(missing_preset.to_dict())
                             else:
                                 logger.warning(f"Could not find preset {active_preset_id} in current state")
                                 env['activePresetId'] = None
@@ -269,7 +274,7 @@ def update_workspace():
             save_workspace(new_app_state)
             
             # Compare states and get required actions
-            compare_workspaces(new_app_state)
+            compare_workspaces(current_state, new_app_state)
             
             return jsonify({"status": "success"})
         except json.JSONDecodeError as e:
@@ -287,34 +292,79 @@ def update_workspace():
         logger.error(f"Error updating workspace: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
-def compare_workspaces(app_state: AppState) -> None:
-    """Update the audio mixer based on the current app state.
+def compare_workspaces(prev_state: AppState, new_state: AppState) -> None:
+    """Update the audio mixer based on comparing the previous and new app states.
     
-    This function checks if any environments are playing and controls
-    the audio processing loop accordingly.
+    This function compares the two states to detect transitions and handle:
+    - Starting/stopping audio processing
+    - Environment fade-ins and fade-outs
+    - Crossfades between environments
     
     Args:
-        app_state: The current application state
+        prev_state: The previous application state
+        new_state: The new application state to transition to
     """    
-    # Check if any environments should be playing
-    should_play = any(env.play_state == PlayState.PLAYING for env in app_state.environments)
-    logger.info(f"Should play audio: {should_play}")
-    
-    # Get current playing state
-    was_playing = mixer._is_running
-    logger.info(f"Was playing audio: {was_playing}")
-    
-    # Start or stop processing based on state change
-    if should_play and not was_playing:
-        logger.info("Starting audio processing")
-        mixer.start_processing(app_state)
-    elif was_playing and not should_play:
-        logger.info("Stopping audio processing")
-        mixer.stop_processing()
+    # Debug log the states
+    logger.debug("Previous state environments:")
+    if prev_state:
+        for env in prev_state.environments:
+            logger.debug(f"  Environment {env.id}: play_state={env.play_state}")
     else:
-        # Update app state if already running
+        logger.debug("  No previous state!")
+        
+    logger.debug("New state environments:")
+    for env in new_state.environments:
+        logger.debug(f"  Environment {env.id}: play_state={env.play_state}")
+    
+    # Check if any environments should be playing (including those that are fading)
+    should_play = any(env.play_state == PlayState.PLAYING or env.is_fading for env in new_state.environments)
+    was_playing = any(env.play_state == PlayState.PLAYING for env in prev_state.environments) if prev_state else False
+    logger.info(f"Should play audio: {should_play}, Was playing: {was_playing}")
+    
+    # Check for state changes in each environment
+    # First identify all environments that are transitioning
+    transitions = []
+    for new_env in new_state.environments:
+        prev_env = next((e for e in prev_state.environments if e.id == new_env.id), None) if prev_state else None
+        if prev_env and prev_env.play_state != new_env.play_state:
+            transitions.append({
+                'env': new_env,
+                'from_state': prev_env.play_state,
+                'to_state': new_env.play_state
+            })
+    
+    # Check for crossfade scenario - one env stopping while another starts
+    is_crossfade = len(transitions) == 2 and any(
+        t1['from_state'] == PlayState.PLAYING and t1['to_state'] == PlayState.STOPPED and
+        t2['from_state'] == PlayState.STOPPED and t2['to_state'] == PlayState.PLAYING
+        for t1, t2 in [(transitions[0], transitions[1]), (transitions[1], transitions[0])]
+    )
+
+    # Handle transitions with crossfade awareness
+    for transition in transitions:
+        env = transition['env']
+        from_state = transition['from_state']
+        to_state = transition['to_state']
+        
+        if from_state == PlayState.PLAYING and to_state == PlayState.STOPPED:
+            logger.info(f"Environment {env.id} transitioning to stopped - starting fade out")
+            env.start_fade()
+        elif from_state == PlayState.STOPPED and to_state == PlayState.PLAYING:
+            if is_crossfade:
+                logger.info(f"Environment {env.id} transitioning to playing with crossfade")
+                env.start_fade()
+            else:
+                logger.info(f"Environment {env.id} transitioning to playing without fade")
+                env.update_fade_state()
+    
+    # Start processing if needed and update state
+    if should_play and not mixer._is_running:
+        logger.info("Starting audio processing")
+        mixer.start_processing(new_state)
+    elif mixer._is_running:
+        # Just update the app state, let mixer handle stopping itself
         with mixer._lock:
-            mixer._app_state = app_state
+            mixer._app_state = new_state
 
 @workspace_bp.route('/soundboard/play/<sound_id>', methods=['POST'])
 def play_soundboard_sound(sound_id: str):

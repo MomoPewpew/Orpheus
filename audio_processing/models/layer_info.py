@@ -232,136 +232,107 @@ class LayerInfo:
         """
         try:
             # For soundboard sounds, check if we've reached the end of the audio
-            if self.layer.id.startswith("soundboard_") and self._audio_position >= self.audio_length_samples:
-                return None
+            if self.layer.id.startswith("soundboard_"):
+                if self._audio_position >= self.audio_length_samples:
+                    self._is_finished = True
+                    return None
                 
+                # Get as many samples as we can
+                samples_to_get = min(chunk_size, self.audio_length_samples - self._audio_position)
+                chunk = np.zeros((chunk_size, self.CHANNELS), dtype=np.int16)
+                chunk[:samples_to_get] = self.audio_data[self._audio_position:self._audio_position + samples_to_get]
+                self._audio_position += samples_to_get
+                return chunk
+            
+            # For normal layers, ensure _should_play is initialized
+            if not self._checked_for_next and not self._should_play:
+                # First time initialization - assume we should play
+                self._should_play = True
+                logger.debug(f"Layer {self.layer.id} initialized _should_play to True")
+            
             chunk = np.zeros((chunk_size, self.CHANNELS), dtype=np.int16)
             samples_remaining = chunk_size
             chunk_offset = 0
             
             while samples_remaining > 0:
-                # For soundboard sounds, just play through the audio once
-                if self.layer.id.startswith("soundboard_"):
-                    if self._audio_position >= self.audio_length_samples:
-                        break
+                # Check if we've reached the loop point
+                if self._position >= self.loop_length_samples:
+                    # Reset positions at loop point
+                    self._position = 0
+                    self._audio_position = 0
                     
-                    # Get as many samples as we can
-                    samples_to_get = min(samples_remaining, self.audio_length_samples - self._audio_position)
-                    chunk[chunk_offset:chunk_offset + samples_to_get] = \
-                        self.audio_data[self._audio_position:self._audio_position + samples_to_get]
+                    # Update the active sound index at the loop point
+                    self.update_active_sound_index()
                     
-                    # Update positions
-                    self._audio_position += samples_to_get
-                    chunk_offset += samples_to_get
-                    samples_remaining -= samples_to_get
-                    
-                else:
-                    # Normal layer behavior - check loop points etc.
-                    # Check if we've reached the loop point
-                    if self._position + samples_remaining > self.loop_length_samples:
-                        # Handle the loop point
-                        samples_until_loop = self.loop_length_samples - self._position
+                    # Handle cooldown cycles at the loop point
+                    cooldown_cycles = self.layer.get_effective_cooldown_cycles()
+                    if cooldown_cycles is None:
+                        cooldown_cycles = 0  # Default to no cooldown if not set
                         
-                        # Get samples until the loop point if we should play
-                        if samples_until_loop > 0 and self._should_play:
-                            # If we still have audio data, use it
-                            if self._audio_position < self.audio_length_samples:
-                                audio_samples = min(samples_until_loop, 
-                                                 self.audio_length_samples - self._audio_position)
-                                
-                                # Get the samples from audio data
-                                chunk[chunk_offset:chunk_offset + audio_samples] = \
-                                    self.audio_data[self._audio_position:self._audio_position + audio_samples]
-                                
-                                # Update positions
-                                self._audio_position += audio_samples
-                                chunk_offset += audio_samples
-                            
-                            # Always increment position by samples_until_loop, even if we ran out of audio
-                            self._position += samples_until_loop
-                        else:
-                            # If not playing, just update position
-                            self._position += samples_until_loop
+                    if self._should_play:
+                        # If we played this cycle, start cooldown
+                        self._in_cooldown = True
+                        self._cooldown_cycles_elapsed = 0
+                        logger.debug(f"Layer {self.layer.id} played, starting cooldown (need {cooldown_cycles} cycles)")
+                    elif self._in_cooldown:
+                        # If we're in cooldown, increment the counter
+                        self._cooldown_cycles_elapsed += 1
                         
-                        # Reset positions at loop point
-                        self._position = 0
-                        self._audio_position = 0  # Reset audio position only at loop points
-                        samples_remaining -= samples_until_loop
-                        
-                        # Update the active sound index at the loop point
-                        self.update_active_sound_index()
-                        
-                        # Handle cooldown cycles at the loop point
-                        cooldown_cycles = self.layer.get_effective_cooldown_cycles()
-                        if cooldown_cycles is None:
-                            cooldown_cycles = 0  # Default to no cooldown if not set
-                            
-                        if self._should_play:
-                            # If we played this cycle, start cooldown
-                            self._in_cooldown = True
-                            self._cooldown_cycles_elapsed = 0
-                            logger.debug(f"Layer {self.layer.id} played, starting cooldown (need {cooldown_cycles} cycles)")
-                        elif self._in_cooldown:
-                            # If we're in cooldown, increment the counter
-                            self._cooldown_cycles_elapsed += 1
-                            
-                        # Check if we've completed the cooldown
-                        if self._cooldown_cycles_elapsed >= cooldown_cycles:
-                            self._in_cooldown = False
-                            logger.debug(f"Layer {self.layer.id} cooldown complete after {self._cooldown_cycles_elapsed} cycles")
-                        else:
-                            logger.debug(f"Layer {self.layer.id} cooldown cycle {self._cooldown_cycles_elapsed} of {cooldown_cycles}")
-                        
-                        # First phase: Check all layers in environment
-                        if self.layer._environment:
-                            # Get all LayerInfo instances for this environment's layers
-                            env_layers = []
-                            for layer in self.layer._environment.layers:
-                                if not layer.sounds:
-                                    continue
-                                # Find the LayerInfo for the current sound
-                                current_sound = layer.sounds[layer.selected_sound_index]
-                                cache_key = f"{layer.id}_{current_sound.file_id}"
-                                # Look in the mixer's cache for the LayerInfo
-                                from audio_processing.models.mixer import mixer
-                                if cache_key in mixer._cached_layers:
-                                    env_layers.append(mixer._cached_layers[cache_key])
-                            
-                            # Check weights for this environment's layers
-                            if env_layers:
-                                logger.debug(f"Checking cycle-end weights for environment with {len(env_layers)} layers")
-                                LayerInfo.check_initial_weights(env_layers)
+                    # Check if we've completed the cooldown
+                    if self._cooldown_cycles_elapsed >= cooldown_cycles:
+                        self._in_cooldown = False
+                        logger.debug(f"Layer {self.layer.id} cooldown complete after {self._cooldown_cycles_elapsed} cycles")
                     else:
-                        # Normal playback - determine how many samples to process in this iteration
-                        samples_this_iteration = min(samples_remaining, 
-                                                  self.loop_length_samples - self._position)
+                        logger.debug(f"Layer {self.layer.id} cooldown cycle {self._cooldown_cycles_elapsed} of {cooldown_cycles}")
+                    
+                    # First phase: Check all layers in environment
+                    if self.layer._environment:
+                        # Get all LayerInfo instances for this environment's layers
+                        env_layers = []
+                        for layer in self.layer._environment.layers:
+                            if not layer.sounds:
+                                continue
+                            # Find the LayerInfo for the current sound
+                            current_sound = layer.sounds[layer.selected_sound_index]
+                            cache_key = f"{layer.id}_{current_sound.file_id}"
+                            # Look in the mixer's cache for the LayerInfo
+                            from audio_processing.models.mixer import mixer
+                            if cache_key in mixer._cached_layers:
+                                env_layers.append(mixer._cached_layers[cache_key])
                         
-                        # If we should play and still have audio data, use it
-                        if self._should_play and self._audio_position < self.audio_length_samples:
-                            audio_samples = min(samples_this_iteration,
-                                             self.audio_length_samples - self._audio_position)
-                            
-                            # Get the samples from audio data
-                            chunk[chunk_offset:chunk_offset + audio_samples] = \
-                                self.audio_data[self._audio_position:self._audio_position + audio_samples]
-                            
-                            # Update audio position
-                            self._audio_position += audio_samples
-                            chunk_offset += audio_samples
-                        
-                        # Always increment position by the full amount
-                        self._position += samples_this_iteration
-                        samples_remaining -= samples_this_iteration
-            
-            # For soundboard sounds, if we didn't get any samples, we're done
-            if self.layer.id.startswith("soundboard_") and chunk_offset == 0:
-                return None
+                        # Check weights for this environment's layers
+                        if env_layers:
+                            logger.debug(f"Checking cycle-end weights for environment with {len(env_layers)} layers")
+                            LayerInfo.check_initial_weights(env_layers)
                 
-            # Apply volume if we're playing
-            if self._should_play:
-                current_volume = self.volume
-                if current_volume != 1.0:
-                    chunk = (chunk.astype(np.float32) * current_volume).astype(np.int16)
+                # Get samples for this chunk
+                samples_to_get = min(samples_remaining, self.loop_length_samples - self._position)
+                
+                # Always copy audio data if we have it
+                if self._audio_position < self.audio_length_samples:
+                    # Get as many samples as we can from current audio position
+                    audio_samples = min(samples_to_get, self.audio_length_samples - self._audio_position)
+                    
+                    # Get the samples from audio data
+                    chunk[chunk_offset:chunk_offset + audio_samples] = \
+                        self.audio_data[self._audio_position:self._audio_position + audio_samples]
+                    
+                    # Update audio position
+                    self._audio_position += audio_samples
+                    chunk_offset += audio_samples
+                else:
+                    # Reset audio position if we've reached the end
+                    self._audio_position = 0
+                    logger.debug(f"Layer {self.layer.id} audio position wrapped to start")
+                
+                # Always update position
+                self._position += samples_to_get
+                samples_remaining -= samples_to_get
+            
+            # Apply volume if needed
+            current_volume = self.volume
+            if current_volume != 1.0:
+                chunk = (chunk.astype(np.float32) * current_volume).astype(np.int16)
             
             return chunk
             
