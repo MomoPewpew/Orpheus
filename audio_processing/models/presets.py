@@ -170,13 +170,18 @@ class Preset:
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
+        # Filter out layers that only have an ID
+        layers_with_overrides = [l.to_dict() for l in self.layers]
+        layers_with_overrides = [l for l in layers_with_overrides if len(l) > 1]  # More than just 'id'
+        
         result = {
             'id': self.id,
-            'name': self.name,
-            # Only include layers that have overrides (more than just an ID)
-            'layers': [l.to_dict() for l in self.layers if len(l.to_dict()) > 1]
+            'name': self.name
         }
         
+        if layers_with_overrides:
+            result['layers'] = layers_with_overrides
+            
         if self.max_weight is not None:
             result['maxWeight'] = self.max_weight
             
