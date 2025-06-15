@@ -127,13 +127,7 @@ class LayerSound:
                 # This makes all sounds peak at the same level
                 sound_volume /= sound_file.peak_volume
         
-        # Apply master volume if available
-        master_volume = 1.0
-        if (self._layer._environment and 
-            self._layer._environment._app_state):
-            master_volume = self._layer._environment._app_state.master_volume
-        
-        return layer_volume * sound_volume * master_volume
+        return layer_volume * sound_volume
     
     def get_effective_frequency(self) -> float:
         """Get the effective frequency for the sound, considering preset overrides."""

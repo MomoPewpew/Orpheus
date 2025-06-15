@@ -109,6 +109,74 @@ class AudioMixer:
         # Convert back to int32
         return (chunk_float * 32768.0).astype(np.int32)
 
+    def _apply_compressor(self, chunk: np.ndarray) -> np.ndarray:
+        """Apply dynamic range compression to the audio chunk.
+        
+        Args:
+            chunk: Audio chunk as float32 numpy array in range [-1.0, 1.0]
+            
+        Returns:
+            Compressed audio chunk as float32 numpy array
+        """
+        if not self._app_state:
+            return chunk
+            
+        # Get compressor settings
+        low_threshold = self._app_state.effects.compressor.low_threshold
+        high_threshold = self._app_state.effects.compressor.high_threshold
+        ratio = self._app_state.effects.compressor.ratio
+        
+        # Initialize state if needed
+        if not hasattr(self, '_compressor_state'):
+            self._compressor_state = {
+                'prev_gain': np.ones(self.CHANNELS),
+                'smoothing': 0.9  # Smoothing factor for gain changes
+            }
+            
+        # Calculate peak levels for each channel
+        peak_levels = np.max(np.abs(chunk), axis=0)
+        
+        # Initialize output array
+        compressed = chunk.copy()
+        
+        # Process each channel
+        for ch in range(self.CHANNELS):
+            if peak_levels[ch] == 0:
+                continue
+                
+            # Convert peak to dB
+            peak_db = 20 * np.log10(peak_levels[ch])
+            
+            # Calculate target gain
+            if low_threshold < peak_db < high_threshold:
+                # Between thresholds - no compression
+                target_gain = 1.0
+            else:
+                if peak_db <= low_threshold:
+                    # Below low threshold - reduce the distance to threshold
+                    db_below = low_threshold - peak_db
+                    # Only move 1/ratio of the way to the threshold
+                    gain_db = db_below / ratio
+                    target_gain = 10 ** (gain_db / 20)
+                else:
+                    # Above high threshold - reduce by ratio
+                    db_above = peak_db - high_threshold
+                    # Move signal down by ratio
+                    gain_db = -db_above * (1 - 1/ratio)
+                    target_gain = 10 ** (gain_db / 20)
+            
+            # Smooth gain transition
+            current_gain = (self._compressor_state['smoothing'] * self._compressor_state['prev_gain'][ch] + 
+                          (1 - self._compressor_state['smoothing']) * target_gain)
+            
+            # Apply gain
+            compressed[:, ch] *= current_gain
+            
+            # Store gain for next chunk
+            self._compressor_state['prev_gain'][ch] = current_gain
+        
+        return np.clip(compressed, -1.0, 1.0)
+
     def _process_audio(self):
         """Main audio processing loop."""
         try:
@@ -266,8 +334,18 @@ class AudioMixer:
                         # Apply filters to the mixed chunk
                         mixed_chunk = self._apply_filters(mixed_chunk)
                         
-                        # Normalize mix to prevent clipping
-                        mixed_chunk = np.clip(mixed_chunk, -32768, 32767).astype(np.int16)
+                        # Convert to float32 for compression
+                        mixed_chunk_float = mixed_chunk.astype(np.float32) / 32768.0
+                        
+                        # Apply compression
+                        mixed_chunk_float = self._apply_compressor(mixed_chunk_float)
+                        
+                        # Apply master volume
+                        if self._app_state:
+                            mixed_chunk_float *= self._app_state.master_volume
+                        
+                        # Convert back to int16 and clip
+                        mixed_chunk = np.clip(mixed_chunk_float * 32768.0, -32768, 32767).astype(np.int16)
                         
                         # Convert to bytes and send
                         pcm_data = mixed_chunk.tobytes()
