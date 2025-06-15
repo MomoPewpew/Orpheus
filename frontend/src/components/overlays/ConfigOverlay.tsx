@@ -219,8 +219,8 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
   const [normalizeVolume, setNormalizeVolume] = useState(true);
   const [fadeInDuration, setFadeInDuration] = useState(4000);
   const [crossfadeDuration, setCrossfadeDuration] = useState(4000);
-  const [highPassFreq, setHighPassFreq] = useState(400);
-  const [lowPassFreq, setLowPassFreq] = useState(10000);
+  const [highPassFreq, setHighPassFreq] = useState(0);
+  const [lowPassFreq, setLowPassFreq] = useState(20000);
   const [dampenSpeechRange, setDampenSpeechRange] = useState(0);
   
   // Glue compressor states with default values
@@ -784,8 +784,8 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
     setNormalizeVolume(true);
     setFadeInDuration(4000);
     setCrossfadeDuration(4000);
-    setHighPassFreq(400);
-    setLowPassFreq(10000);
+    setHighPassFreq(0);
+    setLowPassFreq(20000);
     setDampenSpeechRange(0);
     setCompressorLowThreshold(-40);
     setCompressorHighThreshold(0);
@@ -802,10 +802,10 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
       },
       filters: {
         highPass: {
-          frequency: 400
+          frequency: 0
         },
         lowPass: {
-          frequency: 10000
+          frequency: 20000
         },
         dampenSpeechRange: {
           amount: 0

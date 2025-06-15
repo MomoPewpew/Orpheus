@@ -58,13 +58,17 @@ class AudioMixer:
         """
         if not self._app_state:
             return chunk
-            
-        # Convert to float32 for filter processing
-        chunk_float = chunk.astype(np.float32) / 32768.0
         
         # Get filter frequencies
         high_pass_freq = self._app_state.effects.filters.high_pass.frequency
         low_pass_freq = self._app_state.effects.filters.low_pass.frequency
+
+        if high_pass_freq == 0.0 and low_pass_freq == 20000.0:
+            return chunk
+
+        # Convert to float32 for filter processing
+        chunk_float = chunk.astype(np.float32) / 32768.0
+
         nyquist = self.SAMPLE_RATE / 2
         
         # Only apply filters if frequencies are in valid ranges

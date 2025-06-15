@@ -27,8 +27,8 @@ const App: React.FC = () => {
     normalize: { enabled: true },
     fades: { fadeInDuration: 4000, crossfadeDuration: 4000 },
     filters: {
-      highPass: { frequency: 400 },
-      lowPass: { frequency: 10000 },
+      highPass: { frequency: 0 },
+      lowPass: { frequency: 20000 },
       dampenSpeechRange: { amount: 0 }
     },
     compressor: {
@@ -74,8 +74,8 @@ const App: React.FC = () => {
           normalize: { enabled: true },
           fades: { fadeInDuration: 4000, crossfadeDuration: 4000 },
           filters: {
-            highPass: { frequency: 400 },
-            lowPass: { frequency: 10000 },
+            highPass: { frequency: 0 },
+            lowPass: { frequency: 20000 },
             dampenSpeechRange: { amount: 0 }
           },
           compressor: {
