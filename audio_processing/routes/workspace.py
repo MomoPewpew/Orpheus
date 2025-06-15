@@ -315,3 +315,31 @@ def compare_workspaces(app_state: AppState) -> None:
         # Update app state if already running
         with mixer._lock:
             mixer._app_state = app_state
+
+@workspace_bp.route('/soundboard/play/<sound_id>', methods=['POST'])
+def play_soundboard_sound(sound_id: str):
+    """Play a sound from the soundboard.
+    
+    Args:
+        sound_id: ID of the sound file to play
+    """
+    try:
+        # Load current app state to ensure volume settings are applied
+        app_state = load_workspace()
+        
+        # Start audio processing if not running
+        if not mixer._is_running:
+            mixer.start_processing(app_state)
+        else:
+            # Just update the app state if already running
+            with mixer._lock:
+                mixer._app_state = app_state
+        
+        # Play the sound
+        mixer.play_soundboard_sound(sound_id)
+        
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        logger.error(f"Error playing soundboard sound: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500

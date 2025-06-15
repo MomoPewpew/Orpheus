@@ -23,6 +23,9 @@ import { DragDropContext, Draggable, Droppable, DropResult } from '@hello-pangea
 
 type Mode = 'play' | 'delete' | 'rearrange';
 
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_SOUNDBOARD = `${API_BASE}/soundboard/play`;
+
 interface SoundboardOverlayProps {
   environment: Environment;
   onClose: () => void;
@@ -46,7 +49,7 @@ export const SoundboardOverlay: React.FC<SoundboardOverlayProps> = ({
   const [showAddGlobalSound, setShowAddGlobalSound] = useState(false);
   const [mode, setMode] = useState<Mode>('play');
 
-  const handlePlaySound = (soundId: string) => {
+  const handlePlaySound = async (soundId: string) => {
     if (mode === 'delete') {
       // Delete from environment soundboard
       const updatedEnvironment = {
@@ -58,12 +61,18 @@ export const SoundboardOverlay: React.FC<SoundboardOverlayProps> = ({
     }
 
     if (mode === 'play') {
-      // TODO: Implement sound playback
-      console.log('Playing sound:', soundId);
+      // Play the sound through the backend
+      try {
+        await fetch(`${API_SOUNDBOARD}/${soundId}`, {
+          method: 'POST'
+        });
+      } catch (error) {
+        console.error('Failed to play sound:', error);
+      }
     }
   };
 
-  const handlePlayGlobalSound = (soundId: string) => {
+  const handlePlayGlobalSound = async (soundId: string) => {
     if (mode === 'delete') {
       // Delete from global soundboard
       onGlobalSoundboardChange(globalSoundboard.filter(id => id !== soundId));
@@ -71,8 +80,14 @@ export const SoundboardOverlay: React.FC<SoundboardOverlayProps> = ({
     }
 
     if (mode === 'play') {
-      // TODO: Implement sound playback
-      console.log('Playing sound:', soundId);
+      // Play the sound through the backend
+      try {
+        await fetch(`${API_SOUNDBOARD}/${soundId}`, {
+          method: 'POST'
+        });
+      } catch (error) {
+        console.error('Failed to play sound:', error);
+      }
     }
   };
 

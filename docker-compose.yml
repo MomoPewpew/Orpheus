@@ -26,7 +26,7 @@ services:
       - CHOKIDAR_USEPOLLING=true  # Enable file watching
       - WATCHPACK_POLLING=true    # Enable webpack polling
       - WDS_SOCKET_PORT=3000      # WebSocket port for hot reload
-      - REACT_APP_API_URL=http://localhost:5000  # API URL for frontend
+      - REACT_APP_API_URL=http://localhost:5000/api  # API URL for frontend
       - FLASK_ENV=development     # Enable Flask development mode
       - FLASK_APP=app.py          # Specify Flask application file
     env_file:

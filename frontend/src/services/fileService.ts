@@ -1,7 +1,7 @@
 import { SoundFile } from '../types/audio';
 
-const API_BASE = 'http://localhost:5000';
-const API_FILES = `${API_BASE}/api/files`;
+const API_BASE = 'http://localhost:5000/api';
+const API_FILES = `${API_BASE}/files`;
 
 /**
  * Upload a new audio file
