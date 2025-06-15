@@ -14,6 +14,7 @@ from audio_processing.models.audio import AppState, PlayState, Layer, LayerMode
 from audio_processing.models.layer_info import LayerInfo
 import uuid
 import random
+from scipy import signal
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,72 @@ class AudioMixer:
         self._cached_layers: Dict[str, LayerInfo] = {}
         self._last_chunk_time = 0
         self._chunks_queued = 0
+        # Initialize filter states
+        self._high_pass_state = None
+        self._low_pass_state = None
         
+    def _apply_filters(self, chunk: np.ndarray) -> np.ndarray:
+        """Apply high-pass and low-pass filters to the audio chunk.
+        
+        Args:
+            chunk: Audio chunk as int32 numpy array
+            
+        Returns:
+            Filtered audio chunk as int32 numpy array
+        """
+        if not self._app_state:
+            return chunk
+            
+        # Convert to float32 for filter processing
+        chunk_float = chunk.astype(np.float32) / 32768.0
+        
+        # Get filter frequencies
+        high_pass_freq = self._app_state.effects.filters.high_pass.frequency
+        low_pass_freq = self._app_state.effects.filters.low_pass.frequency
+        nyquist = self.SAMPLE_RATE / 2
+        
+        # Only apply filters if frequencies are in valid ranges
+        if high_pass_freq > 0:
+            # Design high-pass filter (4th order Butterworth)
+            normalized_freq = high_pass_freq / nyquist
+            b, a = signal.butter(4, normalized_freq, btype='high')
+            
+            # Initialize filter state if needed
+            if self._high_pass_state is None:
+                self._high_pass_state = [np.zeros(4) for _ in range(self.CHANNELS)]
+            
+            # Apply filter to each channel
+            filtered = np.zeros_like(chunk_float)
+            for channel in range(self.CHANNELS):
+                filtered_signal, self._high_pass_state[channel] = signal.lfilter(
+                    b, a, chunk_float[:, channel], 
+                    zi=self._high_pass_state[channel]
+                )
+                filtered[:, channel] = filtered_signal
+            chunk_float = filtered
+            
+        if low_pass_freq < nyquist:
+            # Design low-pass filter (4th order Butterworth)
+            normalized_freq = low_pass_freq / nyquist
+            b, a = signal.butter(4, normalized_freq, btype='low')
+            
+            # Initialize filter state if needed
+            if self._low_pass_state is None:
+                self._low_pass_state = [np.zeros(4) for _ in range(self.CHANNELS)]
+            
+            # Apply filter to each channel
+            filtered = np.zeros_like(chunk_float)
+            for channel in range(self.CHANNELS):
+                filtered_signal, self._low_pass_state[channel] = signal.lfilter(
+                    b, a, chunk_float[:, channel],
+                    zi=self._low_pass_state[channel]
+                )
+                filtered[:, channel] = filtered_signal
+            chunk_float = filtered
+            
+        # Convert back to int32
+        return (chunk_float * 32768.0).astype(np.int32)
+
     def _process_audio(self):
         """Main audio processing loop."""
         try:
@@ -197,6 +263,9 @@ class AudioMixer:
                         active_layers += 1
                     
                     if active_layers > 0:
+                        # Apply filters to the mixed chunk
+                        mixed_chunk = self._apply_filters(mixed_chunk)
+                        
                         # Normalize mix to prevent clipping
                         mixed_chunk = np.clip(mixed_chunk, -32768, 32767).astype(np.int16)
                         
