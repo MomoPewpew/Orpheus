@@ -380,7 +380,6 @@ class AudioMixer:
                                 if layer_info:
                                     logger.info(f"Reset layer {layer.id} with sound {selected_sound.file_id}")
                                     layer_info.reset_position()
-                                    layer_info._should_play = True
                                     logger.info(f"Layer {layer.id} ready to play")
                     
                     # Update stored states
@@ -391,7 +390,7 @@ class AudioMixer:
                     
                     # Check for active soundboard sounds - only include those that haven't finished playing
                     soundboard_layers = [layer for key, layer in self._cached_layers.items() 
-                                      if key.startswith("soundboard_") and layer._should_play and not layer._is_finished]
+                                      if key.startswith("soundboard_") and not layer._is_finished]
                     
                     # Pre-check if any environments have non-zero fade volume
                     active_envs = [env for env in playing_envs if env.fade_progress > 0]
@@ -407,14 +406,10 @@ class AudioMixer:
                     mixed_chunk = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.int32)
                     active_layers = 0
                     
-                    # Log active environments and layers
-                    logger.debug(f"Processing {len(active_envs)} active environments (fade > 0) and {len(soundboard_layers)} soundboard layers")
-                    
                     # Mix all active layers from environments
                     for env in active_envs:  # Only process environments with fade > 0
                         # Calculate environment fade volume
                         env_fade_volume = env.fade_progress
-                        logger.debug(f"Processing environment {env.id} with fade volume {env_fade_volume}")
                         
                         # Create a mix buffer for this environment
                         env_mix = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.int32)
@@ -424,9 +419,7 @@ class AudioMixer:
                         for layer in env.layers:
                             if not layer.sounds:
                                 continue
-                                
-                            logger.debug(f"Processing layer {layer.id} in environment {env.id}")
-                            
+                                                        
                             # Get or create LayerInfo for this layer
                             layer_info = None
                             current_file_id = None
@@ -451,15 +444,12 @@ class AudioMixer:
                                 current_file_id = selected_sound.file_id
                             
                             # Get the next chunk - this may trigger a loop point and update active_sound_index
-                            logger.debug(f"Getting next chunk for layer {layer.id} at position {layer_info._position} (total samples: {layer_info.audio_length_samples})")
                             chunk = layer_info.get_next_chunk(self.chunk_samples, 0)
                             if chunk is None:
-                                logger.debug(f"No audio chunk available for layer {layer.id}")
                                 continue
                             
                             # Log audio levels and chunk properties
                             max_level = np.max(np.abs(chunk))
-                            logger.debug(f"Layer {layer.id} chunk - Shape: {chunk.shape}, Max level: {max_level}, Position: {layer_info._position}, Audio length: {layer_info.audio_length_samples}")
                             
                             # Mix this layer into environment mix
                             env_mix += chunk.astype(np.int32)
@@ -480,7 +470,6 @@ class AudioMixer:
                         
                         # Log final mix levels before effects
                         max_level = np.max(np.abs(mixed_chunk))
-                        logger.debug(f"Final mix level before effects: {max_level}")
                         
                         # Apply filters to the mixed chunk
                         mixed_chunk = self._apply_filters(mixed_chunk)
@@ -497,14 +486,12 @@ class AudioMixer:
                         # Apply master volume
                         if self._app_state:
                             mixed_chunk_float *= self._app_state.master_volume
-                            logger.debug(f"Applied master volume: {self._app_state.master_volume}")
                         
                         # Convert back to int16 and clip
                         mixed_chunk = np.clip(mixed_chunk_float * 32768.0, -32768, 32767).astype(np.int16)
                         
                         # Log final output levels
                         max_level = np.max(np.abs(mixed_chunk))
-                        logger.debug(f"Final output level: {max_level}")
                         
                         # Convert to bytes and send
                         pcm_data = mixed_chunk.tobytes()
@@ -512,7 +499,6 @@ class AudioMixer:
                             success = self._bot_manager.audio_manager.queue_audio(self._guild_id, pcm_data)
                             if success:
                                 chunks_sent += 1
-                                logger.debug("Successfully queued audio chunk")
                             else:
                                 logger.warning(f"Failed to queue audio data for guild {self._guild_id}")
                     
@@ -585,8 +571,6 @@ class AudioMixer:
                         logger.info(f"Loaded layer {layer.id} with sound {selected_sound.file_id}")
                         # Always reset position for all layers
                         layer_info.reset_position()
-                        layer_info._should_play = env.play_state == PlayState.PLAYING
-                        logger.info(f"Reset position for layer {layer.id} (_should_play: {layer_info._should_play})")
                 
             # Store initial environment states
             self._env_states = {env.id: env.play_state for env in app_state.environments}
@@ -690,7 +674,6 @@ class AudioMixer:
             cache_key = layer.id if layer.id.startswith("soundboard_") else f"{layer.id}_{file_id}"
             
             if cache_key in self._cached_layers:
-                logger.debug(f"Using cached layer: {cache_key}")
                 # Update the layer reference
                 self._cached_layers[cache_key].layer = layer
                 return self._cached_layers[cache_key]
@@ -783,7 +766,6 @@ class AudioMixer:
                 layer_info.layer._environment = temp_env
                 
             # Force the sound to play once
-            layer_info._should_play = True
             layer_info._position = 0  # Reset position to start
             layer_info._audio_position = 0  # Reset audio position
             layer_info._is_finished = False  # Track when the sound is finished

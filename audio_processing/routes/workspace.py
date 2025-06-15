@@ -303,19 +303,7 @@ def compare_workspaces(prev_state: AppState, new_state: AppState) -> None:
     Args:
         prev_state: The previous application state
         new_state: The new application state to transition to
-    """    
-    # Debug log the states
-    logger.debug("Previous state environments:")
-    if prev_state:
-        for env in prev_state.environments:
-            logger.debug(f"  Environment {env.id}: play_state={env.play_state}")
-    else:
-        logger.debug("  No previous state!")
-        
-    logger.debug("New state environments:")
-    for env in new_state.environments:
-        logger.debug(f"  Environment {env.id}: play_state={env.play_state}")
-    
+    """
     # Check if any environments should be playing (including those that are fading)
     should_play = any(env.play_state == PlayState.PLAYING or env.is_fading for env in new_state.environments)
     was_playing = any(env.play_state == PlayState.PLAYING for env in prev_state.environments) if prev_state else False

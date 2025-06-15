@@ -29,13 +29,10 @@ class LayerInfo:
         self._audio_position = 0  # Position within the audio data
         # Initialize active_sound_index to the selected sound index
         self._active_sound_index = layer.selected_sound_index
-        # Initialize chance state - don't roll yet, wait for first cycle
-        self._should_play = False
-        self._will_play_next = False  # Track if approved for next cycle
-        self._checked_for_next = False  # Track if we've been checked for next cycle
+        # Initialize chance roll
+        self._chance_roll = random.random()  # Store the roll value
         # Initialize cooldown state
         self._cooldown_cycles_elapsed = 0  # Number of cycles since last play
-        self._in_cooldown = False  # Whether we're in a cooldown period
     
     @property
     def layer(self) -> Layer:
@@ -130,79 +127,9 @@ class LayerInfo:
         self._audio_position = 0
         # Reset cooldown state
         self._cooldown_cycles_elapsed = 0
-        self._in_cooldown = False
         # Don't check weights here, just reset state
-        self._should_play = False
         self._will_play_next = False
         self._checked_for_next = False
-        logger.debug(f"Layer {self.layer.id} reset position, cooldown elapsed: {self._cooldown_cycles_elapsed}, in cooldown: {self._in_cooldown}")
-
-    @staticmethod
-    def check_initial_weights(layers: List['LayerInfo']) -> None:
-        """Check initial weights for a list of layers.
-        
-        Args:
-            layers: List of LayerInfo instances to check
-        """
-        logger.debug(f"Starting initial weight checks for {len(layers)} layers")
-        
-        # Reset checked state for all layers
-        for layer_info in layers:
-            layer_info._checked_for_next = False
-            layer_info._will_play_next = False
-            logger.debug(f"Reset state for layer {layer_info.layer.id}")
-        
-        # Check all layers in sequence, accumulating weight
-        current_weight = 0
-        for layer_info in layers:
-            logger.debug(f"Checking layer {layer_info.layer.id} with current weight {current_weight}")
-            if layer_info.check_and_prepare_next_cycle(current_weight):
-                current_weight += layer_info.layer.get_effective_weight()
-                logger.debug(f"Layer {layer_info.layer.id} passed checks, new weight: {current_weight}")
-                
-        # Apply the decisions
-        for layer_info in layers:
-            layer_info._should_play = layer_info._will_play_next
-            if not layer_info._should_play and layer_info._in_cooldown:
-                logger.debug(f"Layer {layer_info.layer.id} in cooldown ({layer_info._cooldown_cycles_elapsed} cycles), forced not to play")
-            elif layer_info._should_play:
-                logger.debug(f"Layer {layer_info.layer.id} will play initially")
-            else:
-                logger.debug(f"Layer {layer_info.layer.id} will not play initially")
-
-    def _check_chance_and_cooldown(self) -> bool:
-        """Check if the layer should play based on chance and cooldown."""
-        # First check cooldown
-        if self._in_cooldown:
-            logger.debug(f"Layer {self.layer.id} is in cooldown")
-            return False
-            
-        # Check chance
-        chance = self.layer.get_effective_chance()
-        if chance is None:
-            chance = 1.0  # Default to always play if no chance set
-        if random.random() > chance:
-            logger.debug(f"Layer {self.layer.id} failed chance roll ({chance})")
-            return False
-            
-        logger.debug(f"Layer {self.layer.id} passed chance roll ({chance})")
-        return True
-
-    def _check_weight_limits(self, current_weight: float) -> bool:
-        """Check if the layer can play based on weight limits."""
-        env = self.layer._environment
-        if not env:
-            return True
-            
-        max_weight = env.get_effective_max_weight()
-        layer_weight = self.layer.get_effective_weight()
-        
-        if current_weight + layer_weight > max_weight:
-            logger.debug(f"Layer {self.layer.id} skipped due to weight limit (current: {current_weight}, max: {max_weight}, layer weight: {layer_weight})")
-            return False
-            
-        logger.debug(f"Layer {self.layer.id} weight check passed (current: {current_weight}, max: {max_weight}, layer weight: {layer_weight})")
-        return True
 
     def check_and_prepare_next_cycle(self, current_weight: float = 0) -> bool:
         """Check if this layer should play in the next cycle."""
@@ -244,12 +171,6 @@ class LayerInfo:
                 self._audio_position += samples_to_get
                 return chunk
             
-            # For normal layers, ensure _should_play is initialized
-            if not self._checked_for_next and not self._should_play:
-                # First time initialization - assume we should play
-                self._should_play = True
-                logger.debug(f"Layer {self.layer.id} initialized _should_play to True")
-            
             chunk = np.zeros((chunk_size, self.CHANNELS), dtype=np.int16)
             samples_remaining = chunk_size
             chunk_offset = 0
@@ -263,27 +184,6 @@ class LayerInfo:
                     
                     # Update the active sound index at the loop point
                     self.update_active_sound_index()
-                    
-                    # Handle cooldown cycles at the loop point
-                    cooldown_cycles = self.layer.get_effective_cooldown_cycles()
-                    if cooldown_cycles is None:
-                        cooldown_cycles = 0  # Default to no cooldown if not set
-                        
-                    if self._should_play:
-                        # If we played this cycle, start cooldown
-                        self._in_cooldown = True
-                        self._cooldown_cycles_elapsed = 0
-                        logger.debug(f"Layer {self.layer.id} played, starting cooldown (need {cooldown_cycles} cycles)")
-                    elif self._in_cooldown:
-                        # If we're in cooldown, increment the counter
-                        self._cooldown_cycles_elapsed += 1
-                        
-                    # Check if we've completed the cooldown
-                    if self._cooldown_cycles_elapsed >= cooldown_cycles:
-                        self._in_cooldown = False
-                        logger.debug(f"Layer {self.layer.id} cooldown complete after {self._cooldown_cycles_elapsed} cycles")
-                    else:
-                        logger.debug(f"Layer {self.layer.id} cooldown cycle {self._cooldown_cycles_elapsed} of {cooldown_cycles}")
                     
                     # First phase: Check all layers in environment
                     if self.layer._environment:
@@ -299,11 +199,6 @@ class LayerInfo:
                             from audio_processing.models.mixer import mixer
                             if cache_key in mixer._cached_layers:
                                 env_layers.append(mixer._cached_layers[cache_key])
-                        
-                        # Check weights for this environment's layers
-                        if env_layers:
-                            logger.debug(f"Checking cycle-end weights for environment with {len(env_layers)} layers")
-                            LayerInfo.check_initial_weights(env_layers)
                 
                 # Get samples for this chunk
                 samples_to_get = min(samples_remaining, self.loop_length_samples - self._position)
@@ -323,7 +218,6 @@ class LayerInfo:
                 else:
                     # Reset audio position if we've reached the end
                     self._audio_position = 0
-                    logger.debug(f"Layer {self.layer.id} audio position wrapped to start")
                 
                 # Always update position
                 self._position += samples_to_get

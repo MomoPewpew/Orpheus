@@ -390,26 +390,36 @@ class Layer:
                 preset_layer._base_layer = self
         return preset_layer
     
-    def get_effective_weight(self) -> float:
+    def _get_effective_weight(self) -> float:
         """Get the effective weight for the layer, considering the layer weight and preset overrides."""
         preset_layer = self.get_active_preset_layer()
         if preset_layer and preset_layer.weight is not None:
             return preset_layer.weight
         return self.weight
     
-    def get_effective_chance(self) -> float:
+    def _get_effective_chance(self) -> float:
         """Get the effective chance for the layer, considering the layer chance and preset overrides."""
         preset_layer = self.get_active_preset_layer()
         if preset_layer and preset_layer.chance is not None:
             return preset_layer.chance
         return self.chance
     
-    def get_effective_cooldown_cycles(self) -> int:
+    def _get_effective_cooldown_cycles(self) -> int:
         """Get the effective cooldown cycles for the layer, considering the layer cooldown cycles and preset overrides."""
         preset_layer = self.get_active_preset_layer()
         if preset_layer and preset_layer.cooldown_cycles is not None:
             return preset_layer.cooldown_cycles
         return self.cooldown_cycles
+    
+    def should_play(self, rolled_chance: float, passed_cooldown_cycles: int, weight_left: float) -> bool:
+        """Check if the sound should play based on the chance, cooldown and weight."""
+        if rolled_chance > self._get_effective_chance():
+            return False
+        if passed_cooldown_cycles < self._get_effective_cooldown_cycles():
+            return False
+        if weight_left < self._get_effective_weight():
+            return False
+        return True
 
 @dataclass
 class Environment:
