@@ -64,6 +64,9 @@ class LayerSound:
     
     # Runtime-only fields (not serialized)
     _layer: Optional['Layer'] = None
+    _fade_start_time: Optional[float] = None
+    _fade_end_time: Optional[float] = None
+    _fade_volume_start: Optional[float] = None
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'LayerSound':
@@ -95,7 +98,6 @@ class LayerSound:
         1. Base sound volume or preset override
         2. Volume normalization (if enabled)
         3. Layer volume or preset override
-        4. Master volume from app state
         """
         # Get the base sound volume, potentially overridden by preset
         sound_volume = self.volume
@@ -130,6 +132,37 @@ class LayerSound:
         
         return layer_volume * sound_volume
     
+    def get_effective_volume_including_fade(self) -> float:
+        """Get the effective volume for the sound, considering:
+        1. Base sound volume or preset override
+        2. Volume normalization (if enabled)
+        3. Layer volume or preset override
+        4. Fade state
+        """
+        effective_volume = self.get_effective_volume()
+        if self._fade_start_time and self._fade_end_time and self._fade_volume_start is not None:
+            current_time = time.time()
+            if current_time < self._fade_start_time:
+                return self._fade_volume_start
+            if current_time >= self._fade_end_time:
+                return effective_volume
+                
+            # Calculate progress and clamp between 0 and 1
+            fade_progress = (current_time - self._fade_start_time) / (self._fade_end_time - self._fade_start_time)
+            fade_progress = max(0.0, min(1.0, fade_progress))
+            
+            # Linear interpolation from fade_volume_start to effective_volume
+            return self._fade_volume_start + (effective_volume - self._fade_volume_start) * fade_progress
+        return effective_volume
+
+    def start_fade(self, volume_start: float) -> None:
+        """Start a fade in or out based on the current play state."""
+        current_time = time.time()
+        self._fade_start_time = current_time
+        fade_duration = self._layer._environment._app_state.effects.fades.fade_in_duration / 1000  # Convert to seconds
+        self._fade_end_time = current_time + fade_duration
+        self._fade_volume_start = volume_start
+
     def get_effective_frequency(self) -> float:
         """Get the effective frequency for the sound, considering preset overrides."""
         # Start with base sound frequency
