@@ -206,14 +206,14 @@ class Effects:
 
     @dataclass
     class Compressor:
-        low_threshold: float = -60.0
-        high_threshold: float = -12.0
+        lowThreshold: float = -40.0
+        highThreshold: float = 0.0
         ratio: float = 2.0
         
         def to_dict(self) -> Dict:
             return {
-                "lowThreshold": self.low_threshold,
-                "highThreshold": self.high_threshold,
+                "lowThreshold": self.lowThreshold,
+                "highThreshold": self.highThreshold,
                 "ratio": self.ratio
             }
 
@@ -246,8 +246,8 @@ class Effects:
 
         if 'compressor' in data:
             comp = data['compressor']
-            effects.compressor.low_threshold = float(comp.get('lowThreshold', -60.0))
-            effects.compressor.high_threshold = float(comp.get('highThreshold', -12.0))
+            effects.compressor.lowThreshold = float(comp.get('lowThreshold', -40.0))
+            effects.compressor.highThreshold = float(comp.get('highThreshold', 0.0))
             effects.compressor.ratio = float(comp.get('ratio', 2.0))
 
         return effects

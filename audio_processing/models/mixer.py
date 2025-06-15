@@ -122,8 +122,8 @@ class AudioMixer:
             return chunk
             
         # Get compressor settings
-        low_threshold = self._app_state.effects.compressor.low_threshold
-        high_threshold = self._app_state.effects.compressor.high_threshold
+        low_threshold = self._app_state.effects.compressor.lowThreshold
+        high_threshold = self._app_state.effects.compressor.highThreshold
         ratio = self._app_state.effects.compressor.ratio
         
         # Initialize state if needed

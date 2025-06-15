@@ -555,6 +555,7 @@ const App: React.FC = () => {
             onEffectsUpdate={handleEffectsUpdate}
             onGlobalSoundboardUpdate={setGlobalSoundboard}
             globalSoundboard={globalSoundboard}
+            effects={effects}
           />
         </Box>
       </DragDropContext>

@@ -191,6 +191,7 @@ export interface ConfigOverlayProps {
   onEffectsUpdate: (effects: Effects) => void;
   onGlobalSoundboardUpdate: (soundFileIds: string[]) => void;
   globalSoundboard: string[];
+  effects: Effects;
 }
 
 const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
@@ -205,6 +206,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
   onEffectsUpdate,
   onGlobalSoundboardUpdate,
   globalSoundboard,
+  effects,
 }) => {
   const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -225,6 +227,28 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
   const [compressorLowThreshold, setCompressorLowThreshold] = useState(-40);
   const [compressorHighThreshold, setCompressorHighThreshold] = useState(0);
   const [compressorRatio, setCompressorRatio] = useState(1);
+
+  // Initialize effect values from props when overlay opens
+  useEffect(() => {
+    if (open && effects) {
+      // Initialize normalize settings
+      setNormalizeVolume(effects.normalize.enabled);
+      
+      // Initialize fade settings
+      setFadeInDuration(effects.fades.fadeInDuration);
+      setCrossfadeDuration(effects.fades.crossfadeDuration);
+      
+      // Initialize filter settings
+      setHighPassFreq(effects.filters.highPass.frequency);
+      setLowPassFreq(effects.filters.lowPass.frequency);
+      setDampenSpeechRange(effects.filters.dampenSpeechRange.amount);
+      
+      // Initialize compressor settings
+      setCompressorLowThreshold(effects.compressor.lowThreshold);
+      setCompressorHighThreshold(effects.compressor.highThreshold);
+      setCompressorRatio(effects.compressor.ratio);
+    }
+  }, [open, effects]);
 
   const refreshFiles = async () => {
     try {
