@@ -78,7 +78,7 @@ class LayerInfo:
         if not sound:
             return self.layer.volume
             
-        return sound.get_effective_volume_including_fade()
+        return sound._effective_volume_including_fade
         
     def get_layer_sound(self) -> Optional[LayerSound]:
         """Get the currently active LayerSound."""
@@ -90,6 +90,19 @@ class LayerInfo:
             self._active_sound_index = 0
             
         return self.layer.sounds[self._active_sound_index]
+
+    def end_of_loop(self) -> None:
+        """Handle the end of a loop."""
+        self._position = 0
+        self._audio_position = 0
+
+        self.update_active_sound_index()
+        self._chance_roll = random.random()
+
+        if (self._cooldown_cycles_elapsed >= self.layer._effective_cooldown_cycles):
+            self._cooldown_cycles_elapsed = 0
+        else:
+            self._cooldown_cycles_elapsed += 1
 
     def update_active_sound_index(self):
         """Update the active sound index based on the layer mode when a loop completes."""
@@ -107,7 +120,7 @@ class LayerInfo:
             import random
             
             # Get effective frequencies (considering preset overrides)
-            frequencies = [sound.get_effective_frequency() for sound in self.layer.sounds]
+            frequencies = [sound._effective_frequency for sound in self.layer.sounds]
             
             # Use weighted choice based on frequencies
             self._active_sound_index = random.choices(
@@ -124,8 +137,34 @@ class LayerInfo:
         """Reset the playback position to the start of the audio."""
         self._position = 0
         self._audio_position = 0
-        # Reset cooldown state
+        self._active_sound_index = self.layer.selected_sound_index
         self._cooldown_cycles_elapsed = 0
+        self._chance_roll = random.random()
+
+    @property
+    def should_play(self) -> bool:
+        """Check if the sound should play based on the chance, cooldown and weight."""
+        return self._layer.should_play(self._chance_roll, self._cooldown_cycles_elapsed, self._free_weight)
+    
+    @property
+    def _free_weight(self) -> float:
+        max_weight = self.layer._environment._effective_max_weight
+        used_weight = 0.0
+
+        from audio_processing.models.mixer import mixer
+        cached_layers = mixer._cached_layers
+
+        for layer in self.layer._environment.layers:
+            if layer.id == self.layer.id:
+                break
+            # Find corresponding LayerInfo in mixer cache
+            for cache_key in list(cached_layers.keys()):
+                if cache_key.startswith(f"{layer.id}_"):
+                    layer_info = cached_layers[cache_key]
+                    used_weight += layer_info.layer._effective_weight
+                    break
+
+        return max_weight - used_weight
 
     def get_next_chunk(self, chunk_size: int) -> Optional[np.ndarray]:
         """Get the next chunk of audio data.
@@ -158,27 +197,7 @@ class LayerInfo:
             while samples_remaining > 0:
                 # Check if we've reached the loop point
                 if self._position >= self.loop_length_samples:
-                    # Reset positions at loop point
-                    self._position = 0
-                    self._audio_position = 0
-                    
-                    # Update the active sound index at the loop point
-                    self.update_active_sound_index()
-                    
-                    # First phase: Check all layers in environment
-                    if self.layer._environment:
-                        # Get all LayerInfo instances for this environment's layers
-                        env_layers = []
-                        for layer in self.layer._environment.layers:
-                            if not layer.sounds:
-                                continue
-                            # Find the LayerInfo for the current sound
-                            current_sound = layer.sounds[layer.selected_sound_index]
-                            cache_key = f"{layer.id}_{current_sound.file_id}"
-                            # Look in the mixer's cache for the LayerInfo
-                            from audio_processing.models.mixer import mixer
-                            if cache_key in mixer._cached_layers:
-                                env_layers.append(mixer._cached_layers[cache_key])
+                    self.end_of_loop()
                 
                 # Get samples for this chunk
                 samples_to_get = min(samples_remaining, self.loop_length_samples - self._position)

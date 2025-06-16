@@ -422,38 +422,23 @@ class AudioMixer:
                                                         
                             # Get or create LayerInfo for this layer
                             layer_info = None
-                            current_file_id = None
                             
                             # Try to find existing LayerInfo
                             for cache_key in list(self._cached_layers.keys()):
                                 if cache_key.startswith(f"{layer.id}_"):
                                     layer_info = self._cached_layers[cache_key]
-                                    current_file_id = cache_key.split('_')[1]
                                     layer_info.layer = layer
                                     break
-                            
-                            # Create new LayerInfo if needed
-                            if not layer_info:
-                                if layer.selected_sound_index >= len(layer.sounds):
-                                    layer.selected_sound_index = 0
-                                selected_sound = layer.sounds[layer.selected_sound_index]
-                                layer_info = self._get_or_load_layer(selected_sound.file_id, layer)
-                                if not layer_info:
-                                    logger.error(f"Failed to load layer info for sound {selected_sound.file_id}")
-                                    continue
-                                current_file_id = selected_sound.file_id
                             
                             # Get the next chunk - this may trigger a loop point and update active_sound_index
                             chunk = layer_info.get_next_chunk(self.chunk_samples)
                             if chunk is None:
                                 continue
                             
-                            # Log audio levels and chunk properties
-                            max_level = np.max(np.abs(chunk))
-                            
-                            # Mix this layer into environment mix
-                            env_mix += chunk.astype(np.int32)
-                            env_active_layers += 1
+                            if layer_info.should_play:
+                                # Mix this layer into environment mix
+                                env_mix += chunk.astype(np.int32)
+                                env_active_layers += 1
                             
                         # If environment had active layers, apply fade volume and add to main mix
                         if env_active_layers > 0:
@@ -467,10 +452,7 @@ class AudioMixer:
                     
                     if active_layers > 0:
                         chunks_processed += 1
-                        
-                        # Log final mix levels before effects
-                        max_level = np.max(np.abs(mixed_chunk))
-                        
+
                         # Apply filters to the mixed chunk
                         mixed_chunk = self._apply_filters(mixed_chunk)
                         
@@ -489,9 +471,6 @@ class AudioMixer:
                         
                         # Convert back to int16 and clip
                         mixed_chunk = np.clip(mixed_chunk_float * 32768.0, -32768, 32767).astype(np.int16)
-                        
-                        # Log final output levels
-                        max_level = np.max(np.abs(mixed_chunk))
                         
                         # Convert to bytes and send
                         pcm_data = mixed_chunk.tobytes()
@@ -750,7 +729,9 @@ class AudioMixer:
                 )],
                 chance=1.0,
                 loop_length_ms=None,  # Don't loop at all
-                mode=LayerMode.SINGLE
+                mode=LayerMode.SINGLE,
+                weight=0.0,
+                cooldown_cycles=0
             )
             
             # Load the layer
