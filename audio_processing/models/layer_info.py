@@ -28,6 +28,7 @@ class LayerInfo:
         self.layer = layer  # Use the setter
         self._position = 0  # Position within the loop
         self._audio_position = 0  # Position within the audio data
+        self.has_played = False
         # Initialize active_sound_index to the selected sound index
         self._active_sound_index = layer.selected_sound_index
         # Initialize chance roll
@@ -102,7 +103,10 @@ class LayerInfo:
         if (self._cooldown_cycles_elapsed >= self.layer._effective_cooldown_cycles):
             self._cooldown_cycles_elapsed = 0
         else:
-            self._cooldown_cycles_elapsed += 1
+            if (self.has_played or self._cooldown_cycles_elapsed > 0):
+                self._cooldown_cycles_elapsed += 1
+        
+        self.has_played = False
 
     def update_active_sound_index(self):
         """Update the active sound index based on the layer mode when a loop completes."""

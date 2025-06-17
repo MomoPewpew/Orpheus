@@ -448,7 +448,8 @@ class AudioMixer:
                             if layer_info.should_play:
                                 # Mix this layer into environment mix
                                 env_mix += chunk.astype(np.int32)
-                                env_active_layers += 1
+                                layer_info.has_played = True
+                            env_active_layers += 1
                             
                         # If environment had active layers, apply fade volume and add to main mix
                         if env_active_layers > 0:
