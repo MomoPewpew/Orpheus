@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
-from audio_processing.routes.workspace import workspace_bp, ensure_workspace_dir
+from audio_processing.routes.workspace import workspace_bp, ensure_workspace_dir, load_workspace
 from audio_processing.routes.files import files_bp
 from audio_processing.models.bot_manager import BotManager, DiscordBotManager
 from audio_processing.models.mixer import mixer
@@ -64,6 +64,15 @@ def create_app() -> Flask:
 
     # Reset play state on server startup
     ensure_workspace_dir()
+    
+    # Pre-load workspace
+    logger.info("Pre-loading workspace...")
+    try:
+        app.workspace = load_workspace()
+        logger.info(f"Workspace pre-loaded with {len(app.workspace.environments)} environments and {len(app.workspace.sound_files)} sound files")
+    except Exception as e:
+        logger.error(f"Error pre-loading workspace: {e}", exc_info=True)
+        app.workspace = None
 
     # Register blueprints
     logger.info("Registering workspace blueprint with /api prefix")

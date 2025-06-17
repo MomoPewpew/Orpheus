@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 import json
 from pathlib import Path
 import logging
@@ -154,6 +154,13 @@ ensure_workspace_dir()
 def get_workspace():
     """Get the current workspace state."""
     try:
+        # Use pre-loaded workspace if available
+        if hasattr(current_app, 'workspace') and current_app.workspace is not None:
+            logger.debug("Using pre-loaded workspace")
+            return jsonify(current_app.workspace.to_dict())
+            
+        # Otherwise load workspace from file
+        logger.debug("Pre-loaded workspace not available, loading from file")
         # Load raw config first
         if CONFIG_FILE.exists():
             with open(CONFIG_FILE, 'r') as f:
