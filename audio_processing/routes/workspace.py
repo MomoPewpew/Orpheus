@@ -6,6 +6,7 @@ from audio_processing.models.audio import AppState, PlayState, Effects
 from audio_processing.models.mixer import mixer
 from audio_processing.routes.files import file_lock, get_default_config
 import os
+import random
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -306,6 +307,10 @@ def compare_workspaces(prev_state: AppState, new_state: AppState) -> None:
     - Starting/stopping audio processing
     - Environment fade-ins and fade-outs
     - Crossfades between environments
+    - Layer-level fading for:
+        - Volume changes
+        - Layers starting to play due to chance/cooldown/weight changes
+        - Layers stopping due to chance/cooldown/weight changes
     
     Args:
         prev_state: The previous application state
@@ -351,6 +356,63 @@ def compare_workspaces(prev_state: AppState, new_state: AppState) -> None:
             else:
                 logger.info(f"Environment {env.id} transitioning to playing without fade")
                 env.update_fade_state()
+    
+    # Handle layer-level transitions
+    if prev_state:
+        for new_env in new_state.environments:
+            prev_env = next((e for e in prev_state.environments if e.id == new_env.id), None)
+            if not prev_env:
+                continue
+            
+            # Compare each layer
+            for new_layer in new_env.layers:
+                prev_layer = next((l for l in prev_env.layers if l.id == new_layer.id), None)
+                if not prev_layer:
+                    continue
+                    
+                # Get the currently active sound for this layer
+                new_active_sound = new_layer.sounds[new_layer.selected_sound_index] if new_layer.sounds else None
+                prev_active_sound = prev_layer.sounds[prev_layer.selected_sound_index] if prev_layer.sounds else None
+                
+                if not new_active_sound or not prev_active_sound:
+                    continue
+                
+                # Check if volume has changed for active sound
+                if new_active_sound._effective_volume != prev_active_sound._effective_volume:
+                    logger.info(f"Layer {new_layer.id} volume changed from {prev_active_sound._effective_volume} to {new_active_sound._effective_volume}")
+                    new_active_sound.start_fade_in(prev_active_sound._effective_volume)
+                
+                # Check if layer should start/stop playing based on chance/cooldown/weight
+                # Get the LayerInfo from mixer's cache if it exists
+                layer_info = None
+                for cache_key in mixer._cached_layers:
+                    if cache_key.startswith(f"{new_layer.id}_"):
+                        layer_info = mixer._cached_layers[cache_key]
+                        break
+                
+                # If the layer info is not in the cache, skip the transition
+                if not layer_info:
+                    continue
+                
+                new_should_play = new_layer.should_play(
+                    rolled_chance=layer_info._chance_roll,
+                    passed_cooldown_cycles=layer_info._cooldown_cycles_elapsed,
+                    weight_left=layer_info._free_weight
+                )
+                
+                prev_should_play = prev_layer.should_play(
+                    rolled_chance=layer_info._chance_roll,
+                    passed_cooldown_cycles=layer_info._cooldown_cycles_elapsed,
+                    weight_left=layer_info._free_weight
+                )
+                
+                # Handle layer start/stop transitions
+                if not prev_should_play and new_should_play:
+                    logger.info(f"Layer {new_layer.id} starting to play - fading in")
+                    new_active_sound.start_fade_in(0.0)
+                elif prev_should_play and not new_should_play:
+                    logger.info(f"Layer {new_layer.id} stopping - fading out")
+                    new_active_sound.start_fade_out()
     
     # Start processing if needed and update state
     if should_play and not mixer._is_running:
