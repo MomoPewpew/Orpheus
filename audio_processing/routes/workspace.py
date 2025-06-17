@@ -394,16 +394,18 @@ def compare_workspaces(prev_state: AppState, new_state: AppState) -> None:
                 if not layer_info:
                     continue
                 
+                free_weight = layer_info._free_weight
+
                 new_should_play = new_layer.should_play(
                     rolled_chance=layer_info._chance_roll,
                     passed_cooldown_cycles=layer_info._cooldown_cycles_elapsed,
-                    weight_left=layer_info._free_weight
+                    weight_left=free_weight
                 )
                 
                 prev_should_play = prev_layer.should_play(
                     rolled_chance=layer_info._chance_roll,
                     passed_cooldown_cycles=layer_info._cooldown_cycles_elapsed,
-                    weight_left=layer_info._free_weight
+                    weight_left=free_weight
                 )
                 
                 # Handle layer start/stop transitions
