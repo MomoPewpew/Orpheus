@@ -89,6 +89,7 @@ class LayerSound:
     _fade_start_time: Optional[float] = None
     _fade_end_time: Optional[float] = None
     _fade_volume_start: Optional[float] = None
+    _fade_volume_end: Optional[float] = None
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'LayerSound':
@@ -176,16 +177,26 @@ class LayerSound:
             fade_progress = max(0.0, min(1.0, fade_progress))
             
             # Linear interpolation from fade_volume_start to effective_volume
-            return self._fade_volume_start + (effective_volume - self._fade_volume_start) * fade_progress
+            return self._fade_volume_start + (self._fade_volume_end - self._fade_volume_start) * fade_progress
         return effective_volume
 
-    def start_fade(self, volume_start: float) -> None:
+    def start_fade_in(self, volume_start: float) -> None:
         """Start a fade in or out based on the current play state."""
         current_time = time.time()
         self._fade_start_time = current_time
         fade_duration = self._layer._environment._app_state.effects.fades.fade_in_duration / 1000  # Convert to seconds
         self._fade_end_time = current_time + fade_duration
         self._fade_volume_start = volume_start
+        self._fade_volume_end = self._effective_volume
+
+    def start_fade_out(self) -> None:
+        """Start a fade out based on the current play state."""
+        current_time = time.time()
+        self._fade_start_time = current_time
+        fade_duration = self._layer._environment._app_state.effects.fades.fade_in_duration / 1000  # Convert to seconds
+        self._fade_end_time = current_time + fade_duration
+        self._fade_volume_start = self._effective_volume
+        self._fade_volume_end = 0.0
 
     @property
     def _effective_frequency(self) -> float:
