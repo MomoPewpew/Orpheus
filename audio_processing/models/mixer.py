@@ -430,6 +430,16 @@ class AudioMixer:
                                     layer_info.layer = layer
                                     break
                             
+                            # If no existing LayerInfo found, create a new one
+                            if layer_info is None:
+                                if layer.selected_sound_index >= len(layer.sounds):
+                                    layer.selected_sound_index = 0
+                                selected_sound = layer.sounds[layer.selected_sound_index]
+                                layer_info = self._get_or_load_layer(selected_sound.file_id, layer)
+                                if layer_info is None:
+                                    logger.warning(f"Failed to load layer {layer.id} with sound {selected_sound.file_id}")
+                                    continue
+                            
                             # Get the next chunk - this may trigger a loop point and update active_sound_index
                             chunk = layer_info.get_next_chunk(self.chunk_samples)
                             if chunk is None:
@@ -489,87 +499,34 @@ class AudioMixer:
             self._is_running = False
 
     def start_processing(self, app_state: AppState) -> None:
-        """Start the audio processing loop with the given state.
+        """Start audio processing with the given app state.
         
         Args:
-            app_state: The current application state
+            app_state: The current app state to process
         """
         with self._lock:
-            logger.info("Starting audio processing with new app state")
-            
-            # Reset processing state
-            self._is_running = False
-            if self._process_thread and self._process_thread.is_alive():
-                logger.info("Waiting for existing processing thread to stop")
-                self._process_thread.join(timeout=1.0)
-            self._process_thread = None
-            
-            # Clear all cached layers to ensure fresh start
-            self._cached_layers.clear()
-            self._env_states.clear()
-            
-            # Ensure we have a bot manager and guild ID
             if not self._bot_manager:
-                logger.error("No bot manager set - cannot start processing")
+                logger.warning("Cannot start processing - no bot manager set")
                 return
                 
-            if not self._guild_id and hasattr(self._bot_manager, 'guild_id'):
-                self._guild_id = self._bot_manager.guild_id
-                logger.info(f"Set guild ID to {self._guild_id}")
-            
-            if not self._guild_id:
-                logger.error("No guild ID set - cannot start processing")
-                return
-            
-            # Ensure voice client is connected
-            if hasattr(self._bot_manager, 'ensure_voice_client'):
-                logger.info("Ensuring voice client is connected")
-                try:
-                    self._bot_manager.ensure_voice_client(self._guild_id)
-                    # Wait a short time for the voice client to be ready
-                    time.sleep(0.5)
-                except Exception as e:
-                    logger.error(f"Failed to connect voice client: {e}")
-                    return
-
-            # First, ensure all environment layers are loaded and reset
-            for env in app_state.environments:
-                # Reset positions for all environments, not just playing ones
-                logger.info(f"Loading and resetting layers for environment {env.id}")
-                for layer in env.layers:
-                    if not layer.sounds:
-                        continue
-                    # Load the selected sound for this layer
-                    if layer.selected_sound_index >= len(layer.sounds):
-                        layer.selected_sound_index = 0
-                    selected_sound = layer.sounds[layer.selected_sound_index]
-                    
-                    # Create or get the layer info
-                    layer_info = self._get_or_load_layer(selected_sound.file_id, layer)
-                    if layer_info:
-                        logger.info(f"Loaded layer {layer.id} with sound {selected_sound.file_id}")
-                        # Always reset position for all layers
-                        layer_info.reset_position()
-                
-            # Store initial environment states
-            self._env_states = {env.id: env.play_state for env in app_state.environments}
+            # Store app state
             self._app_state = app_state
             
-            # Log the state before starting
-            playing_envs = [env for env in app_state.environments if env.play_state == PlayState.PLAYING]
-            logger.info(f"Starting processing with {len(playing_envs)} playing environments")
-            for env in playing_envs:
-                logger.info(f"Environment {env.id} is playing with {len(env.layers)} layers")
-                for layer in env.layers:
-                    if layer.sounds:
-                        logger.info(f"Layer {layer.id} has {len(layer.sounds)} sounds, selected: {layer.selected_sound_index}")
+            # Clear any cached layers since we have a new app state
+            self._cached_layers.clear()
             
-            # Start the processing thread
-            self._is_running = True
-            self._process_thread = Thread(target=self._process_audio)
-            self._process_thread.daemon = True
-            self._process_thread.start()
-            logger.info("Started main audio processing thread")
+            # Reset environment states
+            self._env_states.clear()
+            for env in app_state.environments:
+                self._env_states[env.id] = env.play_state
+            
+            # Start processing thread if not running
+            if not self._is_running:
+                self._is_running = True
+                self._process_thread = Thread(target=self._process_audio)
+                self._process_thread.daemon = True
+                self._process_thread.start()
+                logger.info("Started audio processing thread")
 
     def stop_processing(self) -> None:
         """Stop the audio processing loop."""
@@ -628,9 +585,9 @@ class AudioMixer:
         except Exception as e:
             logger.error(f"Error loading audio file {file_path}: {e}", exc_info=True)
             raise
-            
+
     def _get_or_load_layer(self, file_id: str, layer: Optional[Layer] = None) -> Optional[LayerInfo]:
-        """Get a cached layer or load it if not cached."""
+        """Get a cached layer or create it if not cached."""
         try:
             if layer is None:
                 # Create a minimal layer for standalone sounds
@@ -645,7 +602,7 @@ class AudioMixer:
                         volume=1.0
                     )],
                     chance=1.0,
-                    loop_length_ms=8000,  # Default 8 seconds
+                    loop_length_ms=999999,
                     mode=LayerMode.SINGLE
                 )
             
@@ -657,23 +614,32 @@ class AudioMixer:
                 self._cached_layers[cache_key].layer = layer
                 return self._cached_layers[cache_key]
             
-            # Load new layer
-            sound_path = AUDIO_DIR / f"{file_id}.mp3"
-            if not sound_path.exists():
-                logger.warning(f"Audio file not found: {sound_path}")
+            # Find the sound file in app state
+            if not self._app_state:
+                logger.warning("No app state available")
                 return None
                 
-            logger.info(f"Loading new layer: {cache_key} from {sound_path}")
-            audio_data = self._load_audio_file(sound_path)
+            sound_file = next(
+                (sf for sf in self._app_state.sound_files if sf.id == file_id),
+                None
+            )
+            if not sound_file:
+                logger.warning(f"Sound file {file_id} not found in app state")
+                return None
             
-            # Create new LayerInfo
+            # Use pre-loaded audio data
+            if sound_file._audio_data is None:
+                logger.error(f"Audio data not loaded for sound file {file_id}")
+                return None
+            
+            # Create new LayerInfo using pre-loaded audio data
             layer_info = LayerInfo(
-                audio_data=audio_data,
+                audio_data=sound_file._audio_data,
                 layer=layer
             )
             
             # Log layer info properties
-            logger.info(f"Created LayerInfo - Audio shape: {audio_data.shape}, Layer ID: {layer.id}")
+            logger.info(f"Created LayerInfo - Audio shape: {sound_file._audio_data.shape}, Layer ID: {layer.id}")
             
             self._cached_layers[cache_key] = layer_info
             return layer_info

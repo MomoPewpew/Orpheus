@@ -1,10 +1,11 @@
 from dataclasses import dataclass, field
 import time
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from enum import Enum
 import uuid
 import json
 import logging
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +30,29 @@ class SoundFile:
     duration_ms: int
     original_filename: Optional[str] = None
     usage_count: int = 0
+    
+    # Runtime-only fields (not serialized)
+    _audio_data: Optional[np.ndarray] = None  # Pre-processed audio data in int16 format
+
+    def __post_init__(self):
+        """Load audio data immediately after initialization"""
+        from audio_processing.models.mixer import mixer, AUDIO_DIR
+        try:
+            sound_path = AUDIO_DIR / f"{self.id}.mp3"
+            if not sound_path.exists():
+                logger.warning(f"Audio file not found during initialization: {sound_path}")
+                return
+                
+            logger.info(f"Loading audio file during initialization: {sound_path}")
+            self._audio_data = mixer._load_audio_file(sound_path)
+            logger.info(f"Loaded audio file {self.id} - Shape: {self._audio_data.shape}")
+            
+        except Exception as e:
+            logger.error(f"Error loading audio file {self.id} during initialization: {e}", exc_info=True)
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'SoundFile':
-        return cls(
+        sound_file = cls(
             id=data['id'],
             name=data['name'],
             path=data['path'],
@@ -41,6 +61,8 @@ class SoundFile:
             original_filename=data.get('original_filename'),
             usage_count=int(data.get('usageCount', 0))
         )
+        # __post_init__ will be called automatically and load the audio data
+        return sound_file
         
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
@@ -668,14 +690,42 @@ class AppState:
                     except Exception as e:
                         logger.error(f"Error creating environment: {e}", exc_info=True)
             
+            # Handle sound files - preserve existing audio data
+            sound_files = []
+            if hasattr(cls, '_current_instance'):
+                # Create a map of existing sound files by ID
+                existing_sound_files = {sf.id: sf for sf in cls._current_instance.sound_files}
+            else:
+                existing_sound_files = {}
+                
+            for file_data in data.get('files', []):
+                file_id = file_data['id']
+                if file_id in existing_sound_files:
+                    # Update existing sound file with new metadata but preserve audio data
+                    sound_file = existing_sound_files[file_id]
+                    sound_file.name = file_data['name']
+                    sound_file.path = file_data['path']
+                    sound_file.peak_volume = float(file_data['peak_volume'])
+                    sound_file.duration_ms = int(file_data['duration_ms'])
+                    sound_file.original_filename = file_data.get('original_filename')
+                    sound_file.usage_count = int(file_data.get('usageCount', 0))
+                    sound_files.append(sound_file)
+                else:
+                    # Create new sound file
+                    sound_file = SoundFile.from_dict(file_data)
+                    sound_files.append(sound_file)
+            
             # Create app state
             app_state = cls(
                 environments=environments,
                 master_volume=float(data['masterVolume']),
                 soundboard=data['soundboard'],
                 effects=Effects.from_dict(data.get('effects', {})),
-                sound_files=[SoundFile.from_dict(f) for f in data.get('files', [])]
+                sound_files=sound_files
             )
+            
+            # Store as current instance for future updates
+            cls._current_instance = app_state
             
             # Set app_state reference and log
             app_state.__post_init__()
