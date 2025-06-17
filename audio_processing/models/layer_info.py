@@ -35,6 +35,9 @@ class LayerInfo:
         self._chance_roll = random.random()  # Store the roll value
         # Initialize cooldown state
         self._cooldown_cycles_elapsed = 0  # Number of cycles since last play
+        # Fields that track the state of the sound at the last processing cycle
+        self.was_playing = True
+        self.previous_volume = self.get_layer_sound()._effective_volume
     
     @property
     def layer(self) -> Layer:
@@ -107,6 +110,8 @@ class LayerInfo:
                 self._cooldown_cycles_elapsed += 1
         
         self.has_played = False
+        self.was_playing = True
+        self.previous_volume = self.get_layer_sound()._effective_volume
 
     def update_active_sound_index(self):
         """Update the active sound index based on the layer mode when a loop completes."""
@@ -144,21 +149,23 @@ class LayerInfo:
         self._active_sound_index = self.layer.selected_sound_index
         self._cooldown_cycles_elapsed = 0
         self._chance_roll = random.random()
+        self.was_playing = True
+        self.previous_volume = self.get_layer_sound()._effective_volume
 
     @property
     def should_play(self) -> bool:
         """Check if the sound should play based on the chance, cooldown, weight, and fading state."""
+        return self._layer.should_play(self._chance_roll, self._cooldown_cycles_elapsed, self._free_weight)
+
+    @property
+    def is_fading(self) -> bool:
+        """Check if the sound is currently fading."""
         # Get the currently active sound
         sound = self.get_layer_sound()
         if not sound:
             return False
             
-        # If the sound is fading, we should continue playing it
-        if sound._is_fading:
-            return True
-            
-        # Otherwise check normal play conditions
-        return self._layer.should_play(self._chance_roll, self._cooldown_cycles_elapsed, self._free_weight)
+        return sound._is_fading
     
     @property
     def _free_weight(self) -> float:
