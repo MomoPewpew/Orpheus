@@ -56,14 +56,6 @@ export async function saveWorkspace(state: WorkspaceState): Promise<void> {
   }
 
   try {
-    // Log the incoming state
-    console.debug('Saving workspace state:', {
-      hasEffects: !!state.effects,
-      effectsKeys: state.effects ? Object.keys(state.effects) : [],
-      fullEffects: state.effects,
-      stateKeys: Object.keys(state)
-    });
-
     // Create a clean state object with only the required properties
     const cleanState = {
       environments: state.environments || [],
@@ -89,46 +81,9 @@ export async function saveWorkspace(state: WorkspaceState): Promise<void> {
     // Convert boolean values to Python format
     const pythonState = convertToPythonBooleans(cleanState);
 
-    // Log the clean state before serialization
-    console.debug('Clean state before JSON:', {
-      hasEffects: !!pythonState.effects,
-      effectsKeys: pythonState.effects ? Object.keys(pythonState.effects) : [],
-      fullEffects: pythonState.effects,
-      cleanStateKeys: Object.keys(pythonState)
-    });
-
     // Convert to JSON string with no whitespace
     const requestBody = JSON.stringify(pythonState);
     
-    // Log the exact JSON being sent
-    console.debug('JSON being sent:', requestBody);
-    console.debug('JSON length:', requestBody.length);
-    console.debug('First 200 chars:', requestBody.substring(0, 200));
-    console.debug('Last 200 chars:', requestBody.substring(Math.max(0, requestBody.length - 200)));
-    
-    // Verify JSON is valid and contains effects
-    try {
-      const parsed = JSON.parse(requestBody);
-      console.debug('Parsed JSON verification:', {
-        hasEffects: !!parsed.effects,
-        effectsKeys: parsed.effects ? Object.keys(parsed.effects) : [],
-        parsedKeys: Object.keys(parsed),
-        fullEffects: parsed.effects
-      });
-    } catch (e) {
-      console.error('Invalid JSON generated:', e);
-      throw new Error('Generated invalid JSON');
-    }
-
-    // Log the actual request being sent
-    console.debug('Sending request with:', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: requestBody
-    });
-
     const response = await fetch(API_WORKSPACE, {
       method: 'POST',
       headers: {
@@ -138,16 +93,13 @@ export async function saveWorkspace(state: WorkspaceState): Promise<void> {
     });
 
     const responseText = await response.text();
-    console.debug('Raw server response:', responseText);
     
     if (!response.ok) {
-      throw new Error(`Server error (${response.status}): ${responseText}`);
+      // Just throw the raw error text
+      throw new Error(responseText);
     }
   } catch (error) {
-    console.error('Error saving workspace:', {
-      error,
-      message: error instanceof Error ? error.message : String(error)
-    });
+    console.error('Error saving workspace:', error);
     throw error;
   }
 }

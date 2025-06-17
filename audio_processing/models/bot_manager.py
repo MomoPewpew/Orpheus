@@ -61,6 +61,18 @@ class BotManager(ABC):
         """
         pass
 
+    @abstractmethod
+    def is_voice_connected(self, guild_id: int) -> bool:
+        """Check if the bot has an active voice connection for the given guild.
+        
+        Args:
+            guild_id: The guild ID to check
+            
+        Returns:
+            bool: True if there is an active voice connection, False otherwise
+        """
+        pass
+
 class DiscordBotManager(BotManager):
     """Discord-specific implementation of BotManager."""
     
@@ -150,3 +162,11 @@ class DiscordBotManager(BotManager):
         if not guild_id:
             logger.error("Cannot queue audio - guild ID not set in app")
         return False
+
+    def is_voice_connected(self, guild_id: int) -> bool:
+        """Check if the bot has an active voice connection for the given guild."""
+        if not self.bot or not self.audio_manager:
+            return False
+            
+        # Check if we have a voice client for this guild
+        return bool(self.bot.get_guild(guild_id) and self.bot.get_guild(guild_id).voice_client)

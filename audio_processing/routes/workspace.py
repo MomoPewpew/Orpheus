@@ -224,6 +224,14 @@ def update_workspace():
         try:
             data = json.loads(raw_data, strict=True)
             
+            # If any environment is PLAYING, check for voice connection
+            if any(env.get('playState') == 'PLAYING' for env in data.get('environments', [])):
+                if not current_app.bot_manager or not current_app.bot_manager.is_voice_connected(current_app.guild_id):
+                    logger.error("Cannot start playback - no active voice connection")
+                    return jsonify({
+                        "error": "Cannot start playback - Please join a voice channel first."
+                    }), 400
+            
             # Load current state to preserve presets if needed
             current_state = None
             if CONFIG_FILE.exists():

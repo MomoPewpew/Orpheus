@@ -425,40 +425,52 @@ const App: React.FC = () => {
     setEffects(newEffects);
   };
 
-  const handlePlayStop = () => {
+  const handlePlayStop = async () => {
     if (!activeEnvironment) return;
-    
-    // Toggle the active environment's state
-    const newState = activeEnvironment.playState === PlayState.Playing ? 
-      PlayState.Stopped : 
-      PlayState.Playing;
-    
-    setEnvironments(prevEnvironments => {
-      const newEnvironments = prevEnvironments.map(env => {
-        if (env.id === activeEnvironment.id) {
-          // Update the target environment
-          return {
-            ...env,
-            playState: newState
-          };
-        } else if (newState === PlayState.Playing && env.playState === PlayState.Playing) {
-          // Stop any other playing environments when starting a new one
-          return {
-            ...env,
-            playState: PlayState.Stopped
-          };
-        }
-        return env;
+
+    const newPlayState = activeEnvironment.playState === PlayState.Playing 
+      ? PlayState.Stopped 
+      : PlayState.Playing;
+
+    // Create updated environment with new play state
+    const updatedEnvironment: Environment = {
+      ...activeEnvironment,
+      playState: newPlayState
+    };
+
+    // Create updated environments array
+    const updatedEnvironments = environments.map((env: Environment) => 
+      env.id === updatedEnvironment.id ? updatedEnvironment : env
+    );
+
+    try {
+      // First try to save the state
+      await saveWorkspace({
+        environments: updatedEnvironments,
+        files: soundFiles,
+        soundboard: globalSoundboard,
+        masterVolume,
+        effects,
       });
 
-      // Also update the active environment reference
-      const updatedActiveEnv = newEnvironments.find(env => env.id === activeEnvironment.id);
-      if (updatedActiveEnv) {
-        setActiveEnvironment(updatedActiveEnv);
+      // Only update state if save was successful
+      setEnvironments(updatedEnvironments);
+      setActiveEnvironment(updatedEnvironment);
+    } catch (error: unknown) {
+      // Try to parse error message from JSON if possible
+      let message = 'Failed to update playback state';
+      if (error instanceof Error) {
+        try {
+          const errorObj = JSON.parse(error.message);
+          message = errorObj.error || message;
+        } catch {
+          message = error.message || message;
+        }
       }
-
-      return newEnvironments;
-    });
+      
+      // Show simple alert
+      window.alert(message);
+    }
   };
 
   if (isLoading) {
