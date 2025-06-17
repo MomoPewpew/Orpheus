@@ -147,7 +147,17 @@ class LayerInfo:
 
     @property
     def should_play(self) -> bool:
-        """Check if the sound should play based on the chance, cooldown and weight."""
+        """Check if the sound should play based on the chance, cooldown, weight, and fading state."""
+        # Get the currently active sound
+        sound = self.get_layer_sound()
+        if not sound:
+            return False
+            
+        # If the sound is fading, we should continue playing it
+        if sound._is_fading:
+            return True
+            
+        # Otherwise check normal play conditions
         return self._layer.should_play(self._chance_roll, self._cooldown_cycles_elapsed, self._free_weight)
     
     @property

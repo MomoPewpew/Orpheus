@@ -179,6 +179,12 @@ class LayerSound:
             # Linear interpolation from fade_volume_start to effective_volume
             return self._fade_volume_start + (self._fade_volume_end - self._fade_volume_start) * fade_progress
         return effective_volume
+    
+    @property
+    def _is_fading(self) -> bool:
+        """Check if the sound is currently fading"""
+        current_time = time.time()
+        return bool(self._fade_start_time and self._fade_end_time and self._fade_start_time < current_time and current_time < self._fade_end_time)
 
     def start_fade_in(self, volume_start: float) -> None:
         """Start a fade in or out based on the current play state."""
