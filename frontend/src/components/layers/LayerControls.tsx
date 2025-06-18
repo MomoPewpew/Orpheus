@@ -135,6 +135,7 @@ interface LayerControlsProps {
   defaultLayer?: Layer; // The layer without preset overrides
   onPresetUpdate: (preset: Preset) => void;
   isPlaying?: boolean; // New prop to indicate if the layer is currently playing
+  onSoundFilesChange?: (soundFiles: SoundFile[]) => void; // Add this prop
 }
 
 export const LayerControls: React.FC<LayerControlsProps> = ({
@@ -148,6 +149,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   defaultLayer,
   onPresetUpdate,
   isPlaying = false, // Default to false if not provided
+  onSoundFilesChange, // Add this prop
 }) => {
   const sounds = layer.sounds || [];
   const defaultSounds = defaultLayer?.sounds || sounds;
@@ -1183,6 +1185,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
         onClose={() => setIsAddingSoundOpen(false)}
         onAdd={handleAddSound}
         soundFiles={soundFiles}
+        onSoundFilesChange={onSoundFilesChange}
         mode="sound"
       />
     </Paper>

@@ -494,6 +494,8 @@ export const MainContent: React.FC<MainContentProps> = ({
                           activePreset={activePreset}
                           defaultLayer={getDefaultLayer(layer)}
                           onPresetUpdate={onPresetUpdate}
+                          onSoundFilesChange={onSoundFilesChange}
+                          isPlaying={environment.playState === PlayState.Playing}
                         />
                       </div>
                     )}

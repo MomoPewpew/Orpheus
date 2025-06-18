@@ -75,7 +75,7 @@ def save_workspace(app_state: AppState):
             # Convert AppState to dict
             new_config = app_state.to_dict()
             
-            # Load existing config to preserve files
+            # Load existing config to merge files
             current_config = {}
             if CONFIG_FILE.exists():
                 with open(CONFIG_FILE, 'r') as f:
@@ -87,8 +87,16 @@ def save_workspace(app_state: AppState):
                             logger.error(f"Error reading existing config: {e}")
                             current_config = {}
             
-            # Only update the files from current config, preserve everything else from new config
-            new_config['files'] = current_config.get('files', [])
+            # Merge files lists, keeping new files and preserving existing ones
+            current_files = current_config.get('files', [])
+            new_files = new_config.get('files', [])
+            
+            # Create a map of file IDs to files from both lists
+            files_map = {f['id']: f for f in current_files}
+            files_map.update({f['id']: f for f in new_files})
+            
+            # Use the merged map values as our files list
+            new_config['files'] = list(files_map.values())
                 
             # Write atomically using a temp file
             temp_file = CONFIG_FILE.with_suffix('.tmp')
