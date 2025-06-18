@@ -955,14 +955,14 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
               {/* Speech Range Dampening */}
               <Box>
                 <Typography gutterBottom>
-                  Speech Range Dampening
-                  <Tooltip title="This feature is currently disabled as Discord's API does not provide reliable voice activity detection.">
+                  Speech Range Dampening: {Math.round(dampenSpeechRange * 100)}%
+                  <Tooltip title="This feature is supposed to only activate when somebody is speaking. But since Discord doesn't provide reliable voice activity detection, it's always active.">
                     <InfoIcon sx={{ ml: 1, fontSize: '1rem', verticalAlign: 'middle', color: 'text.secondary' }} />
                   </Tooltip>
                 </Typography>
                 <Slider
-                  value={0}
-                  disabled
+                  value={dampenSpeechRange}
+                  onChange={(_, value) => setDampenSpeechRange(value as number)}
                   min={0}
                   max={1}
                   step={0.05}

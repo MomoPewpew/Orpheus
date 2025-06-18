@@ -153,7 +153,7 @@ class DiscordBotManager(BotManager):
         if not self.bot or not self.audio_manager:
             return False
 
-        return False
+        return True
 
     def queue_audio(self, audio_data: BytesIO) -> bool:
         """Queue audio to the Discord bot"""
