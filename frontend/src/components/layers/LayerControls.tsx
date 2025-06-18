@@ -20,8 +20,8 @@ import {
   Tooltip,
 } from '@mui/material';
 import { Theme } from '@mui/material/styles';
-import { Edit, Delete, Add, DragIndicator, Settings, Shuffle, Repeat, RadioButtonChecked } from '@mui/icons-material';
-import { Layer, LayerSound, SoundFile, getLayerSoundName, Preset, PresetLayer, PresetSound, LayerMode } from '../../types/audio';
+import { Delete, Add, DragIndicator, Settings, Shuffle, Repeat, RadioButtonChecked } from '@mui/icons-material';
+import { Layer, LayerSound, SoundFile, Preset, PresetLayer, PresetSound, LayerMode } from '../../types/audio';
 import AddLayerDialog from '../AddLayerDialog';
 import { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
 import { alpha } from '@mui/material/styles';

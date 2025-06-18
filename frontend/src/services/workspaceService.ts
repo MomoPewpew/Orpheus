@@ -1,5 +1,4 @@
-import { Environment, SoundFile, PlayState, Effects } from '../types/audio';
-import { generateId } from '../utils/ids';
+import { Environment, SoundFile, Effects } from '../types/audio';
 
 // Get the API URL from environment or use default
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';

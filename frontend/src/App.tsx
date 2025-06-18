@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Environment, Layer, LayerSound, SoundFile, Preset, PresetLayer, PresetSound, Effects, PlayState } from './types/audio';
+import React, { useState, useEffect } from 'react';
+import { Environment, Layer, SoundFile, Preset, PresetLayer, PresetSound, Effects, PlayState } from './types/audio';
 import { Box, CssBaseline, ThemeProvider, createTheme, Typography } from '@mui/material';
-import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
+import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import ConfigOverlay from './components/overlays/ConfigOverlay';

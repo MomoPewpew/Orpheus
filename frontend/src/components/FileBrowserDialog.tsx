@@ -13,7 +13,6 @@ import {
   TextField,
   Typography,
   Box,
-  CircularProgress,
 } from '@mui/material';
 import { PlayArrow, Stop, Check } from '@mui/icons-material';
 import { SoundFile } from '../types/audio';

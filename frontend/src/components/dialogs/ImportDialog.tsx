@@ -13,7 +13,6 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel,
 } from '@mui/material';
 import JSZip from 'jszip';
 

@@ -1,5 +1,5 @@
 import React, { useState, MouseEvent } from 'react';
-import { Layer, Preset, Environment } from '../../types/audio';
+import { Preset, Environment } from '../../types/audio';
 import { generateId } from '../../utils/ids';
 import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';

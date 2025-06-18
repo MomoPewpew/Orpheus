@@ -1,5 +1,4 @@
 import { AppConfig } from '../types/config';
-import { SoundFile } from '../types/audio';
 
 const API_BASE = '/api';
 

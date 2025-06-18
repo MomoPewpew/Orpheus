@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Environment, Layer, Preset, getLayerVolume } from '../types/audio';
+import { Environment, Preset } from '../types/audio';
 import { generateId } from '../utils/ids';
 import {
   Box,
@@ -17,7 +17,6 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import { v4 as uuidv4 } from 'uuid';
 
 interface PresetManagerProps {
   presets: Preset[];

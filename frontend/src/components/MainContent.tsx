@@ -3,13 +3,8 @@ import {
   Box,
   Typography,
   Paper,
-  Tabs,
-  Tab,
   Button,
   TextField,
-  Slider,
-  Stack,
-  Drawer,
   IconButton,
   Dialog,
   DialogTitle,
@@ -18,11 +13,11 @@ import {
   Divider,
 } from '@mui/material';
 import { Add as AddIcon, Delete, Settings, PlayArrow, Stop } from '@mui/icons-material';
-import { Environment, Layer, Preset, SoundFile, setLayerVolume, getLayerVolume, LayerSound, PlayState } from '../types/audio';
+import { Environment, Layer, Preset, SoundFile, setLayerVolume, PlayState } from '../types/audio';
 import { generateId } from '../utils/ids';
 import { LayerControls } from './layers/LayerControls';
 import AddLayerDialog from './AddLayerDialog';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DroppableProvided, DroppableStateSnapshot, DraggableProvided, DraggableStateSnapshot } from '@hello-pangea/dnd';
 import EnvironmentConfigOverlay from './overlays/EnvironmentConfigOverlay';
 import { SoundboardOverlay } from './overlays/SoundboardOverlay';
@@ -47,8 +42,6 @@ interface MainContentProps {
   onToggleSoundboard: () => void;
   onPlayStop: () => void;
 }
-
-const DRAWER_WIDTH = 300;
 
 export const MainContent: React.FC<MainContentProps> = ({
   environment,

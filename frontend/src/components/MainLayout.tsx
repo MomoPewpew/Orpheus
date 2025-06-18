@@ -1,5 +1,5 @@
 import React from 'react';
-import { Environment, Layer, SoundFile } from '../types/audio';
+import { Environment, SoundFile } from '../types/audio';
 import Sidebar from './Sidebar';
 import '../styles/AppLayout.css';
 

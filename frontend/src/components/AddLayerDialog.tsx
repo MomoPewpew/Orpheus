@@ -11,7 +11,6 @@ import {
   Tab,
   Tabs,
   IconButton,
-  CircularProgress,
 } from '@mui/material';
 import { Upload, AudioFile as AudioFileIcon } from '@mui/icons-material';
 import { Layer, SoundFile } from '../types/audio';
@@ -334,7 +333,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
               disabled={!selectedFile || uploading}
               variant="contained"
             >
-              {uploading ? <CircularProgress size={24} /> : (mode === 'layer' ? 'Upload & Add Layer' : 'Upload & Add Sound')}
+              {uploading ? 'Uploading...' : (mode === 'layer' ? 'Upload & Add Layer' : 'Upload & Add Sound')}
             </Button>
           ) : (
             <Button
