@@ -289,6 +289,9 @@ def update_workspace():
             # Save the new workspace state
             save_workspace(new_app_state)
             
+            # Update the pre-loaded workspace in the app
+            current_app.workspace = new_app_state
+            
             # Compare states and get required actions
             compare_workspaces(current_state, new_app_state)
             
