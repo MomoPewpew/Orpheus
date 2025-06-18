@@ -1,15 +1,14 @@
 import logging
 import discord
-import io
 from typing import Optional, Dict, Any
-import numpy as np
 import time
 
 logger = logging.getLogger(__name__)
 
+
 class PCMStreamSource(discord.AudioSource):
     """Custom audio source for streaming PCM data."""
-    
+
     def __init__(self):
         self.buffer = bytearray()
         self.FRAME_LENGTH = 3840  # 20ms of 48kHz stereo audio (48000 * 2 * 2 * 0.02)
@@ -18,17 +17,17 @@ class PCMStreamSource(discord.AudioSource):
         self._read_count = 0
         self._last_read_time = 0
         self._active = True  # Track if we're actively streaming
-        self._done = False   # Track if we're done streaming
+        self.done = False  # Track if we're done streaming
         self._started = False  # Track if we've started reading
         logger.info("Initialized PCM stream source")
-        
+
     def add_audio(self, pcm_data: bytes):
         """Add PCM audio data to the buffer."""
         try:
             if not self._active:
                 logger.warning("Trying to add audio to inactive stream")
                 return
-                
+
             # Only add data if we have room
             if len(self.buffer) < self.MAX_BUFFER_SIZE:
                 self.buffer.extend(pcm_data)
@@ -36,7 +35,7 @@ class PCMStreamSource(discord.AudioSource):
                 logger.warning("Buffer full, dropping audio data")
         except Exception as e:
             logger.error(f"Error adding audio data: {e}")
-        
+
     def read(self) -> Optional[bytes]:
         """Read the next frame of audio data.
         
@@ -47,13 +46,13 @@ class PCMStreamSource(discord.AudioSource):
             if not self._active:
                 logger.debug("Stream inactive, returning None")
                 return None
-                
+
             if not self._started:
                 self._started = True
                 logger.info("Starting to read audio data")
-                
+
             current_time = time.time()
-            
+
             # Check if we have enough data
             if len(self.buffer) >= self.FRAME_LENGTH:
                 # If we have more than minimum buffer, we can be strict about timing
@@ -62,12 +61,12 @@ class PCMStreamSource(discord.AudioSource):
                     time_since_last_read = current_time - self._last_read_time
                     if time_since_last_read < 0.02:  # 20ms frame time
                         time.sleep(0.02 - time_since_last_read)
-                
+
                 frame = bytes(self.buffer[:self.FRAME_LENGTH])
                 self.buffer = self.buffer[self.FRAME_LENGTH:]
                 self._read_count += 1
                 self._last_read_time = current_time
-                
+
                 return frame
             else:
                 if len(self.buffer) > 0:
@@ -77,29 +76,26 @@ class PCMStreamSource(discord.AudioSource):
                     self.buffer.clear()
                     logger.debug(f"Padding partial frame with {len(padding)} bytes of silence")
                     return remaining + padding
-                elif not self._done and self._started and self._read_count > 0:
+                elif not self.done and self._started and self._read_count > 0:
                     # Only mark as done if we've actually started reading and have read some frames
                     logger.info(f"Buffer empty after reading {self._read_count} frames, marking stream as done")
-                    self._done = True
+                    self.done = True
                 return None
         except Exception as e:
             logger.error(f"Error reading frame: {e}")
             return None
-        
+
     def cleanup(self):
         """Clean up resources."""
         if self._active:  # Only log cleanup once
             logger.info(f"Cleaning up PCM stream source after reading {self._read_count} frames")
             self._active = False
             self.buffer.clear()
-        
-    def is_opus(self) -> bool:
-        """Return False since we're sending raw PCM."""
-        return False
+
 
 class AudioManager:
     """Manages audio playback for a Discord bot."""
-    
+
     def __init__(self, bot: discord.Client):
         """Initialize the audio manager.
         
@@ -108,7 +104,7 @@ class AudioManager:
         """
         self.bot = bot
         self._audio_streams: Dict[int, Any] = {}
-        
+
     def _get_voice_client(self, guild_id: int) -> Optional[discord.VoiceClient]:
         """Get the voice client for a guild.
         
@@ -121,12 +117,12 @@ class AudioManager:
         if not self.bot:
             logger.error("Bot not initialized")
             return None
-            
+
         for voice_client in self.bot.voice_clients:
             if voice_client.guild.id == guild_id:
                 return voice_client
         return None
-        
+
     def queue_audio(self, guild_id: int, pcm_data: bytes) -> bool:
         """Queue PCM audio data for playback in a guild.
         
@@ -151,18 +147,18 @@ class AudioManager:
                     'voice_client': voice_client,
                     'audio_source': audio_source
                 }
-                
+
                 # Add audio before starting playback
                 audio_source.add_audio(pcm_data)
-                
+
                 # Make sure we're not already playing
                 if voice_client.is_playing():
                     logger.info("Stopping existing playback")
                     voice_client.stop()
-                
+
                 logger.info("Starting playback with new audio source")
-                voice_client.play(audio_source, after=lambda e: self._on_playback_finished(guild_id, e))
-                
+                voice_client.play(audio_source, after=lambda e2: self._on_playback_finished(guild_id, e2))
+
                 # Verify playback started
                 if not voice_client.is_playing():
                     logger.error("Failed to start playback")
@@ -172,20 +168,19 @@ class AudioManager:
                 # Add to existing stream
                 stream_data = self._audio_streams[guild_id]
                 stream_data['audio_source'].add_audio(pcm_data)
-                
+
                 # Restart playback if needed
                 if not voice_client.is_playing():
                     logger.info("Restarting playback")
-                    voice_client.play(stream_data['audio_source'], after=lambda e: self._on_playback_finished(guild_id, e))
-            
-            stream_data = self._audio_streams[guild_id]
-            
+                    voice_client.play(stream_data['audio_source'],
+                                      after=lambda e3: self._on_playback_finished(guild_id, e3))
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Error queueing audio: {e}", exc_info=True)
             return False
-            
+
     def _on_playback_finished(self, guild_id: int, error: Optional[Exception]) -> None:
         """Handle playback completion or errors.
         
@@ -199,9 +194,9 @@ class AudioManager:
         else:
             logger.info(f"Playback finished in guild {guild_id}")
             # Only cleanup if the stream is done
-            if guild_id in self._audio_streams and self._audio_streams[guild_id]['audio_source']._done:
+            if guild_id in self._audio_streams and self._audio_streams[guild_id]['audio_source'].done:
                 self.cleanup_guild(guild_id)
-            
+
     def cleanup_guild(self, guild_id: int) -> None:
         """Clean up resources for a guild.
         
@@ -217,7 +212,7 @@ class AudioManager:
             if 'audio_source' in stream_data:
                 stream_data['audio_source'].cleanup()
             del self._audio_streams[guild_id]
-            
+
     def stop_playback(self, guild_id: int) -> bool:
         """Stop audio playback for a guild.
         
@@ -233,12 +228,12 @@ class AudioManager:
             self.cleanup_guild(guild_id)
             return True
         return False
-        
+
     @property
     def active_guilds(self) -> list[int]:
         """Get the list of guild IDs with active audio streams."""
         return list(self._audio_streams.keys())
-        
+
     def is_playing(self, guild_id: int) -> bool:
         """Check if audio is currently playing in a guild.
         
@@ -261,12 +256,13 @@ class AudioManager:
         """
         if guild_id not in self._audio_streams:
             return None
-            
+
         stream_data = self._audio_streams[guild_id]
         if 'audio_source' not in stream_data:
             return None
-            
+
         audio_source = stream_data['audio_source']
         return len(audio_source.buffer) // audio_source.FRAME_LENGTH
 
-__all__ = ['AudioManager'] 
+
+__all__ = ['AudioManager']

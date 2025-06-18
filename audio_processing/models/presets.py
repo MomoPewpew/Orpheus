@@ -2,17 +2,17 @@ from dataclasses import dataclass
 from typing import List, Optional, Dict
 from .audio import LayerMode
 import logging
-import json
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class PresetSound:
     """Represents a sound override in a preset"""
-    id: str        # Must match the original sound ID
+    id: str  # Must match the original sound ID
     volume: Optional[float] = None
     frequency: Optional[float] = None
-    file_id: Optional[str] = None   # Only used internally, not serialized
+    file_id: Optional[str] = None  # Only used internally, not serialized
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'PresetSound':
@@ -30,14 +30,15 @@ class PresetSound:
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
         result = {'id': self.id}
-        
+
         # Only include fields that have values
         if self.volume is not None:
             result['volume'] = self.volume
         if self.frequency is not None:
             result['frequency'] = self.frequency
-            
+
         return result
+
 
 @dataclass
 class PresetLayer:
@@ -51,15 +52,15 @@ class PresetLayer:
     sounds: Optional[List[PresetSound]] = None
 
     # Runtime-only fields (not serialized)
-    _environment: Optional['Environment'] = None
-    _base_layer: Optional['Layer'] = None  # Reference to the base layer this preset overrides
+    environment: Optional['Environment'] = None
+    base_layer: Optional['Layer'] = None  # Reference to the base layer this preset overrides
 
-    def set_environment(self, environment: 'Environment') -> None:
+    def setenvironment(self, environment: 'Environment') -> None:
         """Set the environment reference for this preset layer"""
-        self._environment = environment
+        self.environment = environment
         # Find and store reference to base layer
-        self._base_layer = next((l for l in environment.layers if l.id == self.id), None)
-        if not self._base_layer:
+        self.base_layer = next((layer_ for layer_ in environment.layers if layer_.id == self.id), None)
+        if not self.base_layer:
             logger.warning(f"No base layer found for preset layer {self.id}")
 
     @classmethod
@@ -70,7 +71,8 @@ class PresetLayer:
                 volume=float(data['volume']) if 'volume' in data and data['volume'] is not None else None,
                 weight=float(data['weight']) if 'weight' in data and data['weight'] is not None else None,
                 chance=float(data['chance']) if 'chance' in data and data['chance'] is not None else None,
-                cooldown_cycles=int(data['cooldownCycles']) if 'cooldownCycles' in data and data['cooldownCycles'] is not None else None,
+                cooldown_cycles=int(data['cooldownCycles']) if 'cooldownCycles' in data and data[
+                    'cooldownCycles'] is not None else None,
                 mode=LayerMode(data['mode']) if 'mode' in data and data['mode'] is not None else None,
                 sounds=[PresetSound.from_dict(s) for s in data.get('sounds', [])] if data.get('sounds') else None
             )
@@ -83,7 +85,7 @@ class PresetLayer:
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
         result = {'id': self.id}
-        
+
         # Only include fields that have values
         if self.volume is not None:
             result['volume'] = self.volume
@@ -95,8 +97,9 @@ class PresetLayer:
             result['cooldownCycles'] = self.cooldown_cycles
         if self.sounds:
             result['sounds'] = [s.to_dict() for s in self.sounds]
-            
+
         return result
+
 
 @dataclass
 class Preset:
@@ -108,21 +111,21 @@ class Preset:
     is_default: bool = False
 
     # Runtime-only fields (not serialized)
-    _environment: Optional['Environment'] = None
+    environment: Optional['Environment'] = None
 
     def __post_init__(self):
         if self.layers is None:
             self.layers = []
 
-    def set_environment(self, environment: 'Environment') -> None:
+    def setenvironment(self, environment: 'Environment') -> None:
         """Set the environment reference for this preset and all its layers"""
-        self._environment = environment
+        self.environment = environment
         for layer in self.layers:
-            layer.set_environment(environment)
+            layer.setenvironment(environment)
             # Also set environment on the corresponding base layer
-            base_layer = next((l for l in environment.layers if l.id == layer.id), None)
+            base_layer = next((layer_ for layer_ in environment.layers if layer_.id == layer.id), None)
             if base_layer:
-                base_layer.set_environment(environment)
+                base_layer.setenvironment(environment)
             else:
                 logger.warning(f"No base layer found for preset layer {layer.id} in preset {self.id}")
 
@@ -134,7 +137,7 @@ class Preset:
                 raise ValueError("Missing required field: id")
             if 'name' not in data:
                 raise ValueError("Missing required field: name")
-            
+
             # Process layers
             layers = []
             if 'layers' in data:
@@ -144,16 +147,16 @@ class Preset:
                         layers.append(layer)
                     except Exception as e:
                         logger.error(f"Error creating preset layer: {e}", exc_info=True)
-            
+
             # Handle maxWeight - only convert to float if it exists and is not None
             max_weight = None
             if 'maxWeight' in data and data['maxWeight'] is not None:
                 try:
                     max_weight = float(data['maxWeight'])
-                except (TypeError, ValueError) as e:
+                except (TypeError, ValueError) as _:
                     logger.error(f"Invalid maxWeight value: {data['maxWeight']}")
                     max_weight = None
-            
+
             # Create preset
             preset = cls(
                 id=data['id'],
@@ -161,9 +164,9 @@ class Preset:
                 max_weight=max_weight,
                 layers=layers
             )
-            
+
             return preset
-            
+
         except Exception as e:
             logger.error(f"Error creating preset: {e}", exc_info=True)
             raise
@@ -171,18 +174,18 @@ class Preset:
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
         # Filter out layers that only have an ID
-        layers_with_overrides = [l.to_dict() for l in self.layers]
-        layers_with_overrides = [l for l in layers_with_overrides if len(l) > 1]  # More than just 'id'
-        
+        layers_with_overrides = [layer_.to_dict() for layer_ in self.layers]
+        layers_with_overrides = [layer_ for layer_ in layers_with_overrides if len(layer_) > 1]  # More than just 'id'
+
         result = {
             'id': self.id,
             'name': self.name
         }
-        
+
         if layers_with_overrides:
             result['layers'] = layers_with_overrides
-            
+
         if self.max_weight is not None:
             result['maxWeight'] = self.max_weight
-            
-        return result 
+
+        return result

@@ -15,6 +15,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 def is_main_process():
     """Check if this is the main Flask process (not the reloader)."""
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
@@ -23,86 +24,90 @@ def is_main_process():
         return True
     return False
 
+
 def create_app() -> Flask:
     """Create and configure the Flask application."""
-    app = Flask(__name__)
-    CORS(app)  # Enable CORS for all routes
-    
+    application = Flask(__name__)
+    CORS(application)  # Enable CORS for all routes
+
     # Only initialize the bot in the main process
     if is_main_process():
         logger.info("Initializing bot in main process")
         # Initialize the Discord bot manager with a new bot instance
         bot_manager: BotManager = DiscordBotManager()
-        app.bot_manager = bot_manager
-        
+        application.bot_manager = bot_manager
+
         # Get guild ID from environment variable or use a default
         guild_id = int(os.environ.get('DISCORD_GUILD_ID', '0'))
         if guild_id:
             # Store guild ID in the app and mixer
-            app.guild_id = guild_id
+            application.guild_id = guild_id
             mixer._guild_id = guild_id  # Set guild ID directly in mixer
             logger.info(f"Guild ID {guild_id} set in app and mixer")
         else:
-            app.guild_id = None
+            application.guild_id = None
             logger.warning("No Discord guild ID provided - audio playback will be disabled")
-        
+
         # Set the bot manager in the mixer
         mixer.set_bot_manager(bot_manager)
-        
+
         # Start the bot in a separate thread
         def start_bot():
             try:
                 bot_manager.start_bot()
-            except Exception as e:
-                logger.error(f"Failed to start Discord bot: {e}")
+            except Exception as e2:
+                logger.error(f"Failed to start Discord bot: {e2}")
 
         bot_thread = threading.Thread(target=start_bot, daemon=True)
         bot_thread.start()
     else:
         logger.info("Skipping bot initialization in reloader process")
-        app.bot_manager = None
+        application.bot_manager = None
 
     # Reset play state on server startup
     ensure_workspace_dir()
-    
+
     # Pre-load workspace
     logger.info("Pre-loading workspace...")
     try:
-        app.workspace = load_workspace()
-        logger.info(f"Workspace pre-loaded with {len(app.workspace.environments)} environments and {len(app.workspace.sound_files)} sound files")
+        application.workspace = load_workspace()
+        logger.info(
+            f"Workspace pre-loaded with {len(application.workspace.environments)}" +
+            " environments and {len(application.workspace.sound_files)} sound files")
     except Exception as e:
         logger.error(f"Error pre-loading workspace: {e}", exc_info=True)
-        app.workspace = None
+        application.workspace = None
 
     # Register blueprints
     logger.info("Registering workspace blueprint with /api prefix")
-    app.register_blueprint(workspace_bp, url_prefix='/api')
+    application.register_blueprint(workspace_bp, url_prefix='/api')
     logger.info("Registering files blueprint with /api prefix")
-    app.register_blueprint(files_bp, url_prefix='/api')
+    application.register_blueprint(files_bp, url_prefix='/api')
     logger.info("Registering environment blueprint with /api prefix")
-    
-    @app.route('/health')
+
+    @application.route('/health')
     def health_check():
         """Health check endpoint"""
-        if app.bot_manager:
-            bot_status = "ok" if app.bot_manager.is_ready() else "not_ready"
+        if application.bot_manager:
+            bot_status = "ok" if application.bot_manager.is_ready() else "not_ready"
         else:
             bot_status = "disabled"
         return {
             'status': 'ok',
             'bot_status': bot_status
         }
-    
-    return app
+
+    return application
+
 
 if __name__ == '__main__':
     # Get host and port from environment or use defaults
     host = os.environ.get('FLASK_HOST', '0.0.0.0')
     port = int(os.environ.get('FLASK_PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
-    
+
     app = create_app()
     logger.info(f"Starting Flask server on {host}:{port} (debug={debug})")
     logger.info(f"Registered routes: {[str(rule) for rule in app.url_map.iter_rules()]}")
-    
-    app.run(host=host, port=port, debug=debug) 
+
+    app.run(host=host, port=port, debug=debug)

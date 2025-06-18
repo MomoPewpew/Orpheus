@@ -33,23 +33,27 @@ app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR)), name="audio")
 # Serve frontend static files - Create React App structure
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR / "static")), name="static")
 
+
 def load_config() -> Dict[str, Any]:
     """Load configuration from file"""
     if not CONFIG_FILE.exists():
         return {"environments": [], "files": []}
-    
+
     with open(CONFIG_FILE, 'r') as f:
         return json.load(f)
+
 
 def save_config(config: Dict[str, Any]) -> None:
     """Save configuration to file"""
     with open(CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=2)
 
+
 @app.get("/api/config")
 async def get_config():
     """Get the current configuration"""
     return load_config()
+
 
 @app.post("/api/config")
 async def update_config(config: Dict[str, Any]):
@@ -57,16 +61,17 @@ async def update_config(config: Dict[str, Any]):
     save_config(config)
     return {"status": "success"}
 
+
 @app.post("/api/audio/upload")
 async def upload_audio(file: UploadFile = File(...)):
     """Handle audio file upload"""
     file_path = AUDIO_DIR / file.filename
-    
+
     # Save the uploaded file
     with open(file_path, 'wb') as f:
         content = await file.read()
         f.write(content)
-    
+
     # TODO: Analyze audio file for peak volume and length
     # For now, return dummy values
     audio_file = {
@@ -76,13 +81,14 @@ async def upload_audio(file: UploadFile = File(...)):
         "peakVolume": 1.0,
         "lengthMs": 0  # TODO: Calculate actual length
     }
-    
+
     # Update config with new file
     config = load_config()
     config["files"].append(audio_file)
     save_config(config)
-    
+
     return audio_file
+
 
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
@@ -91,6 +97,6 @@ async def serve_frontend(full_path: str):
     requested_path = STATIC_DIR / full_path
     if requested_path.is_file():
         return FileResponse(requested_path)
-    
+
     # Otherwise serve index.html for client-side routing
-    return FileResponse(STATIC_DIR / "index.html") 
+    return FileResponse(STATIC_DIR / "index.html")
