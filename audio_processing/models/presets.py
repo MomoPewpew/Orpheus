@@ -108,7 +108,6 @@ class Preset:
     name: str
     max_weight: Optional[float] = None
     layers: List[PresetLayer] = None
-    is_default: bool = False
 
     # Runtime-only fields (not serialized)
     environment: Optional['Environment'] = None

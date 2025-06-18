@@ -613,14 +613,6 @@ class Environment:
         preset = next((p for p in self.presets if p.id == self.active_preset_id), None)
         return preset
 
-    def get_preset_layer(self, layer_id: str, preset: Optional['Preset'] = None) -> Optional['PresetLayer']:
-        """Get preset layer override for a given layer ID"""
-        if not preset:
-            preset = self.get_active_preset()
-        if not preset:
-            return None
-        return next((pl for pl in preset.layers if pl.id == layer_id), None)
-
     @property
     def effective_max_weight(self) -> float:
         """Get the effective max weight for the environment, considering the preset overrides."""

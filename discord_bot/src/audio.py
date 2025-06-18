@@ -213,22 +213,6 @@ class AudioManager:
                 stream_data['audio_source'].cleanup()
             del self._audio_streams[guild_id]
 
-    def stop_playback(self, guild_id: int) -> bool:
-        """Stop audio playback for a guild.
-        
-        Args:
-            guild_id: The ID of the guild to stop playback for.
-            
-        Returns:
-            True if playback was stopped, False if there was no active playback.
-        """
-        voice_client = self._get_voice_client(guild_id)
-        if voice_client and voice_client.is_playing():
-            voice_client.stop()
-            self.cleanup_guild(guild_id)
-            return True
-        return False
-
     @property
     def active_guilds(self) -> list[int]:
         """Get the list of guild IDs with active audio streams."""

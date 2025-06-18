@@ -25,10 +25,6 @@ class AudioMixer:
     CHUNK_MS = 20  # Size of processing chunks in milliseconds
     TARGET_BUFFER_MS = 100  # Target buffer size in Discord (in milliseconds)
 
-    # Speech range configuration
-    SPEECH_CENTER_FREQ = 1250.0  # Center frequency (Hz) - middle of speech range 500-2000 Hz
-    SPEECH_BANDWIDTH = 1500.0  # Width of the affected range (Hz)
-
     def __init__(self):
         """Initialize the audio mixer."""
         self.chunk_samples = int(self.SAMPLE_RATE * (self.CHUNK_MS / 1000))
@@ -40,8 +36,6 @@ class AudioMixer:
         self._guild_id: Optional[int] = None
         self.app_state: Optional[AppState] = None
         self.cached_layers: Dict[str, LayerInfo] = {}
-        self._last_chunk_time = 0
-        self._chunks_queued = 0
         # Track environment states
         self._env_states: Dict[str, PlayState] = {}
         # Initialize filter states
@@ -546,17 +540,6 @@ class AudioMixer:
                 self._process_thread.daemon = True
                 self._process_thread.start()
                 logger.info("Started audio processing thread")
-
-    def stop_processing(self) -> None:
-        """Stop the audio processing loop."""
-        with self.lock:
-            logger.info("Stopping audio processing")
-            self.is_running = False
-            if self._process_thread and self._process_thread.is_alive():
-                self._process_thread.join(timeout=1.0)
-            self._process_thread = None
-            self.app_state = None
-            logger.info("Stopped main audio processing thread")
 
     def set_bot_manager(self, bot_manager):
         """Set the bot manager instance."""
