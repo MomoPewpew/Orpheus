@@ -13,7 +13,7 @@ import {
   Divider,
 } from '@mui/material';
 import { Add as AddIcon, Delete, Settings, PlayArrow, Stop } from '@mui/icons-material';
-import { Environment, Layer, Preset, SoundFile, setLayerVolume, PlayState } from '../types/audio';
+import { Environment, Layer, Preset, SoundFile, PlayState } from '../types/audio';
 import { LayerControls } from './layers/LayerControls';
 import AddLayerDialog from './AddLayerDialog';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
