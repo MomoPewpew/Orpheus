@@ -339,21 +339,43 @@ def compare_workspaces(prev_state: AppState, new_state: AppState) -> None:
         prev_state: The previous application state
         new_state: The new application state to transition to
     """
+    # First, check if any environments in the previous state are still fading
+    fading_envs = []
+    if prev_state:
+        fading_envs = [env for env in prev_state.environments if env.is_fading]
+        if fading_envs:
+            logger.info(f"Found {len(fading_envs)} environments still fading from previous state")
+
     # Check if any environments should be playing (including those that are fading)
     should_play = any(env.play_state == PlayState.PLAYING or env.is_fading for env in new_state.environments)
     was_playing = any(env.play_state == PlayState.PLAYING for env in prev_state.environments) if prev_state else False
     logger.info(f"Should play audio: {should_play}, Was playing: {was_playing}")
+
+    # First preserve any in-progress fades
+    for new_env in new_state.environments:
+        # If this environment was fading in the previous state, preserve its fade
+        fading_env = next((env for env in fading_envs if env.id == new_env.id), None)
+        if fading_env:
+            logger.info(f"Preserving in-progress fade for environment {new_env.id}")
+            new_env._fade_start_time = fading_env._fade_start_time
+            new_env._fade_end_time = fading_env._fade_end_time
 
     # Check for state changes in each environment
     # First identify all environments that are transitioning
     transitions = []
     for new_env in new_state.environments:
         prev_env = next((e for e in prev_state.environments if e.id == new_env.id), None) if prev_state else None
+        
+        # Skip if we already preserved a fade for this environment
+        if new_env._fade_start_time is not None and new_env._fade_end_time is not None:
+            continue
+
         if prev_env and prev_env.play_state != new_env.play_state:
             transitions.append({
                 'env': new_env,
                 'from_state': prev_env.play_state,
-                'to_state': new_env.play_state
+                'to_state': new_env.play_state,
+                'prev_env': prev_env
             })
 
     # Check for crossfade scenario - one env stopping while another starts
@@ -380,12 +402,15 @@ def compare_workspaces(prev_state: AppState, new_state: AppState) -> None:
                 logger.info(f"Environment {env.id} transitioning to playing without fade")
                 env.update_fade_state()
 
+    # Recalculate should_play to include environments that are still fading
+    should_play = any(env.play_state == PlayState.PLAYING or env.is_fading for env in new_state.environments)
+
     # Start processing if needed and update state
     if should_play and not mixer.is_running:
         logger.info("Starting audio processing")
         mixer.start_processing(new_state)
     elif mixer.is_running:
-        # Just update the app state, let mixer handle stopping itself
+        # Update the app state while preserving fade states
         with mixer.lock:
             mixer.app_state = new_state
 

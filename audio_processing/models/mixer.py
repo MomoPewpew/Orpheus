@@ -375,21 +375,18 @@ class AudioMixer:
                     # Update stored states
                     self._env_states = current_env_states
 
-                    # Process each playing environment
-                    playing_envs = [env for env in self.app_state.environments if
-                                    env.play_state == PlayState.PLAYING or env.is_fading]
+                    # Get active environments (either playing or fading)
+                    active_envs = [env for env in self.app_state.environments if
+                                 env.play_state == PlayState.PLAYING or env.is_fading]
 
-                    # Check for active soundboard sounds - only include those that haven't finished playing
+                    # Check for active soundboard sounds
                     soundboard_layers = [layer for key, layer in self.cached_layers.items()
-                                         if key.startswith("soundboard_") and not layer.is_finished]
-
-                    # Pre-check if any environments have non-zero fade volume
-                    active_envs = [env for env in playing_envs if env.fade_progress > 0]
+                                      if key.startswith("soundboard_") and not layer.is_finished]
 
                     if not active_envs and not soundboard_layers:
                         # No active environments or soundboard sounds, stop processing
                         logger.info(
-                            "No active environments (with fade > 0) or soundboard sounds, stopping audio processing")
+                            "No active environments (playing or fading) or soundboard sounds, stopping audio processing")
                         self.is_running = False
                         next_frame_time += frame_time_ns
                         continue
@@ -398,8 +395,8 @@ class AudioMixer:
                     mixed_chunk = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.int32)
                     active_layers = 0
 
-                    # Mix all active layers from environments
-                    for env in active_envs:  # Only process environments with fade > 0
+                    # Mix all active environments
+                    for env in active_envs:
                         # Calculate environment fade volume
                         env_fade_volume = env.fade_progress
 

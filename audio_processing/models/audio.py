@@ -508,25 +508,59 @@ class Environment:
     @property
     def is_fading(self) -> bool:
         """Check if the environment is currently fading"""
-        return bool(self._fade_start_time and self._fade_end_time and self._fade_start_time < time.time())
+        if self._fade_start_time is None or self._fade_end_time is None:
+            return False
+            
+        current_time = time.time()
+        is_fading = (current_time >= self._fade_start_time and current_time < self._fade_end_time)
+        
+        # Debug log fade state changes
+        if hasattr(self, '_last_fade_state'):
+            if self._last_fade_state != is_fading:
+                logger.debug(
+                    f"Environment {self.id} fade state changed: {self._last_fade_state} -> {is_fading}"
+                    + f" (current={current_time:.3f}, start={self._fade_start_time:.3f},"
+                    + f" end={self._fade_end_time:.3f})")
+        self._last_fade_state = is_fading
+        
+        return is_fading
 
     @property
     def fade_progress(self) -> float:
-        """Get the current fade progress (0.0 to 1.0)"""
+        """Get the current fade progress (0.0 to 1.0).
+        For fade-in: starts at 0.0 and goes to 1.0
+        For fade-out: starts at 1.0 and goes to 0.0
+        """
+        # If not fading, return the appropriate static value
         if not self.is_fading or self._fade_start_time is None or self._fade_end_time is None:
             return 1.0 if self.play_state == PlayState.PLAYING else 0.0
 
-        import time
         current_time = time.time()
 
-        # Clamp progress between 0 and 1
-        progress = max(0.0, min(1.0,
-                                (current_time - self._fade_start_time) /
-                                (self._fade_end_time - self._fade_start_time)
-                                ))
+        # Calculate raw progress (0 to 1)
+        raw_progress = max(0.0, min(1.0,
+                            (current_time - self._fade_start_time) /
+                            (self._fade_end_time - self._fade_start_time)
+                            ))
 
-        # Invert progress for fade out (when state is STOPPED)
-        return progress if self.play_state == PlayState.PLAYING else (1.0 - progress)
+        # For fade-in (PLAYING), we want to start at 0.0 and go to 1.0
+        # For fade-out (STOPPED), we want to start at 1.0 and go to 0.0
+        if self.play_state == PlayState.PLAYING:
+            # Fade-in: use raw progress
+            progress = raw_progress
+        else:
+            # Fade-out: start at 1.0 and decrease
+            progress = 1.0 - raw_progress
+
+        # Log significant progress changes
+        if hasattr(self, '_last_progress'):
+            if abs(progress - self._last_progress) >= 0.1:  # Log every 10% change
+                logger.debug(
+                    f"Environment {self.id} fade progress: {self._last_progress:.2f} -> {progress:.2f}"
+                    + f" ({self.play_state.value})")
+        self._last_progress = progress
+
+        return progress
 
     def start_fade(self) -> None:
         """Start a fade in or out based on the current play state."""
@@ -534,17 +568,45 @@ class Environment:
         fade_duration = self.app_state.effects.fades.crossfade_duration / 1000  # Convert to seconds
         self._fade_start_time = current_time
         self._fade_end_time = current_time + fade_duration
+        
+        # Immediately check if we're fading
+        is_fading = self.is_fading
+        fade_progress = self.fade_progress
+        
         logger.info(
             f"Starting fade {'in' if self.play_state == PlayState.PLAYING else 'out'}"
-            + " for environment {self.id} over {fade_duration}s")
-
+            + f" for environment {self.id} over {fade_duration}s"
+            + f" (is_fading={is_fading}, fade_progress={fade_progress:.2f})")
+        
+        # Verify the fade state is correct
+        if not is_fading:
+            logger.error(
+                f"Fade did not start correctly for environment {self.id}"
+                + f" (start={self._fade_start_time}, end={self._fade_end_time})")
+            
     def update_fade_state(self):
         """Update the fade state based on current time"""
-        if not self.is_fading:
+        was_fading = self.is_fading
+        if not was_fading:
             return
 
-        # If fade is complete, clear the fade timing fields
-        if self.fade_progress >= 1.0 or self.fade_progress <= 0.0:
+        # Get current fade progress
+        progress = self.fade_progress
+        
+        # Check if fade is complete based on direction
+        fade_complete = False
+        if self.play_state == PlayState.PLAYING:
+            # Fade-in is complete when progress reaches 1.0
+            fade_complete = progress >= 1.0
+        else:
+            # Fade-out is complete when progress reaches 0.0
+            fade_complete = progress <= 0.0
+            
+        if fade_complete:
+            logger.info(
+                f"Fade {'in' if self.play_state == PlayState.PLAYING else 'out'}"
+                + f" complete for environment {self.id}"
+                + f" (progress={progress:.2f})")
             self._fade_start_time = None
             self._fade_end_time = None
 
