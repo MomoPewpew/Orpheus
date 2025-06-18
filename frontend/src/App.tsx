@@ -449,16 +449,18 @@ const App: React.FC = () => {
       ? PlayState.Stopped 
       : PlayState.Playing;
 
-    // Create updated environment with new play state
-    const updatedEnvironment: Environment = {
-      ...activeEnvironment,
-      playState: newPlayState
-    };
+    // Create updated environments array, ensuring only one environment is playing
+    const updatedEnvironments = environments.map((env: Environment) => ({
+      ...env,
+      // If this is the active environment, use its new state
+      // Otherwise, if we're starting to play, force all others to stop
+      playState: env.id === activeEnvironment.id 
+        ? newPlayState 
+        : (newPlayState === PlayState.Playing ? PlayState.Stopped : env.playState)
+    }));
 
-    // Create updated environments array
-    const updatedEnvironments = environments.map((env: Environment) => 
-      env.id === updatedEnvironment.id ? updatedEnvironment : env
-    );
+    // Create updated environment with new play state
+    const updatedEnvironment = updatedEnvironments.find(env => env.id === activeEnvironment.id)!;
 
     try {
       // First try to save the state
