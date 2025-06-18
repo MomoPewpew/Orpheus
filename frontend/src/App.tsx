@@ -188,12 +188,13 @@ const App: React.FC = () => {
       ? activeEnvironment.presets?.find((p: Preset) => p.id === activeEnvironment.activePresetId)
       : undefined;
 
-    // Check if we're updating a non-preset property (mode, name, loopLengthMs, or sounds)
+    // Check if we're updating a non-preset property (mode, name, loopLengthMs, sounds, or selectedSoundIndex)
     const isNonPresetUpdate = 
       updatedLayer.mode !== originalLayer.mode ||
       updatedLayer.name !== originalLayer.name ||
       updatedLayer.loopLengthMs !== originalLayer.loopLengthMs ||
-      updatedLayer.sounds.length !== originalLayer.sounds.length; // Adding/removing sounds is a non-preset operation
+      updatedLayer.sounds.length !== originalLayer.sounds.length ||
+      updatedLayer.selectedSoundIndex !== originalLayer.selectedSoundIndex; // Track changes to selectedSoundIndex
 
     if (isNonPresetUpdate) {
       // For non-preset properties, update the base layer directly
@@ -206,7 +207,7 @@ const App: React.FC = () => {
             name: updatedLayer.name,
             loopLengthMs: updatedLayer.loopLengthMs,
             selectedSoundIndex: updatedLayer.selectedSoundIndex,
-            sounds: updatedLayer.sounds // Include sounds in the update
+            sounds: updatedLayer.sounds
           } : l
         )
       };
@@ -216,6 +217,20 @@ const App: React.FC = () => {
 
     // If we get here, we're handling preset-managed properties
     if (activePreset && activePreset.layers) {
+      // Always update the base layer's selectedSoundIndex if it changed
+      if (updatedLayer.selectedSoundIndex !== originalLayer.selectedSoundIndex) {
+        const updatedEnvironment = {
+          ...activeEnvironment,
+          layers: activeEnvironment.layers.map((l: Layer) =>
+            l.id === updatedLayer.id ? {
+              ...l,
+              selectedSoundIndex: updatedLayer.selectedSoundIndex
+            } : l
+          )
+        };
+        handleEnvironmentUpdate(updatedEnvironment);
+      }
+
       // Update the preset with the changes for preset-managed properties only
       const presetLayer = activePreset.layers.find((p: PresetLayer) => p.id === updatedLayer.id) || { 
         id: updatedLayer.id 
