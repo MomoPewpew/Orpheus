@@ -34,6 +34,17 @@ def register_commands(bot: discord.Client) -> None:
             # Get the voice channel
             channel = interaction.user.voice.channel
 
+            # Check if we're already in this voice channel
+            if interaction.guild.voice_client and interaction.guild.voice_client.channel == channel:
+                logger.info(f"Already in channel {channel.name}")
+                await interaction.edit_original_response(content=f"Already in {channel.name}")
+                return
+
+            # If we're in a different channel, disconnect first
+            if interaction.guild.voice_client:
+                logger.info("Disconnecting from current channel before joining new one")
+                await interaction.guild.voice_client.disconnect()
+
             try:
                 logger.info(f"Joining channel {channel.name}")
                 # Set a reasonable timeout for the connection attempt
