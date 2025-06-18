@@ -43,10 +43,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewEnvironment,
   onToggleConfig,
   onToggleSoundboard,
-  masterVolume,
-  onMasterVolumeChange,
-  soundFiles,
-  onSoundFilesChange,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 

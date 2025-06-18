@@ -14,7 +14,6 @@ import {
 } from '@mui/material';
 import { Add as AddIcon, Delete, Settings, PlayArrow, Stop } from '@mui/icons-material';
 import { Environment, Layer, Preset, SoundFile, setLayerVolume, PlayState } from '../types/audio';
-import { generateId } from '../utils/ids';
 import { LayerControls } from './layers/LayerControls';
 import AddLayerDialog from './AddLayerDialog';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
@@ -55,18 +54,14 @@ export const MainContent: React.FC<MainContentProps> = ({
   onPresetCreate,
   onPresetSelect,
   onPresetUpdate,
-  onPresetDelete,
-  onPresetsReorder,
   onSoundFilesChange,
   onGlobalSoundboardChange,
   onToggleSoundboard,
   onPlayStop,
 }) => {
-  const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
   const [showAddLayer, setShowAddLayer] = useState(false);
   const [showEnvironmentConfig, setShowEnvironmentConfig] = useState(false);
   const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
-  const [editingLayer, setEditingLayer] = useState<Layer | null>(null);
 
   if (!environment) {
     return (
@@ -83,14 +78,6 @@ export const MainContent: React.FC<MainContentProps> = ({
       </Box>
     );
   }
-
-  const handlePresetChange = (event: React.SyntheticEvent, newValue: number) => {
-    setSelectedPresetIndex(newValue);
-    const selectedPreset = environment.presets[newValue];
-    if (selectedPreset) {
-      onPresetSelect(selectedPreset.id);
-    }
-  };
 
   const handleMaxWeightChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!environment) return;
@@ -131,17 +118,6 @@ export const MainContent: React.FC<MainContentProps> = ({
     return activePreset?.maxWeight !== undefined;
   };
 
-  const handleLayerPropertyChange = (layer: Layer, property: keyof Layer | 'volume', value: number) => {
-    if (property === 'volume') {
-      onLayerUpdate(setLayerVolume(layer, value));
-    } else if (property in layer) {
-      onLayerUpdate({
-        ...layer,
-        [property]: value
-      });
-    }
-  };
-
   // Get the active preset if one is selected
   const activePreset = environment.activePresetId 
     ? environment.presets.find(p => p.id === environment.activePresetId)
@@ -171,37 +147,6 @@ export const MainContent: React.FC<MainContentProps> = ({
     };
   };
 
-  const handleAddPreset = () => {
-    const basePreset = environment.presets[selectedPresetIndex];
-    onPresetCreate({
-      ...basePreset,
-      id: generateId(),
-      name: 'New Preset'
-    });
-  };
-
-  const handleAddLayer = (layer: Layer) => {
-    if (!environment) return;
-    
-    const updatedEnvironment = {
-      ...environment,
-      layers: [...environment.layers, layer]
-    };
-    onEnvironmentUpdate(updatedEnvironment);
-  };
-
-  const handleDragEnd = (result: any) => {
-    if (!result.destination) return;
-    const { source, destination } = result;
-    const layers = Array.from(environment.layers);
-    const [removed] = layers.splice(source.index, 1);
-    layers.splice(destination.index, 0, removed);
-    onEnvironmentUpdate({
-      ...environment,
-      layers
-    });
-  };
-
   const handleLayerEdit = (layer: Layer) => {
     // The LayerControls component handles its own dialog state
     // We just need to pass the layer update handler
@@ -223,15 +168,6 @@ export const MainContent: React.FC<MainContentProps> = ({
       }))
     };
     onEnvironmentUpdate(updatedEnvironment);
-  };
-
-  const handleLayerUpdate = (updatedLayer: Layer) => {
-    const updatedEnvironment = {
-      ...environment,
-      layers: environment.layers.map(l => l.id === updatedLayer.id ? updatedLayer : l)
-    };
-    onEnvironmentUpdate(updatedEnvironment);
-    setEditingLayer(null);
   };
 
   return (

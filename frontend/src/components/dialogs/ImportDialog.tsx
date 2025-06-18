@@ -57,7 +57,6 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   open,
   onClose,
   onImport,
-  environments,
 }) => {
   const [importZip, setImportZip] = useState<JSZip | null>(null);
   const [manifest, setManifest] = useState<ImportManifest | null>(null);

@@ -721,7 +721,6 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
           if (mode === EnvironmentImportMode.Insert) {
             // Generate new IDs for everything
             const newEnvId = generateId();
-            const idMap = new Map<string, string>();
 
             // Create new environment with new IDs
             const newEnv: Environment = {

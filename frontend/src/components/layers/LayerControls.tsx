@@ -142,17 +142,14 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   layer,
   soundFiles = [],
   onLayerUpdate,
-  onLayerEdit,
   onLayerRemove,
   dragHandleProps,
   activePreset,
-  defaultLayer,
   onPresetUpdate,
   isPlaying = false, // Default to false if not provided
   onSoundFilesChange, // Add this prop
 }) => {
   const sounds = layer.sounds || [];
-  const defaultSounds = defaultLayer?.sounds || sounds;
   const [selectedSoundIndex, setSelectedSoundIndex] = useState(layer.selectedSoundIndex || 0);
   const [isAddingSoundOpen, setIsAddingSoundOpen] = useState(false);
   const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
@@ -222,11 +219,6 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
     return typeof value === 'number' ? value : undefined;
   };
 
-  // Get the default mode value for a layer
-  const getDefaultMode = (): LayerMode => {
-    return layer.mode ?? LayerMode.Shuffle;
-  };
-
   // Get mark value for sliders (always returns a number)
   const getMarkValue = (property: string, soundId?: string): number => {
     const value = getDefaultValue(property, soundId);
@@ -276,21 +268,6 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
     }
   };
 
-  const updateLayer = (updates: Partial<Layer>) => {
-    onLayerUpdate({ ...layer, ...updates });
-  };
-
-  const updateSound = (soundIndex: number, updates: Partial<LayerSound>) => {
-    const newSounds = [...sounds];
-    if (updates.frequency !== undefined) {
-      const { weight, ...cleanUpdates } = updates as any;
-      newSounds[soundIndex] = { ...newSounds[soundIndex], ...cleanUpdates };
-    } else {
-      newSounds[soundIndex] = { ...newSounds[soundIndex], ...updates };
-    }
-    updateLayer({ sounds: newSounds });
-  };
-
   const handleAddSound = (newLayer: Layer) => {
     // Extract the first sound from the new layer and add it to our layer
     if (newLayer.sounds.length > 0) {
@@ -331,11 +308,6 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
       });
       setIsConfigureOpen(false);
     }
-  };
-
-  // Type guard to ensure a layer is a PresetLayer
-  const isPresetLayer = (layer: any): layer is PresetLayer => {
-    return layer && typeof layer.id === 'string' && Array.isArray(layer.sounds);
   };
 
   const handleLayerVolumeChange = (newValue: number) => {

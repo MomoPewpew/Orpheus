@@ -38,7 +38,6 @@ interface PresetControlsProps {
 type Mode = 'play' | 'delete' | 'rename' | 'rearrange';
 
 export const PresetControls: React.FC<PresetControlsProps> = ({
-  environment,
   presets,
   activePresetId,
   onPresetAdd,
@@ -55,7 +54,7 @@ export const PresetControls: React.FC<PresetControlsProps> = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [presetToDelete, setPresetToDelete] = useState<Preset | null>(null);
 
-  const handleModeChange = (event: React.MouseEvent<HTMLElement>, newMode: Mode | null) => {
+  const handleModeChange = (_: React.MouseEvent<HTMLElement>, newMode: Mode | null) => {
     if (newMode !== null) {
       setMode(newMode);
     }

@@ -95,9 +95,6 @@ export const SoundboardOverlay: React.FC<SoundboardOverlayProps> = ({
 
     const { source, destination } = result;
 
-    // Extract the actual soundId from the draggableId (remove the prefix)
-    const soundId = result.draggableId.split('-')[2];
-
     // Handle environment soundboard reordering
     if (result.type === 'environment-sound') {
       const items = Array.from(environment.soundboard);

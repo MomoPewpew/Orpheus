@@ -18,7 +18,6 @@ interface PresetManagerProps {
 
 export const PresetManager: React.FC<PresetManagerProps> = ({
   presets,
-  environment,
   activePresetId,
   onPresetCreate,
   onPresetUpdate,
