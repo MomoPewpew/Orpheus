@@ -188,11 +188,12 @@ const App: React.FC = () => {
       ? activeEnvironment.presets?.find((p: Preset) => p.id === activeEnvironment.activePresetId)
       : undefined;
 
-    // Check if we're updating a non-preset property (mode, name, or loopLengthMs)
+    // Check if we're updating a non-preset property (mode, name, loopLengthMs, or sounds)
     const isNonPresetUpdate = 
       updatedLayer.mode !== originalLayer.mode ||
       updatedLayer.name !== originalLayer.name ||
-      updatedLayer.loopLengthMs !== originalLayer.loopLengthMs;
+      updatedLayer.loopLengthMs !== originalLayer.loopLengthMs ||
+      updatedLayer.sounds.length !== originalLayer.sounds.length; // Adding/removing sounds is a non-preset operation
 
     if (isNonPresetUpdate) {
       // For non-preset properties, update the base layer directly
@@ -204,7 +205,8 @@ const App: React.FC = () => {
             mode: updatedLayer.mode,
             name: updatedLayer.name,
             loopLengthMs: updatedLayer.loopLengthMs,
-            selectedSoundIndex: updatedLayer.selectedSoundIndex
+            selectedSoundIndex: updatedLayer.selectedSoundIndex,
+            sounds: updatedLayer.sounds // Include sounds in the update
           } : l
         )
       };

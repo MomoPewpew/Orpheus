@@ -295,10 +295,21 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
     // Extract the first sound from the new layer and add it to our layer
     if (newLayer.sounds.length > 0) {
       const newIndex = sounds.length;  // The new sound will be added at the end
-      updateLayer({ 
-        sounds: [...sounds, newLayer.sounds[0]],
-        selectedSoundIndex: newIndex  // Include the new index in the update
-      });
+      const newSound = newLayer.sounds[0];
+      
+      // Create updated layer with new sound
+      const updatedLayer = {
+        ...layer,
+        sounds: [...sounds, newSound],
+        selectedSoundIndex: newIndex,
+        // Add non-preset properties to ensure they're preserved
+        name: layer.name,
+        loopLengthMs: layer.loopLengthMs,
+        mode: layer.mode
+      };
+
+      // Update through the main layer update handler
+      onLayerUpdate(updatedLayer);
       setSelectedSoundIndex(newIndex);
     }
     setIsAddingSoundOpen(false);
