@@ -121,7 +121,7 @@ const App: React.FC = () => {
       layers: [],
       soundboard: [],
       presets: [],
-      maxWeight: 2,
+      maxWeight: 99,
       playState: PlayState.Stopped,
       activePresetId: undefined
     };
@@ -562,7 +562,7 @@ const App: React.FC = () => {
                   layers: [], 
                   soundboard: [], 
                   presets: [], 
-                  maxWeight: 2,
+                  maxWeight: 99,
                   playState: PlayState.Stopped 
                 }}
                 onClose={handleToggleSoundboard}
