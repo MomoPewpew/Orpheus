@@ -148,3 +148,6 @@ Orpheus/
 ## License
 
 This project is licensed under the GNU License - see the [LICENSE](LICENSE) file for details.
+
+### Assets
+The example environments include image and audio assets that are licensed under CC0 (Creative Commons Zero). These assets can be used without attribution in any context.
