@@ -237,7 +237,20 @@ def update_workspace():
 
             # If any environment is PLAYING, check for voice connection
             if any(env.get('playState') == 'PLAYING' for env in data.get('environments', [])):
-                if not current_app.bot_manager or not current_app.bot_manager.is_voice_connected(current_app.guild_id):
+                if not current_app.bot_manager:
+                    logger.error("Cannot start playback - bot manager not available")
+                    return jsonify({
+                        "error": "Cannot start playback - Bot not initialized properly."
+                    }), 400
+                
+                guild_id = current_app.bot_manager.get_guild_id()
+                if guild_id is None:
+                    logger.error("Cannot start playback - no guild ID set")
+                    return jsonify({
+                        "error": "Cannot start playback - Please join a voice channel first."
+                    }), 400
+                
+                if not current_app.bot_manager.is_voice_connected(guild_id):
                     logger.error("Cannot start playback - no active voice connection")
                     return jsonify({
                         "error": "Cannot start playback - Please join a voice channel first."

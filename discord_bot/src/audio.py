@@ -104,6 +104,7 @@ class AudioManager:
         """
         self.bot = bot
         self._audio_streams: Dict[int, Any] = {}
+        self._mixer = None  # Reference to the audio mixer for guild ID updates
 
     def _get_voice_client(self, guild_id: int) -> Optional[discord.VoiceClient]:
         """Get the voice client for a guild.

@@ -50,6 +50,13 @@ def register_commands(bot: discord.Client) -> None:
                 # Set a reasonable timeout for the connection attempt
                 try:
                     await asyncio.wait_for(channel.connect(), timeout=10.0)
+                    # Set the guild ID using the bot manager
+                    if hasattr(bot, '_bot_manager'):
+                        bot._bot_manager.set_guild_id(interaction.guild_id)
+                    else:
+                        # Fallback to just setting it in the bot
+                        bot.set_active_guild(interaction.guild_id)
+                        logger.warning("Bot manager not available, guild ID only set in bot")
                     await interaction.edit_original_response(content=f"Joined {channel.name}")
                 except asyncio.TimeoutError:
                     logger.error("Timed out while trying to join voice channel")

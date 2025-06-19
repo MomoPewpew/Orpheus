@@ -93,6 +93,7 @@ class DiscordBotManager(BotManager):
         self._initialized = True
         self.bot = bot
         self.audio_manager = None
+        self._guild_id = None  # Store guild ID in the manager
         self._setup_bot()
 
     def _setup_bot(self) -> None:
@@ -115,6 +116,10 @@ class DiscordBotManager(BotManager):
         if self.bot is None:
             logger.info("No bot instance provided, creating new one")
             self.bot = create_bot()
+            
+        # Store reference to this manager in the bot
+        self.bot._bot_manager = self
+        logger.info("Bot manager reference stored in bot instance")
 
         # Initialize audio manager
         self.audio_manager = AudioManager(self.bot)
@@ -157,12 +162,12 @@ class DiscordBotManager(BotManager):
 
     def queue_audio(self, audio_data: BytesIO) -> bool:
         """Queue audio to the Discord bot"""
-        guild_id = current_app.guild_id if current_app else None
+        if not self._guild_id:
+            logger.error("Cannot queue audio - guild ID not set in bot manager")
+            return False
 
-        if self.audio_manager and guild_id:
-            return self.audio_manager.queue_audio(guild_id, audio_data)
-        if not guild_id:
-            logger.error("Cannot queue audio - guild ID not set in app")
+        if self.audio_manager:
+            return self.audio_manager.queue_audio(self._guild_id, audio_data)
         return False
 
     def is_voice_connected(self, guild_id: int) -> bool:
@@ -172,3 +177,30 @@ class DiscordBotManager(BotManager):
 
         # Check if we have a voice client for this guild
         return bool(self.bot.get_guild(guild_id) and self.bot.get_guild(guild_id).voice_client)
+
+    def set_guild_id(self, guild_id: int) -> None:
+        """Set the guild ID in the bot manager and related components.
+        
+        Args:
+            guild_id: The Discord guild ID to set
+        """
+        # Store guild ID in manager
+        self._guild_id = guild_id
+        logger.info(f"Set guild ID {guild_id} in bot manager")
+        
+        # Set guild ID in bot
+        if self.bot:
+            self.bot.set_active_guild(guild_id)
+        
+        # Set guild ID in mixer
+        if self.audio_manager and hasattr(self.audio_manager, '_mixer'):
+            self.audio_manager._mixer._guild_id = guild_id
+            logger.info(f"Set guild ID {guild_id} in mixer")
+
+    def get_guild_id(self) -> Optional[int]:
+        """Get the current guild ID.
+        
+        Returns:
+            The current guild ID, or None if not set
+        """
+        return self._guild_id

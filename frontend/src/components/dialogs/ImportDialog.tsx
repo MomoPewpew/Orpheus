@@ -214,7 +214,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                 <Typography variant="subtitle1" gutterBottom>
                   Environments
                 </Typography>
-                {manifest.selection.environments.map((env, index) => (
+                {manifest.selection.environments.map((env) => (
                   <Box key={`env-${env.id}`} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                     <FormControl size="small" sx={{ minWidth: 120 }}>
                       <Select

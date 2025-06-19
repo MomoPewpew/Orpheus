@@ -30,6 +30,9 @@ def create_app() -> Flask:
     application = Flask(__name__)
     CORS(application)  # Enable CORS for all routes
 
+    # Initialize guild_id as None - will be set when bot joins a channel
+    application.guild_id = None
+
     # Only initialize the bot in the main process
     if is_main_process():
         logger.info("Initializing bot in main process")
@@ -37,19 +40,11 @@ def create_app() -> Flask:
         bot_manager: BotManager = DiscordBotManager()
         application.bot_manager = bot_manager
 
-        # Get guild ID from environment variable or use a default
-        guild_id = int(os.environ.get('DISCORD_GUILD_ID', '0'))
-        if guild_id:
-            # Store guild ID in the app and mixer
-            application.guild_id = guild_id
-            mixer._guild_id = guild_id  # Set guild ID directly in mixer
-            logger.info(f"Guild ID {guild_id} set in app and mixer")
-        else:
-            application.guild_id = None
-            logger.warning("No Discord guild ID provided - audio playback will be disabled")
-
         # Set the bot manager in the mixer
         mixer.set_bot_manager(bot_manager)
+        # Store reference to mixer in bot manager's audio manager for guild ID updates
+        if hasattr(bot_manager, 'audio_manager'):
+            bot_manager.audio_manager._mixer = mixer
 
         # Start the bot in a separate thread
         def start_bot():

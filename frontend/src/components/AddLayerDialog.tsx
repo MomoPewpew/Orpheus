@@ -67,7 +67,7 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
     // Clear selected file when switching tabs
     setSelectedFile(null);
