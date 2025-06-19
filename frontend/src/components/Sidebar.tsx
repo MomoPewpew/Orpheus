@@ -46,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredEnvironments = environments.filter(env =>
+  const filteredEnvironments = environments.filter((env: Environment) =>
     env.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -109,8 +109,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <ListItemButton
                 selected={activeEnvironment?.id === env.id}
                 onClick={() => onEnvironmentSelect(env)}
+                sx={{
+                  position: 'relative',
+                  overflow: 'hidden',
+                  '&::before': env.backgroundImage ? {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundImage: `url(${env.backgroundImage})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    opacity: 0.15,
+                    zIndex: 0,
+                  } : undefined,
+                }}
               >
-                <ListItemText primary={env.name} />
+                <ListItemText 
+                  primary={env.name} 
+                  sx={{ 
+                    position: 'relative',
+                    zIndex: 1,
+                  }}
+                />
               </ListItemButton>
             </ListItem>
           ))}
