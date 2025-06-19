@@ -15,6 +15,7 @@ interface MainLayoutProps {
   onMasterVolumeChange: (volume: number) => void;
   soundFiles: SoundFile[];
   onSoundFilesChange: (files: SoundFile[]) => void;
+  onEnvironmentsReorder: (environments: Environment[]) => void;
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({
@@ -29,6 +30,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   onMasterVolumeChange,
   soundFiles,
   onSoundFilesChange,
+  onEnvironmentsReorder,
 }) => {
   return (
     <div className="app-layout">
@@ -43,6 +45,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
         onMasterVolumeChange={onMasterVolumeChange}
         soundFiles={soundFiles}
         onSoundFilesChange={onSoundFilesChange}
+        onEnvironmentsReorder={onEnvironmentsReorder}
       />
       <main className="main-content">
         {children}

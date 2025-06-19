@@ -18,8 +18,11 @@ import {
   Search as SearchIcon,
   Settings as SettingsIcon,
   Speaker as SpeakerIcon,
+  DragIndicator,
 } from '@mui/icons-material';
 import { Environment, SoundFile } from '../types/audio';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import type { DropResult } from '@hello-pangea/dnd';
 
 interface SidebarProps {
   environments: Environment[];
@@ -32,6 +35,7 @@ interface SidebarProps {
   onMasterVolumeChange: (volume: number) => void;
   soundFiles: SoundFile[];
   onSoundFilesChange: (files: SoundFile[]) => void;
+  onEnvironmentsReorder: (environments: Environment[]) => void;
 }
 
 const DRAWER_WIDTH = 280;
@@ -43,12 +47,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewEnvironment,
   onToggleConfig,
   onToggleSoundboard,
+  onEnvironmentsReorder,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredEnvironments = environments.filter((env: Environment) =>
     env.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const { source, destination } = result;
+    const items = Array.from(environments);
+    const [reorderedItem] = items.splice(source.index, 1);
+    items.splice(destination.index, 0, reorderedItem);
+    onEnvironmentsReorder(items);
+  };
 
   return (
     <Drawer
@@ -103,41 +118,74 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
 
         {/* Environment List */}
-        <List sx={{ flex: 1, overflow: 'auto' }}>
-          {filteredEnvironments.map((env) => (
-            <ListItem key={env.id} disablePadding>
-              <ListItemButton
-                selected={activeEnvironment?.id === env.id}
-                onClick={() => onEnvironmentSelect(env)}
-                sx={{
-                  position: 'relative',
-                  overflow: 'hidden',
-                  '&::before': env.backgroundImage ? {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundImage: `url(${env.backgroundImage})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    opacity: 0.15,
-                    zIndex: 0,
-                  } : undefined,
-                }}
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="environments" type="environment">
+            {(provided) => (
+              <List 
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                sx={{ flex: 1, overflow: 'auto' }}
               >
-                <ListItemText 
-                  primary={env.name} 
-                  sx={{ 
-                    position: 'relative',
-                    zIndex: 1,
-                  }}
-                />
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List>
+                {filteredEnvironments.map((env, index) => (
+                  <Draggable key={env.id} draggableId={env.id} index={index}>
+                    {(provided, snapshot) => (
+                      <ListItem 
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        disablePadding
+                      >
+                        <ListItemButton
+                          selected={activeEnvironment?.id === env.id}
+                          onClick={() => onEnvironmentSelect(env)}
+                          sx={{
+                            position: 'relative',
+                            overflow: 'hidden',
+                            '&::before': env.backgroundImage ? {
+                              content: '""',
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              backgroundImage: `url(${env.backgroundImage})`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                              opacity: 0.15,
+                              zIndex: 0,
+                            } : undefined,
+                          }}
+                        >
+                          <Box 
+                            {...provided.dragHandleProps}
+                            sx={{ 
+                              display: 'flex',
+                              alignItems: 'center',
+                              mr: 1,
+                              cursor: 'grab',
+                              '&:active': { cursor: 'grabbing' },
+                              opacity: 0.5,
+                            }}
+                          >
+                            <DragIndicator fontSize="small" />
+                          </Box>
+                          <ListItemText 
+                            primary={env.name} 
+                            sx={{ 
+                              position: 'relative',
+                              zIndex: 1,
+                              opacity: snapshot.isDragging ? 0.5 : 1,
+                            }}
+                          />
+                        </ListItemButton>
+                      </ListItem>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </List>
+            )}
+          </Droppable>
+        </DragDropContext>
 
         {/* Add Environment Button */}
         <Button

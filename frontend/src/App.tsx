@@ -519,6 +519,7 @@ const App: React.FC = () => {
             onMasterVolumeChange={handleMasterVolumeChange}
             soundFiles={soundFiles}
             onSoundFilesChange={setSoundFiles}
+            onEnvironmentsReorder={setEnvironments}
           />
           <Box 
             component="main" 
