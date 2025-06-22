@@ -31,7 +31,14 @@ def filelock():
     """Context manager for file locking to prevent race conditions."""
     lock_file = None
     try:
-        # Open the lock file in append mode (create if it doesn't exist)
+        # Ensure the lock file's directory exists
+        LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Create the lock file if it doesn't exist
+        if not LOCK_FILE.exists():
+            LOCK_FILE.touch()
+
+        # Open the lock file in append mode
         lock_file = open(LOCK_FILE, 'a')
 
         # Try to acquire lock, wait up to 5 seconds
@@ -179,14 +186,19 @@ def save_config(config: dict):
 def ensure_directories():
     """Create necessary directories if they don't exist."""
     try:
-        with filelock():
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+        # Create directories without locking first
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
+        # Now use the lock to create/update the config file
+        with filelock():
             # Create default config if it doesn't exist
             if not CONFIG_FILE.exists():
                 logger.debug(f"Creating default config file at {CONFIG_FILE}")
-                save_config(get_default_config())
+                # Write the default config directly here instead of calling save_config
+                # to avoid potential recursive lock acquisition
+                with open(CONFIG_FILE, 'w') as f:
+                    json.dump(get_default_config(), f, indent=2)
     except Exception as e:
         logger.error(f"Error ensuring directories: {e}", exc_info=True)
         raise
