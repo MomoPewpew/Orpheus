@@ -215,7 +215,7 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isConfirmRevertOpen, setIsConfirmRevertOpen] = useState(false);
   const [localSoundFiles, setLocalSoundFiles] = useState(soundFiles);
-  const [importSelection, setImportSelection] = useState<ImportSelection | null>(null);
+  const [_importSelection, setImportSelection] = useState<ImportSelection | null>(null);
   
   // Effect chain states with default values
   const [normalizeVolume, setNormalizeVolume] = useState(true);

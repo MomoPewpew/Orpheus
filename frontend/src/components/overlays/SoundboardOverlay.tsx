@@ -204,7 +204,7 @@ export const SoundboardOverlay: React.FC<SoundboardOverlayProps> = ({
               <ToggleButtonGroup
                 value={mode}
                 exclusive
-                onChange={(e, newMode) => newMode && setMode(newMode)}
+                onChange={(_, newMode) => newMode && setMode(newMode)}
                 size="small"
               >
                 <ToggleButton value="play">
