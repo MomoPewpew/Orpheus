@@ -18,13 +18,10 @@ class LayerInfo:
         """Initialize a new audio layer.
         
         Args:
-            audio_data: Numpy array of audio samples (shape: [samples, channels])
+            audio_data: Numpy array of audio samples (shape: [samples, channels]) - no longer stored
             layer: The Layer object containing configuration and sounds
         """
-        # Convert float32 [-1.0, 1.0] to int16 PCM
         self.is_finished = False
-        self.audio_data = (audio_data * 32767).astype(np.int16)
-        self.audio_length_samples = len(self.audio_data)
         self._layer = None  # Initialize as None
         self.layer = layer  # Use the setter
         self._position = 0  # Position within the loop
@@ -200,18 +197,72 @@ class LayerInfo:
         try:
             # For soundboard sounds, check if we've reached the end of the audio
             if self.layer.id.startswith("soundboard_"):
-                if self._audio_position >= self.audio_length_samples:
+                # Get the current layer sound
+                layer_sound = self.get_layer_sound()
+                if not layer_sound:
+                    logger.warning("No layer sound found for soundboard")
+                    return None
+
+                # Find the sound file in app state
+                if not self.layer.environment or not self.layer.environment.app_state:
+                    logger.warning("No app state available for soundboard sound")
+                    return None
+
+                sound_file = next(
+                    (sf for sf in self.layer.environment.app_state.sound_files if sf.id == layer_sound.file_id),
+                    None
+                )
+                if not sound_file or sound_file.audio_data is None:
+                    logger.warning(f"Sound file {layer_sound.file_id} not found or has no audio data")
+                    return None
+
+                # Keep audio data in float32 format
+                audio_data = sound_file.audio_data
+                audio_length = len(audio_data)
+
+                if self._audio_position >= audio_length:
                     self.is_finished = True
                     return None
 
                 # Get as many samples as we can
-                samples_to_get = min(chunk_size, self.audio_length_samples - self._audio_position)
-                chunk = np.zeros((chunk_size, self.CHANNELS), dtype=np.int16)
-                chunk[:samples_to_get] = self.audio_data[self._audio_position:self._audio_position + samples_to_get]
+                samples_to_get = min(chunk_size, audio_length - self._audio_position)
+                chunk = np.zeros((chunk_size, self.CHANNELS), dtype=np.float32)
+                chunk[:samples_to_get] = audio_data[self._audio_position:self._audio_position + samples_to_get]
                 self._audio_position += samples_to_get
-                return chunk
 
-            chunk = np.zeros((chunk_size, self.CHANNELS), dtype=np.int16)
+                # Apply volume if needed
+                current_volume = self.volume
+                if current_volume != 1.0:
+                    chunk *= current_volume
+
+                # Convert to int16 at the end
+                return (chunk * 32767.0).astype(np.int16)
+
+            # Regular layer handling
+            # Get the current layer sound and its audio data
+            layer_sound = self.get_layer_sound()
+            if not layer_sound:
+                logger.warning("No layer sound found")
+                return None
+
+            # Find the sound file in app state
+            if not self.layer.environment or not self.layer.environment.app_state:
+                logger.warning("No app state available")
+                return None
+
+            sound_file = next(
+                (sf for sf in self.layer.environment.app_state.sound_files if sf.id == layer_sound.file_id),
+                None
+            )
+            if not sound_file or sound_file.audio_data is None:
+                logger.warning(f"Sound file {layer_sound.file_id} not found or has no audio data")
+                return None
+
+            # Keep audio data in float32 format
+            audio_data = sound_file.audio_data
+            audio_length = len(audio_data)
+
+            chunk = np.zeros((chunk_size, self.CHANNELS), dtype=np.float32)
             samples_remaining = chunk_size
             chunk_offset = 0
 
@@ -219,18 +270,31 @@ class LayerInfo:
                 # Check if we've reached the loop point
                 if self._position >= self.loop_length_samples:
                     self.end_of_loop()
+                    # After end_of_loop, we need to get the new sound data
+                    layer_sound = self.get_layer_sound()
+                    if not layer_sound:
+                        break
+                    sound_file = next(
+                        (sf for sf in self.layer.environment.app_state.sound_files if sf.id == layer_sound.file_id),
+                        None
+                    )
+                    if not sound_file or sound_file.audio_data is None:
+                        break
+                    # Keep new audio data in float32 format
+                    audio_data = sound_file.audio_data
+                    audio_length = len(audio_data)
 
                 # Get samples for this chunk
                 samples_to_get = min(samples_remaining, self.loop_length_samples - self._position)
 
                 # Always copy audio data if we have it
-                if self._audio_position < self.audio_length_samples:
+                if self._audio_position < audio_length:
                     # Get as many samples as we can from current audio position
-                    audio_samples = min(samples_to_get, self.audio_length_samples - self._audio_position)
+                    audio_samples = min(samples_to_get, audio_length - self._audio_position)
 
                     # Get the samples from audio data
                     chunk[chunk_offset:chunk_offset + audio_samples] = \
-                        self.audio_data[self._audio_position:self._audio_position + audio_samples]
+                        audio_data[self._audio_position:self._audio_position + audio_samples]
 
                     # Update audio position
                     self._audio_position += audio_samples
@@ -246,9 +310,10 @@ class LayerInfo:
             # Apply volume if needed
             current_volume = self.volume
             if current_volume != 1.0:
-                chunk = (chunk.astype(np.float32) * current_volume).astype(np.int16)
+                chunk *= current_volume
 
-            return chunk
+            # Convert to int16 at the end
+            return (chunk * 32767.0).astype(np.int16)
 
         except Exception as e:
             logger.error(f"Error getting next chunk: {e}", exc_info=True)

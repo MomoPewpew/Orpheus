@@ -22,8 +22,8 @@ class AudioMixer:
     # Audio configuration
     SAMPLE_RATE = 48000  # Hz
     CHANNELS = 2
-    CHUNK_MS = 20  # Size of processing chunks in milliseconds
-    TARGET_BUFFER_MS = 100  # Target buffer size in Discord (in milliseconds)
+    CHUNK_MS = 40  # Size of processing chunks in milliseconds
+    TARGET_BUFFER_MS = 200  # Target buffer size in Discord (in milliseconds)
 
     def __init__(self):
         """Initialize the audio mixer."""
@@ -282,14 +282,20 @@ class AudioMixer:
             # Initialize timing
             frame_time_ns = int(self.CHUNK_MS * 1_000_000)  # Convert to nanoseconds
             next_frame_time = time.time_ns()
+            processing_overhead_ns = 0  # Track average processing overhead
+            alpha = 0.1  # Smoothing factor for overhead estimation
 
             # Track audio stats
             last_stats_time = time.time()
             chunks_processed = 0
             chunks_sent = 0
+            
+            # Pre-allocate mix buffers
+            main_mix = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.int32)
+            env_mix = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.int32)
 
             while self.is_running:
-                current_time_ns = time.time_ns()
+                loop_start_ns = time.time_ns()
 
                 # Log stats every 5 seconds
                 current_time = time.time()
@@ -300,20 +306,20 @@ class AudioMixer:
                     chunks_sent = 0
                     last_stats_time = current_time
 
-                # Check if it's time for the next frame
-                if current_time_ns < next_frame_time:
-                    # Use a shorter sleep to be more precise
-                    sleep_time = (next_frame_time - current_time_ns) / 1_000_000_000  # Convert to seconds
-                    if sleep_time > 0.001:  # If we need to sleep more than 1ms
-                        time.sleep(sleep_time - 0.001)  # Sleep slightly less
-                    continue
+                # Calculate sleep time accounting for processing overhead
+                sleep_time_ns = next_frame_time - loop_start_ns - processing_overhead_ns
+                if sleep_time_ns > 1_000_000:  # Only sleep if we have more than 1ms to wait
+                    time.sleep(sleep_time_ns / 1_000_000_000)
 
-                # If we're more than one frame behind, skip frames to catch up
+                # If we're more than half a frame behind, skip to catch up
+                current_time_ns = time.time_ns()
                 frames_behind = (current_time_ns - next_frame_time) // frame_time_ns
                 if frames_behind > 0:
-                    logger.debug(f"Skipping {frames_behind} frames to catch up")
-                    next_frame_time += frame_time_ns * frames_behind
-
+                    # Only skip if we're significantly behind
+                    if frames_behind > 1:
+                        logger.debug(f"Skipping {frames_behind} frames to catch up")
+                    next_frame_time = current_time_ns + frame_time_ns
+                
                 with self.lock:
                     if not self.app_state or not self._guild_id:
                         logger.error("Missing app_state or guild_id in processing loop")
@@ -336,7 +342,7 @@ class AudioMixer:
                     if hasattr(self._bot_manager, 'audio_manager'):
                         buffer_size = self._bot_manager.audio_manager.get_buffer_size(self._guild_id)
                         if buffer_size and buffer_size >= self.target_buffer_chunks:
-                            logger.debug(f"Buffer full ({buffer_size} chunks), waiting")
+                            # Update timing and continue
                             next_frame_time += frame_time_ns
                             continue
 
@@ -398,8 +404,8 @@ class AudioMixer:
                         next_frame_time += frame_time_ns
                         continue
 
-                    # Initialize mix buffer as int32 for headroom during mixing
-                    mixed_chunk = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.int32)
+                    # Clear mix buffers
+                    main_mix.fill(0)
                     active_layers = 0
 
                     # Mix all active environments
@@ -407,8 +413,8 @@ class AudioMixer:
                         # Calculate environment fade volume
                         env_fade_volume = env.fade_progress
 
-                        # Create a mix buffer for this environment
-                        env_mix = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.int32)
+                        # Clear environment mix buffer
+                        env_mix.fill(0)
                         env_active_layers = 0
 
                         # Process each layer in the environment
@@ -474,7 +480,7 @@ class AudioMixer:
                             # Apply fade volume
                             env_mix_float *= env_fade_volume
                             # Convert back to int32 and add to main mix
-                            mixed_chunk += (env_mix_float * 32768.0).astype(np.int32)
+                            main_mix += (env_mix_float * 32768.0).astype(np.int32)
                             active_layers += env_active_layers
 
                     # Mix in soundboard sounds
@@ -495,17 +501,17 @@ class AudioMixer:
                             # Apply sound volume
                             chunk_float *= layer_sound.effective_volume
                             # Convert back to int32 and add to main mix
-                            mixed_chunk += (chunk_float * 32768.0).astype(np.int32)
+                            main_mix += (chunk_float * 32768.0).astype(np.int32)
                             active_layers += 1
 
                     if active_layers > 0:
                         chunks_processed += 1
 
                         # Apply filters to the mixed chunk
-                        mixed_chunk = self._apply_filters(mixed_chunk)
+                        main_mix = self._apply_filters(main_mix)
 
                         # Convert to float32 for compression
-                        mixed_chunk_float = mixed_chunk.astype(np.float32) / 32768.0
+                        mixed_chunk_float = main_mix.astype(np.float32) / 32768.0
 
                         # Apply compression
                         mixed_chunk_float = self._apply_compressor(mixed_chunk_float)
@@ -529,7 +535,9 @@ class AudioMixer:
                             else:
                                 logger.warning(f"Failed to queue audio data for guild {self._guild_id}")
 
-                    # Update timing
+                    # Update timing and processing overhead estimate
+                    processing_time_ns = time.time_ns() - loop_start_ns
+                    processing_overhead_ns = (1 - alpha) * processing_overhead_ns + alpha * processing_time_ns
                     next_frame_time += frame_time_ns
 
         except Exception as e:

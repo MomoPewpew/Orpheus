@@ -12,13 +12,15 @@ class PCMStreamSource(discord.AudioSource):
     def __init__(self):
         self.buffer = bytearray()
         self.FRAME_LENGTH = 3840  # 20ms of 48kHz stereo audio (48000 * 2 * 2 * 0.02)
-        self.MIN_BUFFER_SIZE = self.FRAME_LENGTH * 3  # Keep at least 60ms buffered
-        self.MAX_BUFFER_SIZE = self.FRAME_LENGTH * 10  # Don't let buffer grow beyond 200ms
+        self.MIN_BUFFER_SIZE = self.FRAME_LENGTH * 5  # Keep at least 100ms buffered
+        self.MAX_BUFFER_SIZE = self.FRAME_LENGTH * 15  # Don't let buffer grow beyond 300ms
+        self.UNDERRUN_THRESHOLD = 3  # Number of consecutive underruns before marking as done
         self._read_count = 0
         self._last_read_time = 0
         self._active = True  # Track if we're actively streaming
         self.done = False  # Track if we're done streaming
         self._started = False  # Track if we've started reading
+        self._underrun_count = 0  # Track consecutive buffer underruns
         logger.info("Initialized PCM stream source")
 
     def add_audio(self, pcm_data: bytes):
@@ -27,6 +29,9 @@ class PCMStreamSource(discord.AudioSource):
             if not self._active:
                 logger.warning("Trying to add audio to inactive stream")
                 return
+
+            # Reset underrun count since we're getting data
+            self._underrun_count = 0
 
             # Only add data if we have room
             if len(self.buffer) < self.MAX_BUFFER_SIZE:
@@ -66,7 +71,6 @@ class PCMStreamSource(discord.AudioSource):
                 self.buffer = self.buffer[self.FRAME_LENGTH:]
                 self._read_count += 1
                 self._last_read_time = current_time
-
                 return frame
             else:
                 if len(self.buffer) > 0:
@@ -75,12 +79,15 @@ class PCMStreamSource(discord.AudioSource):
                     padding = bytes(self.FRAME_LENGTH - len(remaining))
                     self.buffer.clear()
                     logger.debug(f"Padding partial frame with {len(padding)} bytes of silence")
+                    self._underrun_count += 1
                     return remaining + padding
-                elif not self.done and self._started and self._read_count > 0:
-                    # Only mark as done if we've actually started reading and have read some frames
-                    logger.info(f"Buffer empty after reading {self._read_count} frames, marking stream as done")
-                    self.done = True
-                return None
+                else:
+                    self._underrun_count += 1
+                    if self._underrun_count >= self.UNDERRUN_THRESHOLD:
+                        if not self.done and self._started and self._read_count > 0:
+                            logger.info(f"Buffer empty after reading {self._read_count} frames, marking stream as done")
+                            self.done = True
+                    return bytes(self.FRAME_LENGTH)  # Return silence instead of None
         except Exception as e:
             logger.error(f"Error reading frame: {e}")
             return None
