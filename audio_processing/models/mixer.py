@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, Optional
 from threading import Lock, Thread
 from pydub import AudioSegment
-from audio_processing.models.audio import AppState, PlayState, Layer, LayerMode
+from audio_processing.models.audio import AppState, PlayState, Layer, LayerMode, Environment
 from audio_processing.models.layer_info import LayerInfo
 import uuid
 from scipy import signal
@@ -383,6 +383,13 @@ class AudioMixer:
                     soundboard_layers = [layer for key, layer in self.cached_layers.items()
                                       if key.startswith("soundboard_") and not layer.is_finished]
 
+                    # Clean up finished soundboard sounds
+                    finished_soundboard_keys = [key for key, layer in self.cached_layers.items()
+                                             if key.startswith("soundboard_") and layer.is_finished]
+                    for key in finished_soundboard_keys:
+                        logger.debug(f"Cleaning up finished soundboard sound {key}")
+                        del self.cached_layers[key]
+
                     if not active_envs and not soundboard_layers:
                         # No active environments or soundboard sounds, stop processing
                         logger.info(
@@ -469,6 +476,27 @@ class AudioMixer:
                             # Convert back to int32 and add to main mix
                             mixed_chunk += (env_mix_float * 32768.0).astype(np.int32)
                             active_layers += env_active_layers
+
+                    # Mix in soundboard sounds
+                    for key, layer_info in list(self.cached_layers.items()):
+                        if not key.startswith("soundboard_") or layer_info.is_finished:
+                            continue
+
+                        # Get the next chunk
+                        chunk = layer_info.get_next_chunk(self.chunk_samples)
+                        if chunk is None:
+                            continue
+
+                        # Get layer sound for volume
+                        layer_sound = layer_info.get_layer_sound()
+                        if layer_sound:
+                            # Convert to float32 for volume multiplication
+                            chunk_float = chunk.astype(np.float32) / 32768.0
+                            # Apply sound volume
+                            chunk_float *= layer_sound.effective_volume
+                            # Convert back to int32 and add to main mix
+                            mixed_chunk += (chunk_float * 32768.0).astype(np.int32)
+                            active_layers += 1
 
                     if active_layers > 0:
                         chunks_processed += 1
@@ -665,10 +693,16 @@ class AudioMixer:
 
             # Check if this sound is already playing
             if soundboard_layer_id in self.cached_layers:
-                logger.debug(f"Soundboard sound {sound_id} is already playing")
-                return
+                layer_info = self.cached_layers[soundboard_layer_id]
+                if not layer_info.is_finished:
+                    logger.debug(f"Soundboard sound {sound_id} is already playing")
+                    return
+                else:
+                    # Remove finished sound from cache
+                    logger.debug(f"Removing finished soundboard sound {sound_id} from cache")
+                    del self.cached_layers[soundboard_layer_id]
 
-            from audio_processing.models.audio import Layer, LayerSound, Environment
+            from audio_processing.models.audio import Layer, LayerSound
 
             # Create temporary objects with weak references to minimize memory leaks
             temp_env = None
@@ -684,6 +718,9 @@ class AudioMixer:
                     play_state=PlayState.PLAYING,
                     app_state=self.app_state
                 )
+                # Make sure the environment has a reference to app_state for volume settings
+                temp_env.app_state = self.app_state
+                logger.info("Created temporary environment for soundboard sound")
 
             layer = Layer(
                 id=soundboard_layer_id,  # Use consistent ID
@@ -692,13 +729,14 @@ class AudioMixer:
                     id=str(uuid.uuid4()),
                     file_id=sound_id,
                     frequency=1.0,
-                    volume=1.0
+                    volume=1.0  # Base volume at maximum
                 )],
                 chance=1.0,
                 loop_length_ms=999999,
                 mode=LayerMode.SINGLE,
                 weight=0.0,
-                cooldown_cycles=0
+                cooldown_cycles=0,
+                volume=1.0  # Layer volume at maximum
             )
 
             # Load the layer
@@ -710,8 +748,10 @@ class AudioMixer:
             # Set the layer's environment to access app state for volume normalization
             if self.app_state.environments:
                 layer_info.layer.environment = self.app_state.environments[0]
+                logger.info(f"Using environment {self.app_state.environments[0].id} for soundboard sound")
             elif temp_env:
                 layer_info.layer.environment = temp_env
+                logger.info("Using temporary environment for soundboard sound")
 
             # Force the sound to play once
             layer_info._position = 0  # Reset position to start
