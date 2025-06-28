@@ -232,11 +232,6 @@ class LayerInfo:
                 chunk[:samples_to_get] = audio_data[self._audio_position:self._audio_position + samples_to_get]
                 self._audio_position += samples_to_get
 
-                # Apply volume if needed
-                current_volume = self.volume
-                if current_volume != 1.0:
-                    chunk *= current_volume
-
                 # Convert to int16 at the end
                 return (chunk * 32767.0).astype(np.int16)
 
@@ -308,11 +303,6 @@ class LayerInfo:
                 # Always update position
                 self._position += samples_to_get
                 samples_remaining -= samples_to_get
-
-            # Apply volume if needed
-            current_volume = self.volume
-            if current_volume != 1.0:
-                chunk *= current_volume
 
             # Convert to int16 at the end
             return (chunk * 32767.0).astype(np.int16)

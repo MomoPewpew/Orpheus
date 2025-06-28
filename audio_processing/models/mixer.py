@@ -452,7 +452,7 @@ class AudioMixer:
                                 continue
 
                             should_play = layer_info.should_play
-                            
+
                             if layer_info.previous_volume != layer_sound.effective_volume and should_play:
                                 layer_sound.start_fade_in(layer_info.previous_volume)
 
@@ -463,6 +463,11 @@ class AudioMixer:
                                 layer_sound.start_fade_out()
 
                             if should_play or layer_info.is_fading:
+                                # Apply volume if needed
+                                current_volume = layer_info.volume
+                                if current_volume != 1.0:
+                                    chunk = (chunk.astype(np.float32) * current_volume).astype(np.int16)
+
                                 # Mix this layer into environment mix
                                 env_mix += chunk.astype(np.int32)
                                 layer_info.has_played = True
