@@ -320,7 +320,12 @@ class Effects:
             return effects
 
         if 'normalize' in data:
-            effects.normalize.enabled = bool(data['normalize'].get('enabled', False))
+            # Handle both string and boolean values
+            enabled = data['normalize'].get('enabled', False)
+            if isinstance(enabled, str):
+                effects.normalize.enabled = enabled.lower() == 'true'
+            else:
+                effects.normalize.enabled = bool(enabled)
 
         if 'fades' in data:
             effects.fades.fade_in_duration = int(data['fades'].get('fadeInDuration', 0))
