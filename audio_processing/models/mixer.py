@@ -451,10 +451,11 @@ class AudioMixer:
                             if chunk is None:
                                 continue
 
-                            if layer_info.previous_volume != layer_sound.effective_volume:
+                            should_play = layer_info.should_play
+                            
+                            if layer_info.previous_volume != layer_sound.effective_volume and should_play:
                                 layer_sound.start_fade_in(layer_info.previous_volume)
 
-                            should_play = layer_info.should_play
                             if should_play and not layer_info.was_playing:
                                 layer_sound.start_fade_in(0.0)
                             elif (not should_play and layer_info.was_playing and
