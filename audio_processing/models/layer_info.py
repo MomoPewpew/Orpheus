@@ -139,8 +139,6 @@ class LayerInfo:
         # Ensure the index is within bounds
         if self._active_sound_index >= len(self.layer.sounds):
             self._active_sound_index = 0
-        
-        self.previous_volume = self.get_layer_sound().effective_volume
 
     def reset_position(self):
         """Reset the playback position to the start of the audio."""
