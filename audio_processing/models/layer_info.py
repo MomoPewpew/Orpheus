@@ -98,7 +98,9 @@ class LayerInfo:
         self._position = 0
         self._audio_position = 0
 
-        self.update_active_sound_index()
+        if self.has_played:
+            self.update_active_sound_index()
+        
         self._chance_roll = random.random()
 
         if self._cooldown_cycles_elapsed >= self.layer.effective_cooldown_cycles:
