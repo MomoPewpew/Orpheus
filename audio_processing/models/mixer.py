@@ -446,6 +446,11 @@ class AudioMixer:
                             # Handle layer-level fading
                             layer_sound = layer_info.get_layer_sound()
 
+                            # Get the next chunk - this may trigger a loop point and update active_sound_index
+                            chunk = layer_info.get_next_chunk(self.chunk_samples)
+                            if chunk is None:
+                                continue
+
                             if layer_info.previous_volume != layer_sound.effective_volume:
                                 layer_sound.start_fade_in(layer_info.previous_volume)
 
@@ -456,20 +461,12 @@ class AudioMixer:
                                   layer_info.has_played and not layer_info.is_fading):
                                 layer_sound.start_fade_out()
 
-                            # Get the next chunk - this may trigger a loop point and update active_sound_index
-                            chunk = layer_info.get_next_chunk(self.chunk_samples)
-                            if chunk is None:
-                                continue
-
                             if should_play or layer_info.is_fading:
                                 # Mix this layer into environment mix
                                 env_mix += chunk.astype(np.int32)
                                 layer_info.has_played = True
-                            if should_play:
-                                layer_info.was_playing = True
-                            else:
-                                layer_info.was_playing = False
 
+                            layer_info.was_playing = should_play
                             layer_info.previous_volume = layer_sound.effective_volume
                             env_active_layers += 1
 
