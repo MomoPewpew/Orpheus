@@ -21,7 +21,7 @@ import {
 } from '@mui/material';
 import { Theme } from '@mui/material/styles';
 import { Delete, Add, DragIndicator, Settings, Shuffle, Repeat, RadioButtonChecked } from '@mui/icons-material';
-import { Layer, LayerSound, SoundFile, Preset, PresetLayer, PresetSound, LayerMode } from '../../types/audio';
+import { Layer, LayerSound, SoundFile, Preset, PresetLayer, LayerMode, PresetSound } from '../../types/audio';
 import AddLayerDialog from '../AddLayerDialog';
 import { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
 import { alpha } from '@mui/material/styles';
@@ -156,6 +156,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   const [isConfigureOpen, setIsConfigureOpen] = useState(false);
   const [newLayerName, setNewLayerName] = useState(layer.name);
   const [newLoopLength, setNewLoopLength] = useState(layer.loopLengthMs);
+  const [tempValues, setTempValues] = useState<Record<string, number>>({});
 
   // Get the current effective value for a property (preset value if exists, otherwise layer value)
   const getEffectiveValue = (property: 'volume' | 'weight' | 'chance' | 'frequency' | 'cooldownCycles' | 'mode', soundId?: string): number | LayerMode => {
@@ -311,399 +312,118 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   };
 
   const handleLayerVolumeChange = (newValue: number) => {
-    if (activePreset && activePreset.layers) {
-      // Get existing preset layer if it exists
-      const existingPresetLayer = activePreset.layers.find(p => p.id === layer.id);
-      
-      // Create a new layer with required id and preserve existing sounds
-      const updatedLayer: PresetLayer = {
-        id: layer.id,
-        sounds: existingPresetLayer?.sounds || []
-      };
+    // Skip if value hasn't changed
+    if (newValue === getEffectiveValue('volume')) {
+      return;
+    }
 
-      // Only add properties that differ from base layer
-      const baseVolume = getDefaultValue('volume');
-      if (newValue !== baseVolume) {
-        updatedLayer.volume = newValue;
-      }
-      if (existingPresetLayer?.weight !== undefined) {
-        const baseWeight = getDefaultValue('weight');
-        if (existingPresetLayer.weight !== baseWeight) {
-          updatedLayer.weight = existingPresetLayer.weight;
-        }
-      }
-      if (existingPresetLayer?.chance !== undefined) {
-        const baseChance = getDefaultValue('chance');
-        if (existingPresetLayer.chance !== baseChance) {
-          updatedLayer.chance = existingPresetLayer.chance;
-        }
-      }
-      if (existingPresetLayer?.cooldownCycles !== undefined) {
-        const baseCooldown = getDefaultValue('cooldownCycles');
-        if (existingPresetLayer.cooldownCycles !== baseCooldown) {
-          updatedLayer.cooldownCycles = existingPresetLayer.cooldownCycles;
-        }
-      }
-
-      // Create a new array of PresetLayer objects
-      const existingLayers = activePreset.layers
-        .filter(p => p.id !== layer.id)
-        .map(p => {
-          const layer: PresetLayer = {
-            id: p.id,
-            sounds: p.sounds || []
-          };
-          if (p.volume !== undefined) {
-            const baseVolume = getDefaultValue('volume');
-            if (p.volume !== baseVolume) {
-              layer.volume = p.volume;
-            }
-          }
-          if (p.weight !== undefined) {
-            const baseWeight = getDefaultValue('weight');
-            if (p.weight !== baseWeight) {
-              layer.weight = p.weight;
-            }
-          }
-          if (p.chance !== undefined) {
-            const baseChance = getDefaultValue('chance');
-            if (p.chance !== baseChance) {
-              layer.chance = p.chance;
-            }
-          }
-          if (p.cooldownCycles !== undefined) {
-            const baseCooldown = getDefaultValue('cooldownCycles');
-            if (p.cooldownCycles !== baseCooldown) {
-              layer.cooldownCycles = p.cooldownCycles;
-            }
-          }
-          return layer;
-        });
-
-      // Only include the layer if it has any overrides or sound overrides
-      const hasOverrides = Object.keys(updatedLayer).length > 2 || // More than just id and sounds
-                          (updatedLayer.sounds && updatedLayer.sounds.length > 0);
-
-      const updatedLayers = hasOverrides 
-        ? [...existingLayers, updatedLayer]
-        : existingLayers;
-
+    if (activePreset?.layers) {
+      // Handle preset override
+      const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
       const updatedPreset = {
         ...activePreset,
-        layers: updatedLayers
+        layers: activePreset.layers
+          .filter(p => p.id !== layer.id)
+          .concat([{ ...presetLayer, volume: newValue }])
       };
-
       onPresetUpdate(updatedPreset);
     } else {
+      // Update layer directly
       onLayerUpdate({ ...layer, volume: newValue });
     }
   };
 
   const handleLayerWeightChange = (newValue: number) => {
-    if (activePreset && activePreset.layers) {
-      // Get existing preset layer if it exists
-      const existingPresetLayer = activePreset.layers.find(p => p.id === layer.id);
-      
-      // Create a new layer with required id and preserve existing sounds
-      const updatedLayer: PresetLayer = {
-        id: layer.id,
-        sounds: existingPresetLayer?.sounds || []
-      };
+    // Skip if value hasn't changed
+    if (newValue === getEffectiveValue('weight')) {
+      return;
+    }
 
-      // Only add properties that differ from base layer
-      if (existingPresetLayer?.volume !== undefined) {
-        const baseVolume = getDefaultValue('volume');
-        if (existingPresetLayer.volume !== baseVolume) {
-          updatedLayer.volume = existingPresetLayer.volume;
-        }
-      }
-      const baseWeight = getDefaultValue('weight');
-      if (newValue !== baseWeight) {
-        updatedLayer.weight = newValue;
-      }
-      if (existingPresetLayer?.chance !== undefined) {
-        const baseChance = getDefaultValue('chance');
-        if (existingPresetLayer.chance !== baseChance) {
-          updatedLayer.chance = existingPresetLayer.chance;
-        }
-      }
-      if (existingPresetLayer?.cooldownCycles !== undefined) {
-        const baseCooldown = getDefaultValue('cooldownCycles');
-        if (existingPresetLayer.cooldownCycles !== baseCooldown) {
-          updatedLayer.cooldownCycles = existingPresetLayer.cooldownCycles;
-        }
-      }
-
-      // Create a new array of PresetLayer objects
-      const existingLayers = activePreset.layers
-        .filter(p => p.id !== layer.id)
-        .map(p => {
-          const layer: PresetLayer = {
-            id: p.id,
-            sounds: p.sounds || []
-          };
-          if (p.volume !== undefined) {
-            const baseVolume = getDefaultValue('volume');
-            if (p.volume !== baseVolume) {
-              layer.volume = p.volume;
-            }
-          }
-          if (p.weight !== undefined) {
-            const baseWeight = getDefaultValue('weight');
-            if (p.weight !== baseWeight) {
-              layer.weight = p.weight;
-            }
-          }
-          if (p.chance !== undefined) {
-            const baseChance = getDefaultValue('chance');
-            if (p.chance !== baseChance) {
-              layer.chance = p.chance;
-            }
-          }
-          if (p.cooldownCycles !== undefined) {
-            const baseCooldown = getDefaultValue('cooldownCycles');
-            if (p.cooldownCycles !== baseCooldown) {
-              layer.cooldownCycles = p.cooldownCycles;
-            }
-          }
-          return layer;
-        });
-
-      // Only include the layer if it has any overrides or sound overrides
-      const hasOverrides = Object.keys(updatedLayer).length > 2 || // More than just id and sounds
-                          (updatedLayer.sounds && updatedLayer.sounds.length > 0);
-
-      const updatedLayers = hasOverrides 
-        ? [...existingLayers, updatedLayer]
-        : existingLayers;
-
+    if (activePreset?.layers) {
+      // Handle preset override
+      const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
       const updatedPreset = {
         ...activePreset,
-        layers: updatedLayers
+        layers: activePreset.layers
+          .filter(p => p.id !== layer.id)
+          .concat([{ ...presetLayer, weight: newValue }])
       };
-
       onPresetUpdate(updatedPreset);
     } else {
+      // Update layer directly
       onLayerUpdate({ ...layer, weight: newValue });
     }
   };
 
   const handleLayerChanceChange = (newValue: number) => {
-    if (activePreset && activePreset.layers) {
-      // Get existing preset layer if it exists
-      const existingPresetLayer = activePreset.layers.find(p => p.id === layer.id);
-      
-      // Create a new layer with required id and preserve existing sounds
-      const updatedLayer: PresetLayer = {
-        id: layer.id,
-        sounds: existingPresetLayer?.sounds || []
-      };
+    // Skip if value hasn't changed
+    if (newValue === getEffectiveValue('chance')) {
+      return;
+    }
 
-      // Only add properties that differ from base layer
-      if (existingPresetLayer?.volume !== undefined) {
-        const baseVolume = getDefaultValue('volume');
-        if (existingPresetLayer.volume !== baseVolume) {
-          updatedLayer.volume = existingPresetLayer.volume;
-        }
-      }
-      if (existingPresetLayer?.weight !== undefined) {
-        const baseWeight = getDefaultValue('weight');
-        if (existingPresetLayer.weight !== baseWeight) {
-          updatedLayer.weight = existingPresetLayer.weight;
-        }
-      }
-      const baseChance = getDefaultValue('chance');
-      if (newValue !== baseChance) {
-        updatedLayer.chance = newValue;
-      }
-      if (existingPresetLayer?.cooldownCycles !== undefined) {
-        const baseCooldown = getDefaultValue('cooldownCycles');
-        if (existingPresetLayer.cooldownCycles !== baseCooldown) {
-          updatedLayer.cooldownCycles = existingPresetLayer.cooldownCycles;
-        }
-      }
-
-      // Create a new array of PresetLayer objects
-      const existingLayers = activePreset.layers
-        .filter(p => p.id !== layer.id)
-        .map(p => {
-          const layer: PresetLayer = {
-            id: p.id,
-            sounds: p.sounds || []
-          };
-          if (p.volume !== undefined) {
-            const baseVolume = getDefaultValue('volume');
-            if (p.volume !== baseVolume) {
-              layer.volume = p.volume;
-            }
-          }
-          if (p.weight !== undefined) {
-            const baseWeight = getDefaultValue('weight');
-            if (p.weight !== baseWeight) {
-              layer.weight = p.weight;
-            }
-          }
-          if (p.chance !== undefined) {
-            const baseChance = getDefaultValue('chance');
-            if (p.chance !== baseChance) {
-              layer.chance = p.chance;
-            }
-          }
-          if (p.cooldownCycles !== undefined) {
-            const baseCooldown = getDefaultValue('cooldownCycles');
-            if (p.cooldownCycles !== baseCooldown) {
-              layer.cooldownCycles = p.cooldownCycles;
-            }
-          }
-          return layer;
-        });
-
-      // Only include the layer if it has any overrides or sound overrides
-      const hasOverrides = Object.keys(updatedLayer).length > 2 || // More than just id and sounds
-                          (updatedLayer.sounds && updatedLayer.sounds.length > 0);
-
-      const updatedLayers = hasOverrides 
-        ? [...existingLayers, updatedLayer]
-        : existingLayers;
-
+    if (activePreset?.layers) {
+      // Handle preset override
+      const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
       const updatedPreset = {
         ...activePreset,
-        layers: updatedLayers
+        layers: activePreset.layers
+          .filter(p => p.id !== layer.id)
+          .concat([{ ...presetLayer, chance: newValue }])
       };
-
       onPresetUpdate(updatedPreset);
     } else {
+      // Update layer directly
       onLayerUpdate({ ...layer, chance: newValue });
     }
   };
 
   const handleLayerCooldownChange = (newValue: number) => {
-    if (activePreset && activePreset.layers) {
-      // Get existing preset layer if it exists
-      const existingPresetLayer = activePreset.layers.find(p => p.id === layer.id);
-      
-      // Create a new layer with required id and preserve existing sounds
-      const updatedLayer: PresetLayer = {
-        id: layer.id,
-        sounds: existingPresetLayer?.sounds || []
-      };
+    // Skip if value hasn't changed
+    if (newValue === getEffectiveValue('cooldownCycles')) {
+      return;
+    }
 
-      // Only add properties that differ from base layer
-      if (existingPresetLayer?.volume !== undefined) {
-        const baseVolume = getDefaultValue('volume');
-        if (existingPresetLayer.volume !== baseVolume) {
-          updatedLayer.volume = existingPresetLayer.volume;
-        }
-      }
-      if (existingPresetLayer?.weight !== undefined) {
-        const baseWeight = getDefaultValue('weight');
-        if (existingPresetLayer.weight !== baseWeight) {
-          updatedLayer.weight = existingPresetLayer.weight;
-        }
-      }
-      if (existingPresetLayer?.chance !== undefined) {
-        const baseChance = getDefaultValue('chance');
-        if (existingPresetLayer.chance !== baseChance) {
-          updatedLayer.chance = existingPresetLayer.chance;
-        }
-      }
-      const baseCooldown = getDefaultValue('cooldownCycles');
-      if (newValue !== baseCooldown) {
-        updatedLayer.cooldownCycles = newValue;
-      }
-
-      // Create a new array of PresetLayer objects
-      const existingLayers = activePreset.layers
-        .filter(p => p.id !== layer.id)
-        .map(p => {
-          const layer: PresetLayer = {
-            id: p.id,
-            sounds: p.sounds || []
-          };
-          if (p.volume !== undefined) {
-            const baseVolume = getDefaultValue('volume');
-            if (p.volume !== baseVolume) {
-              layer.volume = p.volume;
-            }
-          }
-          if (p.weight !== undefined) {
-            const baseWeight = getDefaultValue('weight');
-            if (p.weight !== baseWeight) {
-              layer.weight = p.weight;
-            }
-          }
-          if (p.chance !== undefined) {
-            const baseChance = getDefaultValue('chance');
-            if (p.chance !== baseChance) {
-              layer.chance = p.chance;
-            }
-          }
-          if (p.cooldownCycles !== undefined) {
-            const baseCooldown = getDefaultValue('cooldownCycles');
-            if (p.cooldownCycles !== baseCooldown) {
-              layer.cooldownCycles = p.cooldownCycles;
-            }
-          }
-          return layer;
-        });
-
-      // Only include the layer if it has any overrides or sound overrides
-      const hasOverrides = Object.keys(updatedLayer).length > 2 || // More than just id and sounds
-                          (updatedLayer.sounds && updatedLayer.sounds.length > 0);
-
-      const updatedLayers = hasOverrides 
-        ? [...existingLayers, updatedLayer]
-        : existingLayers;
-
+    if (activePreset?.layers) {
+      // Handle preset override
+      const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
       const updatedPreset = {
         ...activePreset,
-        layers: updatedLayers
+        layers: activePreset.layers
+          .filter(p => p.id !== layer.id)
+          .concat([{ ...presetLayer, cooldownCycles: newValue }])
       };
-
       onPresetUpdate(updatedPreset);
     } else {
+      // Update layer directly
       onLayerUpdate({ ...layer, cooldownCycles: newValue });
     }
   };
 
   const handleSoundVolumeChange = (selectedSound: LayerSound, newValue: number) => {
-    if (activePreset && activePreset.layers) {
-      // Create or update preset layer
-      const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id, sounds: [] };
-      const presetSounds = presetLayer.sounds || [];
-      
-      // Get the base values to compare against
-      const baseVolume = getDefaultValue('volume', selectedSound.id);
-      const baseFrequency = getDefaultValue('frequency', selectedSound.id);
-      
-      // Filter out the current sound
-      const updatedPresetSounds = presetSounds.filter(s => s.id !== selectedSound.id);
-      
-      // Check if we need to keep this sound in the preset
-      const existingPresetSound = presetSounds.find(s => s.id === selectedSound.id);
-      const keepVolume = baseVolume !== undefined && newValue !== baseVolume;
-      const keepFrequency = existingPresetSound?.frequency !== undefined && 
-                           baseFrequency !== undefined && 
-                           existingPresetSound.frequency !== baseFrequency;
-      
-      // Only add the sound if at least one property differs from base
-      if (keepVolume || keepFrequency) {
-        const presetSound = {
-          id: selectedSound.id
-        } as PresetSound;
+    // Skip if value hasn't changed
+    if (newValue === getEffectiveValue('volume', selectedSound.id)) {
+      return;
+    }
 
-        // Only include volume if it differs from base
-        if (keepVolume) {
-          presetSound.volume = newValue;
-        }
-
-        // Keep frequency if it was already overridden and still differs from base
-        if (keepFrequency) {
-          presetSound.frequency = existingPresetSound!.frequency;
-        }
-
-        updatedPresetSounds.push(presetSound);
-      }
+    if (activePreset?.layers) {
+      // Handle preset override
+      const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
+      const existingPresetSound = presetLayer.sounds?.find(s => s.id === selectedSound.id);
+      
+      // Create a properly typed PresetSound object
+      const updatedPresetSound: PresetSound = {
+        id: selectedSound.id,
+        fileId: selectedSound.fileId,  // Include required fileId
+        volume: newValue,
+        // Preserve existing frequency if it exists
+        ...(existingPresetSound?.frequency !== undefined && { frequency: existingPresetSound.frequency })
+      };
+      
+      const updatedPresetSounds: PresetSound[] = presetLayer.sounds
+        ? presetLayer.sounds
+            .filter(s => s.id !== selectedSound.id)
+            .concat([updatedPresetSound])
+        : [updatedPresetSound];
 
       const updatedPreset = {
         ...activePreset,
@@ -729,43 +449,30 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   };
 
   const handleSoundFrequencyChange = (selectedSound: LayerSound, newValue: number) => {
-    if (activePreset && activePreset.layers) {
-      // Create or update preset layer
-      const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id, sounds: [] };
-      const presetSounds = presetLayer.sounds || [];
-      
-      // Get the base values to compare against
-      const baseVolume = getDefaultValue('volume', selectedSound.id);
-      const baseFrequency = getDefaultValue('frequency', selectedSound.id);
-      
-      // Filter out the current sound
-      const updatedPresetSounds = presetSounds.filter(s => s.id !== selectedSound.id);
-      
-      // Check if we need to keep this sound in the preset
-      const existingPresetSound = presetSounds.find(s => s.id === selectedSound.id);
-      const keepVolume = existingPresetSound?.volume !== undefined && 
-                        baseVolume !== undefined && 
-                        existingPresetSound.volume !== baseVolume;
-      const keepFrequency = baseFrequency !== undefined && newValue !== baseFrequency;
-      
-      // Only add the sound if at least one property differs from base
-      if (keepVolume || keepFrequency) {
-        const presetSound = {
-          id: selectedSound.id
-        } as PresetSound;
+    // Skip if value hasn't changed
+    if (newValue === getEffectiveValue('frequency', selectedSound.id)) {
+      return;
+    }
 
-        // Keep volume if it was already overridden and still differs from base
-        if (keepVolume) {
-          presetSound.volume = existingPresetSound!.volume;
-        }
-
-        // Only include frequency if it differs from base
-        if (keepFrequency) {
-          presetSound.frequency = newValue;
-        }
-
-        updatedPresetSounds.push(presetSound);
-      }
+    if (activePreset?.layers) {
+      // Handle preset override
+      const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
+      const existingPresetSound = presetLayer.sounds?.find(s => s.id === selectedSound.id);
+      
+      // Create a properly typed PresetSound object
+      const updatedPresetSound: PresetSound = {
+        id: selectedSound.id,
+        fileId: selectedSound.fileId,  // Include required fileId
+        frequency: newValue,
+        // Preserve existing volume if it exists
+        ...(existingPresetSound?.volume !== undefined && { volume: existingPresetSound.volume })
+      };
+      
+      const updatedPresetSounds: PresetSound[] = presetLayer.sounds
+        ? presetLayer.sounds
+            .filter(s => s.id !== selectedSound.id)
+            .concat([updatedPresetSound])
+        : [updatedPresetSound];
 
       const updatedPreset = {
         ...activePreset,
@@ -826,6 +533,10 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
         selectedSoundIndex: newIndex
       });
     }
+  };
+
+  const handleSliderChange = (key: string, value: number) => {
+    setTempValues(prev => ({ ...prev, [key]: value }));
   };
 
   return (
@@ -925,8 +636,9 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             <Tooltip title={sounds.length <= 1 ? "At least two sounds are required to adjust individual sound volumes" : ""}>
               <Box>  {/* Wrapper needed because Tooltip can't be applied directly to disabled elements */}
                 <DualValueSlider
-                  value={getNumericValue('volume', selectedSound.id)}
-                  onChange={(_, value) => handleSoundVolumeChange(selectedSound, value as number)}
+                  value={tempValues[`volume-${selectedSound.id}`] ?? getNumericValue('volume', selectedSound.id)}
+                  onChange={(_, value) => handleSliderChange(`volume-${selectedSound.id}`, value as number)}
+                  onChangeCommitted={(_, value) => handleSoundVolumeChange(selectedSound, value as number)}
                   min={0}
                   max={1}
                   step={0.01}
@@ -962,8 +674,9 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             }>
               <Box>  {/* Wrapper needed because Tooltip can't be applied directly to disabled elements */}
                 <DualValueSlider
-                  value={getNumericValue('frequency', selectedSound.id)}
-                  onChange={(_, value) => handleSoundFrequencyChange(selectedSound, value as number)}
+                  value={tempValues[`frequency-${selectedSound.id}`] ?? getNumericValue('frequency', selectedSound.id)}
+                  onChange={(_, value) => handleSliderChange(`frequency-${selectedSound.id}`, value as number)}
+                  onChangeCommitted={(_, value) => handleSoundFrequencyChange(selectedSound, value as number)}
                   min={0}
                   max={1}
                   step={0.01}
@@ -992,8 +705,8 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             Volume
           </Typography>
           <DualValueSlider
-            value={getNumericValue('volume')}
-            onChange={(_, value) => handleLayerVolumeChange(value as number)}
+            value={tempValues['volume'] ?? getNumericValue('volume')}
+            onChange={(_, value) => handleSliderChange('volume', value as number)}
             onChangeCommitted={(_, value) => handleLayerVolumeChange(value as number)}
             valueLabelDisplay="auto"
             min={0}
@@ -1020,8 +733,8 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             Weight
           </Typography>
           <DualValueSlider
-            value={getNumericValue('weight')}
-            onChange={(_, value) => handleLayerWeightChange(value as number)}
+            value={tempValues['weight'] ?? getNumericValue('weight')}
+            onChange={(_, value) => handleSliderChange('weight', value as number)}
             onChangeCommitted={(_, value) => handleLayerWeightChange(value as number)}
             valueLabelDisplay="auto"
             min={0}
@@ -1048,8 +761,8 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             Chance
           </Typography>
           <DualValueSlider
-            value={getNumericValue('chance')}
-            onChange={(_, value) => handleLayerChanceChange(value as number)}
+            value={tempValues['chance'] ?? getNumericValue('chance')}
+            onChange={(_, value) => handleSliderChange('chance', value as number)}
             onChangeCommitted={(_, value) => handleLayerChanceChange(value as number)}
             valueLabelDisplay="auto"
             min={0}
@@ -1076,8 +789,8 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
             Cooldown
           </Typography>
           <DualValueSlider
-            value={getNumericValue('cooldownCycles')}
-            onChange={(_, value) => handleLayerCooldownChange(value as number)}
+            value={tempValues['cooldownCycles'] ?? getNumericValue('cooldownCycles')}
+            onChange={(_, value) => handleSliderChange('cooldownCycles', value as number)}
             onChangeCommitted={(_, value) => handleLayerCooldownChange(value as number)}
             valueLabelDisplay="auto"
             min={0}
