@@ -469,7 +469,7 @@ class Layer:
         """Check if the sound should play based on the chance, cooldown and weight."""
         if rolled_chance > self._effective_chance:
             return False
-        if 0 < passed_cooldown_cycles <= self.effective_cooldown_cycles + 1:
+        if 0 < passed_cooldown_cycles <= self.effective_cooldown_cycles:
             return False
         if weight_left < self.effective_weight:
             return False
