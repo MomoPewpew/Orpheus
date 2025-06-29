@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     libffi-dev \
     procps \
     vim \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Create and activate virtual environment
