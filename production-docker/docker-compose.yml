@@ -1,0 +1,15 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: orpheus:latest
+    container_name: orpheus-app
+    environment:
+      - DISCORD_TOKEN=  # User must set this
+      - REACT_APP_API_URL=http://localhost:5000/api
+      - WEB_PORT=8080  # Port for the nginx web server
+      - PYTHONPATH=/app/audio_processing  # Add audio_processing to Python path
+    ports:
+      - "${WEB_PORT:-8080}:80"  # Use WEB_PORT from env or default to 8080
+      - "5000:5000"  # FastAPI port
