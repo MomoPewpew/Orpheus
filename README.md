@@ -116,6 +116,21 @@ To stop the services:
 docker compose down
 ```
 
+### Running from Docker Hub
+
+You can also run Orpheus directly from Docker Hub without cloning the repository:
+
+```bash
+docker run -e DISCORD_TOKEN=your_token_here -p 5000:5000 -p 8080:80 momopewpew/orpheus:latest
+```
+
+Then access the web interface at `http://localhost:8080`
+
+Make sure to:
+- Replace `your_token_here` with your actual Discord bot token
+- The web interface will be available on port 8080
+- The API will be available on port 5000
+
 ## Usage
 
 1. Invite the bot to your Discord server
