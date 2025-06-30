@@ -100,3 +100,4 @@ async def serve_frontend(full_path: str):
 
     # Otherwise serve index.html for client-side routing
     return FileResponse(STATIC_DIR / "index.html")
+

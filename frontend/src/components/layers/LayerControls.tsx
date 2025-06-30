@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
+  Button,
   IconButton,
   MenuItem,
   Select,
@@ -12,7 +13,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Button,
   TextField,
   styled,
   ToggleButton,
@@ -20,13 +20,24 @@ import {
   Tooltip,
 } from '@mui/material';
 import { Theme } from '@mui/material/styles';
-import { Delete, Add, DragIndicator, Settings, Shuffle, Repeat, RadioButtonChecked } from '@mui/icons-material';
+import {
+  Delete,
+  Add,
+  DragIndicator,
+  Settings,
+  Shuffle,
+  Repeat,
+  RadioButtonChecked,
+} from '@mui/icons-material';
 import { Layer, LayerSound, SoundFile, Preset, PresetLayer, LayerMode, PresetSound } from '../../types/audio';
 import AddLayerDialog from '../AddLayerDialog';
 import { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
 import { alpha } from '@mui/material/styles';
 
 export {};
+
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_PLAYING_LAYERS = `${API_BASE}/playing-layers`;
 
 // Custom styled Slider that shows both default and preset values
 const DualValueSlider = styled(Slider)(({ theme }) => ({
@@ -134,8 +145,7 @@ interface LayerControlsProps {
   activePreset?: Preset;
   defaultLayer?: Layer; // The layer without preset overrides
   onPresetUpdate: (preset: Preset) => void;
-  isPlaying?: boolean; // New prop to indicate if the layer is currently playing
-  onSoundFilesChange?: (soundFiles: SoundFile[]) => void; // Add this prop
+  onSoundFilesChange?: (soundFiles: SoundFile[]) => void;
 }
 
 export const LayerControls: React.FC<LayerControlsProps> = ({
@@ -146,8 +156,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   dragHandleProps,
   activePreset,
   onPresetUpdate,
-  isPlaying = false, // Default to false if not provided
-  onSoundFilesChange, // Add this prop
+  onSoundFilesChange,
 }) => {
   const sounds = layer.sounds || [];
   const [selectedSoundIndex, setSelectedSoundIndex] = useState(layer.selectedSoundIndex || 0);
@@ -157,6 +166,29 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   const [newLayerName, setNewLayerName] = useState(layer.name);
   const [newLoopLength, setNewLoopLength] = useState(layer.loopLengthMs);
   const [tempValues, setTempValues] = useState<Record<string, number>>({});
+  const [playingLayers, setPlayingLayers] = useState<string[]>([]);
+
+  // Set up polling for playing layers
+  useEffect(() => {
+    const fetchPlayingLayers = async () => {
+      try {
+        const response = await fetch(API_PLAYING_LAYERS);
+        const data = await response.json();
+        setPlayingLayers(data.playing_layers);
+      } catch (error) {
+        console.error('Failed to fetch playing layers:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchPlayingLayers();
+
+    // Set up polling interval
+    const intervalId = setInterval(fetchPlayingLayers, 250);
+
+    // Cleanup on unmount
+    return () => clearInterval(intervalId);
+  }, []); // Empty dependency array since we want this to run once on mount
 
   // Get the current effective value for a property (preset value if exists, otherwise layer value)
   const getEffectiveValue = (property: 'volume' | 'weight' | 'chance' | 'frequency' | 'cooldownCycles' | 'mode', soundId?: string): number | LayerMode => {
@@ -553,7 +585,7 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
           <DragIndicator sx={{ color: 'text.secondary', opacity: 0.5 }} />
         </Box>
         <Typography variant="subtitle1" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-          <StatusLight isPlaying={isPlaying} />
+          <StatusLight isPlaying={playingLayers.includes(layer.id)} />
           {layer.name}
           <Typography variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
             ({layer.loopLengthMs} ms)

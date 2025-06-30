@@ -452,6 +452,7 @@ class AudioMixer:
                                 continue
 
                             should_play = layer_info.should_play
+                            layer_info.should_play_cached = should_play or layer_info.is_fading
 
                             if layer_info.previous_volume != layer_sound.effective_volume and should_play:
                                 layer_sound.start_fade_in(layer_info.previous_volume)
@@ -674,7 +675,6 @@ class AudioMixer:
 
             # Create new LayerInfo using preloaded audio data
             layer_info = LayerInfo(
-                audio_data=sound_file.audio_data,
                 layer=layer
             )
 

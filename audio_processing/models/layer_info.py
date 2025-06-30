@@ -14,7 +14,7 @@ class LayerInfo:
     SAMPLE_RATE = 48000  # Hz
     CHANNELS = 2
 
-    def __init__(self, audio_data: np.ndarray, layer: Layer):
+    def __init__(self, layer: Layer):
         """Initialize a new audio layer.
         
         Args:
@@ -36,6 +36,7 @@ class LayerInfo:
         # Fields that track the state of the sound at the last processing cycle
         self.was_playing = True
         self.previous_volume = self.get_layer_sound().effective_volume
+        self.should_play_cached = False # This is used to cache the previous should_play value without doing any of the computation
 
     @property
     def layer(self) -> Layer:
@@ -150,6 +151,7 @@ class LayerInfo:
         self._cooldown_cycles_elapsed = 0
         self._chance_roll = random.random()
         self.was_playing = True
+        self.should_play_cached = False
         self.previous_volume = self.get_layer_sound().effective_volume
 
     @property

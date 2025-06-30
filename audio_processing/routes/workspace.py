@@ -455,3 +455,19 @@ def play_soundboard_sound(sound_id: str):
     except Exception as e:
         logger.error(f"Error playing soundboard sound: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
+
+
+@workspace_bp.route('/playing-layers', methods=['GET'])
+def get_playing_layers():
+    """Get a list of layer IDs that are currently playing"""
+    if not mixer or not mixer.cached_layers or not mixer.is_running:
+        return jsonify({"playing_layers": []})
+    
+    playing_layers = []
+    for layer_info in mixer.cached_layers.values():
+        if layer_info.should_play_cached:
+            layer_id = layer_info.layer.id
+            if layer_id not in playing_layers:
+                playing_layers.append(layer_id)
+
+    return jsonify({"playing_layers": playing_layers})
