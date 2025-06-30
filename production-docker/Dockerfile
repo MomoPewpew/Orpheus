@@ -2,7 +2,7 @@
 # Frontend: React/TypeScript
 # Backend: Python/Flask
 
-FROM alpine:latest as downloader
+FROM alpine:latest AS downloader
 WORKDIR /download
 RUN apk add --no-cache curl unzip
 RUN curl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.1/Orpheus.v1.1.zip -o orpheus.zip
