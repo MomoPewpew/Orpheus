@@ -23,6 +23,20 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
+# Create nginx temp directories
+RUN mkdir -p /tmp/nginx/client_temp \
+    && mkdir -p /tmp/nginx/proxy_temp \
+    && mkdir -p /tmp/nginx/fastcgi_temp \
+    && mkdir -p /tmp/nginx/uwsgi_temp \
+    && mkdir -p /tmp/nginx/scgi_temp \
+    && mkdir -p /tmp/nginx/run
+
+# Modify nginx config to use temp directories
+RUN sed -i 's/user www-data/user root/g' /etc/nginx/nginx.conf \
+    && sed -i 's/pid \/run\/nginx.pid/pid \/tmp\/nginx\/run\/nginx.pid/g' /etc/nginx/nginx.conf \
+    && sed -i 's/\/var\/log\/nginx\/error.log/\/tmp\/nginx\/error.log/g' /etc/nginx/nginx.conf \
+    && sed -i 's/\/var\/log\/nginx\/access.log/\/tmp\/nginx\/access.log/g' /etc/nginx/nginx.conf
+
 # Create and activate virtual environment
 ENV VIRTUAL_ENV=/opt/venv
 RUN python -m venv $VIRTUAL_ENV
@@ -30,8 +44,6 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-RUN ln -sf /dev/stdout /var/log/nginx/access.log \
-    && ln -sf /dev/stderr /var/log/nginx/error.log
 
 # Copy app files and install Python dependencies
 COPY --from=downloader /app /app
@@ -55,6 +67,10 @@ RUN chmod +x /start.sh
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONFAULTHANDLER=1
 ENV PYTHONTRACEMALLOC=1
+
+# Create data directory with proper permissions
+RUN mkdir -p /app/audio_processing/data && \
+    chmod -R 777 /app/audio_processing/data /tmp/nginx
 
 EXPOSE 80 5000
 
