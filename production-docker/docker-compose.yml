@@ -13,3 +13,5 @@ services:
     ports:
       - "${WEB_PORT:-8080}:80"  # Use WEB_PORT from env or default to 8080
       - "5000:5000"  # FastAPI port
+    volumes:
+      - ./data:/app/audio_processing/data  # Map data directory for easy access
