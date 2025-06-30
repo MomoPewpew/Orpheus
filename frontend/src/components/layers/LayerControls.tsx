@@ -343,20 +343,49 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
     }
   };
 
+  const handleSliderChange = (key: string, value: number) => {
+    setTempValues(prev => ({ ...prev, [key]: value }));
+  };
+
+  const clearTempValue = (key: string) => {
+    setTempValues(prev => {
+      const newValues = { ...prev };
+      delete newValues[key];
+      return newValues;
+    });
+  };
+
   const handleLayerVolumeChange = (newValue: number) => {
+    clearTempValue('volume');
     // Skip if value hasn't changed
     if (newValue === getEffectiveValue('volume')) {
       return;
     }
 
     if (activePreset?.layers) {
+      // Get the base layer value
+      const baseValue = getDefaultValue('volume');
+      
       // Handle preset override
       const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
+      
+      // If the new value matches the base value, remove the volume property
+      const updatedPresetLayer = newValue === baseValue
+        ? { ...presetLayer, volume: undefined }
+        : { ...presetLayer, volume: newValue };
+
+      // Remove the layer entirely if it has no overrides left
       const updatedPreset = {
         ...activePreset,
         layers: activePreset.layers
           .filter(p => p.id !== layer.id)
-          .concat([{ ...presetLayer, volume: newValue }])
+          .concat([updatedPresetLayer])
+          .filter(p => {
+            // Keep the layer if it has properties beyond id or has sounds
+            const hasOverrides = Object.keys(p).length > 1;
+            const hasSounds = p.sounds && p.sounds.length > 0;
+            return hasOverrides || hasSounds;
+          })
       };
       onPresetUpdate(updatedPreset);
     } else {
@@ -366,19 +395,36 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   };
 
   const handleLayerWeightChange = (newValue: number) => {
+    clearTempValue('weight');
     // Skip if value hasn't changed
     if (newValue === getEffectiveValue('weight')) {
       return;
     }
 
     if (activePreset?.layers) {
+      // Get the base layer value
+      const baseValue = getDefaultValue('weight');
+      
       // Handle preset override
       const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
+      
+      // If the new value matches the base value, remove the weight property
+      const updatedPresetLayer = newValue === baseValue
+        ? { ...presetLayer, weight: undefined }
+        : { ...presetLayer, weight: newValue };
+
+      // Remove the layer entirely if it has no overrides left
       const updatedPreset = {
         ...activePreset,
         layers: activePreset.layers
           .filter(p => p.id !== layer.id)
-          .concat([{ ...presetLayer, weight: newValue }])
+          .concat([updatedPresetLayer])
+          .filter(p => {
+            // Keep the layer if it has properties beyond id or has sounds
+            const hasOverrides = Object.keys(p).length > 1;
+            const hasSounds = p.sounds && p.sounds.length > 0;
+            return hasOverrides || hasSounds;
+          })
       };
       onPresetUpdate(updatedPreset);
     } else {
@@ -388,19 +434,36 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   };
 
   const handleLayerChanceChange = (newValue: number) => {
+    clearTempValue('chance');
     // Skip if value hasn't changed
     if (newValue === getEffectiveValue('chance')) {
       return;
     }
 
     if (activePreset?.layers) {
+      // Get the base layer value
+      const baseValue = getDefaultValue('chance');
+      
       // Handle preset override
       const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
+      
+      // If the new value matches the base value, remove the chance property
+      const updatedPresetLayer = newValue === baseValue
+        ? { ...presetLayer, chance: undefined }
+        : { ...presetLayer, chance: newValue };
+
+      // Remove the layer entirely if it has no overrides left
       const updatedPreset = {
         ...activePreset,
         layers: activePreset.layers
           .filter(p => p.id !== layer.id)
-          .concat([{ ...presetLayer, chance: newValue }])
+          .concat([updatedPresetLayer])
+          .filter(p => {
+            // Keep the layer if it has properties beyond id or has sounds
+            const hasOverrides = Object.keys(p).length > 1;
+            const hasSounds = p.sounds && p.sounds.length > 0;
+            return hasOverrides || hasSounds;
+          })
       };
       onPresetUpdate(updatedPreset);
     } else {
@@ -410,19 +473,36 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   };
 
   const handleLayerCooldownChange = (newValue: number) => {
+    clearTempValue('cooldownCycles');
     // Skip if value hasn't changed
     if (newValue === getEffectiveValue('cooldownCycles')) {
       return;
     }
 
     if (activePreset?.layers) {
+      // Get the base layer value
+      const baseValue = getDefaultValue('cooldownCycles');
+      
       // Handle preset override
       const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
+      
+      // If the new value matches the base value, remove the cooldownCycles property
+      const updatedPresetLayer = newValue === baseValue
+        ? { ...presetLayer, cooldownCycles: undefined }
+        : { ...presetLayer, cooldownCycles: newValue };
+
+      // Remove the layer entirely if it has no overrides left
       const updatedPreset = {
         ...activePreset,
         layers: activePreset.layers
           .filter(p => p.id !== layer.id)
-          .concat([{ ...presetLayer, cooldownCycles: newValue }])
+          .concat([updatedPresetLayer])
+          .filter(p => {
+            // Keep the layer if it has properties beyond id or has sounds
+            const hasOverrides = Object.keys(p).length > 1;
+            const hasSounds = p.sounds && p.sounds.length > 0;
+            return hasOverrides || hasSounds;
+          })
       };
       onPresetUpdate(updatedPreset);
     } else {
@@ -432,30 +512,36 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   };
 
   const handleSoundVolumeChange = (selectedSound: LayerSound, newValue: number) => {
+    clearTempValue(`volume-${selectedSound.id}`);
     // Skip if value hasn't changed
     if (newValue === getEffectiveValue('volume', selectedSound.id)) {
       return;
     }
 
     if (activePreset?.layers) {
+      // Get the base sound value
+      const baseValue = getDefaultValue('volume', selectedSound.id);
+      
       // Handle preset override
       const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
       const existingPresetSound = presetLayer.sounds?.find(s => s.id === selectedSound.id);
       
-      // Create a properly typed PresetSound object
+      // If the new value matches the base value, remove the volume property
       const updatedPresetSound: PresetSound = {
         id: selectedSound.id,
-        fileId: selectedSound.fileId,  // Include required fileId
-        volume: newValue,
-        // Preserve existing frequency if it exists
-        ...(existingPresetSound?.frequency !== undefined && { frequency: existingPresetSound.frequency })
+        fileId: selectedSound.fileId,
+        ...(existingPresetSound?.frequency !== undefined && { frequency: existingPresetSound.frequency }),
+        ...(newValue !== baseValue && { volume: newValue })
       };
       
-      const updatedPresetSounds: PresetSound[] = presetLayer.sounds
+      // Only include the sound if it has overrides
+      const hasOverrides = Object.keys(updatedPresetSound).length > 2; // More than just id and fileId
+      
+      const updatedPresetSounds = presetLayer.sounds
         ? presetLayer.sounds
             .filter(s => s.id !== selectedSound.id)
-            .concat([updatedPresetSound])
-        : [updatedPresetSound];
+            .concat(hasOverrides ? [updatedPresetSound] : [])
+        : (hasOverrides ? [updatedPresetSound] : []);
 
       const updatedPreset = {
         ...activePreset,
@@ -467,7 +553,9 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
           }])
           .filter(p => {
             // Keep the layer if it has properties beyond id or has sounds
-            return Object.keys(p).length > 1 || (p.sounds && p.sounds.length > 0);
+            const hasOverrides = Object.keys(p).length > 1;
+            const hasSounds = p.sounds && p.sounds.length > 0;
+            return hasOverrides || hasSounds;
           })
       };
 
@@ -481,30 +569,36 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
   };
 
   const handleSoundFrequencyChange = (selectedSound: LayerSound, newValue: number) => {
+    clearTempValue(`frequency-${selectedSound.id}`);
     // Skip if value hasn't changed
     if (newValue === getEffectiveValue('frequency', selectedSound.id)) {
       return;
     }
 
     if (activePreset?.layers) {
+      // Get the base sound value
+      const baseValue = getDefaultValue('frequency', selectedSound.id);
+      
       // Handle preset override
       const presetLayer = activePreset.layers.find(p => p.id === layer.id) || { id: layer.id };
       const existingPresetSound = presetLayer.sounds?.find(s => s.id === selectedSound.id);
       
-      // Create a properly typed PresetSound object
+      // If the new value matches the base value, remove the frequency property
       const updatedPresetSound: PresetSound = {
         id: selectedSound.id,
-        fileId: selectedSound.fileId,  // Include required fileId
-        frequency: newValue,
-        // Preserve existing volume if it exists
-        ...(existingPresetSound?.volume !== undefined && { volume: existingPresetSound.volume })
+        fileId: selectedSound.fileId,
+        ...(existingPresetSound?.volume !== undefined && { volume: existingPresetSound.volume }),
+        ...(newValue !== baseValue && { frequency: newValue })
       };
       
-      const updatedPresetSounds: PresetSound[] = presetLayer.sounds
+      // Only include the sound if it has overrides
+      const hasOverrides = Object.keys(updatedPresetSound).length > 2; // More than just id and fileId
+      
+      const updatedPresetSounds = presetLayer.sounds
         ? presetLayer.sounds
             .filter(s => s.id !== selectedSound.id)
-            .concat([updatedPresetSound])
-        : [updatedPresetSound];
+            .concat(hasOverrides ? [updatedPresetSound] : [])
+        : (hasOverrides ? [updatedPresetSound] : []);
 
       const updatedPreset = {
         ...activePreset,
@@ -516,7 +610,9 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
           }])
           .filter(p => {
             // Keep the layer if it has properties beyond id or has sounds
-            return Object.keys(p).length > 1 || (p.sounds && p.sounds.length > 0);
+            const hasOverrides = Object.keys(p).length > 1;
+            const hasSounds = p.sounds && p.sounds.length > 0;
+            return hasOverrides || hasSounds;
           })
       };
 
@@ -565,10 +661,6 @@ export const LayerControls: React.FC<LayerControlsProps> = ({
         selectedSoundIndex: newIndex
       });
     }
-  };
-
-  const handleSliderChange = (key: string, value: number) => {
-    setTempValues(prev => ({ ...prev, [key]: value }));
   };
 
   return (
