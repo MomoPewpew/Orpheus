@@ -107,8 +107,8 @@ These dependencies are automatically handled by Docker. Listed here for referenc
    - Discord bot
 
 4. Access the services:
-   - Web Control Panel: http://localhost:3000
-   - Audio Processing API: http://localhost:8000
+   - Web Control Panel: http://0.0.0.0:3000
+   - Audio Processing API: http://0.0.0.0:8000
    - Discord Bot: Will connect to Discord when properly configured
 
 To stop the services:
@@ -121,15 +121,16 @@ docker compose down
 You can also run Orpheus directly from Docker Hub without cloning the repository:
 
 ```bash
-docker run -e DISCORD_TOKEN=your_token_here -p 5000:5000 -p 8080:80 momopewpew/orpheus:latest
+docker run -e DISCORD_TOKEN=your_token_here -p 5000:5000 -p 8080:80 -v ./data:/home/container/audio_processing/data momopewpew/orpheus:selfcontained
 ```
 
-Then access the web interface at `http://localhost:8080`
+Then access the web interface at `http://0.0.0.0:8080`
 
 Make sure to:
 - Replace `your_token_here` with your actual Discord bot token
 - The web interface will be available on port 8080
 - The API will be available on port 5000
+- The `data` directory in your current folder will be mapped to the container's data directory, making config files easily accessible
 
 ## Usage
 

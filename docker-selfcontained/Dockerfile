@@ -6,7 +6,7 @@ FROM alpine:latest AS downloader
 WORKDIR /download
 RUN apk add --no-cache curl unzip
 RUN curl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.1/Orpheus.v1.1.zip -o orpheus.zip
-RUN unzip orpheus.zip -d /app
+RUN unzip orpheus.zip -d /home/container
 RUN rm orpheus.zip
 
 # Final stage with Python and nginx
@@ -46,18 +46,18 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy app files and install Python dependencies
-COPY --from=downloader /app /app
-WORKDIR /app/audio_processing
+COPY --from=downloader /home/container /home/container
+WORKDIR /home/container/audio_processing
 
 # Copy frontend files to Flask static directory
 RUN mkdir -p static && \
-    cp -r /app/frontend/* static/
+    cp -r /home/container/frontend/* static/
 
 # Install Python packages with verbose output
 RUN pip install --verbose -r requirements.txt
-WORKDIR /app/discord_bot
+WORKDIR /home/container/discord_bot
 RUN pip install --verbose -r requirements.txt
-WORKDIR /app/audio_processing
+WORKDIR /home/container/audio_processing
 
 # Copy startup script
 COPY start.sh /start.sh
@@ -69,8 +69,8 @@ ENV PYTHONFAULTHANDLER=1
 ENV PYTHONTRACEMALLOC=1
 
 # Create data directory with proper permissions
-RUN mkdir -p /app/audio_processing/data && \
-    chmod -R 777 /app/audio_processing/data /tmp/nginx
+RUN mkdir -p /home/container/audio_processing/data && \
+    chmod -R 777 /home/container/audio_processing/data /tmp/nginx
 
 EXPOSE 80 5000
 

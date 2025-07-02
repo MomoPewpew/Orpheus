@@ -36,7 +36,7 @@ import { alpha } from '@mui/material/styles';
 
 export {};
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://0.0.0.0:5000/api';
 const API_PLAYING_LAYERS = `${API_BASE}/playing-layers`;
 
 // Custom styled Slider that shows both default and preset values
