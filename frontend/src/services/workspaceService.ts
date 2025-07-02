@@ -1,7 +1,7 @@
 import { Environment, SoundFile, Effects } from '../types/audio';
 
 // Get the API URL from environment or use default
-const API_BASE = process.env.REACT_APP_API_URL || 'http://0.0.0.0:5000/api';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 const API_WORKSPACE = `${API_BASE}/workspace`;
 
 // Helper function to convert JS booleans to Python-style booleans in JSON

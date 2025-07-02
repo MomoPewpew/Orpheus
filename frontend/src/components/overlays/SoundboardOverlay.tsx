@@ -22,7 +22,7 @@ import { DragDropContext, Draggable, Droppable, DropResult } from '@hello-pangea
 
 type Mode = 'play' | 'delete' | 'rearrange';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://0.0.0.0:5000/api';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 const API_SOUNDBOARD = `${API_BASE}/soundboard/play`;
 
 interface SoundboardOverlayProps {

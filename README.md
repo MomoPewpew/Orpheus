@@ -107,8 +107,8 @@ These dependencies are automatically handled by Docker. Listed here for referenc
    - Discord bot
 
 4. Access the services:
-   - Web Control Panel: http://0.0.0.0:3000
-   - Audio Processing API: http://0.0.0.0:8000
+   - Web Control Panel: http://localhost:3000
+   - Audio Processing API: http://localhost:8000
    - Discord Bot: Will connect to Discord when properly configured
 
 To stop the services:
@@ -135,7 +135,7 @@ docker run -e DISCORD_TOKEN=YOUR_TOKEN_HERE \
   momopewpew/orpheus:v1.2-selfcontained
 ```
 
-Then access the web interface at `http://0.0.0.0:8080`
+Then access the web interface at `http://localhost:8080`
 
 Make sure to:
 - Replace `your_token_here` with your actual Discord bot token
