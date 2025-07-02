@@ -120,8 +120,19 @@ docker compose down
 
 You can also run Orpheus directly from Docker Hub without cloning the repository:
 
+Powershell:
 ```bash
-docker run -e DISCORD_TOKEN=your_token_here -p 5000:5000 -p 8080:80 -v ./data:/home/container/audio_processing/data momopewpew/orpheus:selfcontained
+docker run -e DISCORD_TOKEN=YOUR_TOKEN_HERE `
+  -p 5000:5000 -p 8080:80 `
+  --mount type=bind,src=${PWD}\data,dst=/app/audio_processing/data `
+  momopewpew/orpheus:v1.2-selfcontained
+```
+Linux:
+```bash
+docker run -e DISCORD_TOKEN=YOUR_TOKEN_HERE \
+  -p 5000:5000 -p 8080:80 \
+  --mount type=bind,src="$(pwd)/data",dst=/app/audio_processing/data \
+  momopewpew/orpheus:v1.2-selfcontained
 ```
 
 Then access the web interface at `http://0.0.0.0:8080`
