@@ -9,12 +9,11 @@ RUN curl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.2.1/Orphe
 RUN unzip orpheus.zip -d /app
 RUN rm orpheus.zip
 
-# Final stage with Python and nginx
+# Final stage
 FROM python:3.9-slim
 
-# Install nginx and other dependencies
+# Install other dependencies
 RUN apt-get update && apt-get install -y \
-    nginx \
     build-essential \
     python3-dev \
     libffi-dev \
@@ -28,9 +27,6 @@ RUN apt-get update && apt-get install -y \
 ENV VIRTUAL_ENV=/opt/venv
 RUN python -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-# Copy nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Create container directory and copy app files
 RUN mkdir -p /app
@@ -64,6 +60,6 @@ ENV PYTHONTRACEMALLOC=1
 RUN mkdir -p /app/audio_processing/data && \
     chmod -R 777 /app/audio_processing/data
 
-EXPOSE 80 5000
+EXPOSE 5000
 
 CMD ["/app/start.sh"] 
