@@ -2,20 +2,20 @@
 
 # Start nginx with error checking
 echo "Starting nginx..."
-nginx -g 'daemon off; error_log /tmp/nginx/error.log warn;' &
+nginx -g 'daemon off;' &
 NGINX_PID=$!
 
 # Check if nginx started successfully
 sleep 1
 if ! kill -0 $NGINX_PID 2>/dev/null; then
     echo "Nginx failed to start. Check error logs:"
-    cat /tmp/nginx/error.log
+    cat /var/log/nginx/error.log
     exit 1
 fi
 
 echo "Nginx started successfully (PID: $NGINX_PID)"
 echo "Checking nginx error log..."
-tail -f /tmp/nginx/error.log &
+tail -f /var/log/nginx/error.log &
 
 echo "Activating virtual environment..."
 export PATH="/opt/venv/bin:$PATH"
@@ -59,4 +59,4 @@ FASTAPI_PID=$!
 wait $FLASK_PID $FASTAPI_PID $NGINX_PID
 
 # Exit with status of process that exited first
-exit $? 
+exit $?
