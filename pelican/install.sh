@@ -9,6 +9,14 @@ curl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.2.1/Orpheus.v
 unzip orpheus.zip
 rm orpheus.zip
 
+# Fix paths in start.sh
+echo "Fixing paths in start.sh..."
+sed -i 's|/app|/home/container|g' /mnt/server/start.sh
+# Add PYTHONPATH to start.sh after virtual environment activation
+sed -i '/source \/opt\/venv\/bin\/activate/a export PYTHONPATH=/home/container:$PYTHONPATH' /mnt/server/start.sh
+dos2unix /mnt/server/start.sh
+chmod +x /mnt/server/start.sh
+
 # Ensure proper permissions
 echo "Setting permissions..."
 chmod -R 755 /mnt/server
