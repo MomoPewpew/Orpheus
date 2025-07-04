@@ -1,18 +1,7 @@
-# Multi-stage build file for Orpheus production deployment
-# Frontend: React/TypeScript
-# Backend: Python/Flask
-
-FROM alpine:latest AS downloader
-WORKDIR /download
-RUN apk add --no-cache curl unzip
-RUN curl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.2.1/Orpheus.v1.2.1.zip -o orpheus.zip
-RUN unzip orpheus.zip -d /app
-RUN rm orpheus.zip
-
-# Final stage
+# Base Python image for Orpheus
 FROM python:3.9-slim
 
-# Install other dependencies
+# Install dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     python3-dev \
@@ -21,45 +10,41 @@ RUN apt-get update && apt-get install -y \
     vim \
     ffmpeg \
     dos2unix \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -d /home/container -s /bin/bash container
 
 # Create and activate virtual environment
 ENV VIRTUAL_ENV=/opt/venv
 RUN python -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Create container directory and copy app files
-RUN mkdir -p /app
-COPY --from=downloader /app/ /app/
+# Copy requirements files
+COPY requirements/discord_bot/requirements.txt /requirements/discord_bot/requirements.txt
+COPY requirements/audio_processing/requirements.txt /requirements/audio_processing/requirements.txt
 
-# Copy and prepare start script
-COPY ["./start.sh", "/app/start.sh"]
-RUN dos2unix /app/start.sh && \
-    chmod +x /app/start.sh && \
-    ls -la /app/start.sh && \
-    cat /app/start.sh
-
-WORKDIR /app/audio_processing
-
-# Copy frontend files to Flask static directory
-RUN mkdir -p static && \
-    cp -r /app/frontend/* static/
-
-# Install Python packages with verbose output
-RUN pip install --verbose -r requirements.txt
-WORKDIR /app/discord_bot
-RUN pip install --verbose -r requirements.txt
-WORKDIR /app/audio_processing
+# Install Python packages
+RUN pip install -r /requirements/audio_processing/requirements.txt && \
+    pip install -r /requirements/discord_bot/requirements.txt
 
 # Set environment variables for better debugging
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONFAULTHANDLER=1
 ENV PYTHONTRACEMALLOC=1
 
-# Create data directory with proper permissions
-RUN mkdir -p /app/audio_processing/data && \
-    chmod -R 777 /app/audio_processing/data
+# Copy and set up entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN dos2unix /entrypoint.sh && \
+    chmod +x /entrypoint.sh && \
+    chown container:container /entrypoint.sh
 
-EXPOSE 5000
+# Set working directory and ensure container user has access
+WORKDIR /home/container
+RUN chown container:container /home/container
 
-CMD ["/app/start.sh"] 
+# Set container user and environment
+USER container
+ENV USER=container HOME=/home/container
+
+EXPOSE 5000 5001
+
+CMD ["/bin/bash", "/entrypoint.sh"]
