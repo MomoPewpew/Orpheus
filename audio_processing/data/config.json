@@ -1,9 +1,9 @@
 {
   "effects": {
     "compressor": {
-      "highThreshold": 0,
-      "lowThreshold": -40,
-      "ratio": 1
+      "highThreshold": 0.0,
+      "lowThreshold": -40.0,
+      "ratio": 1.0
     },
     "fades": {
       "crossfadeDuration": 4000,
@@ -11,21 +11,31 @@
     },
     "filters": {
       "dampenSpeechRange": {
-        "amount": 0
+        "amount": 0.0
       },
       "highPass": {
-        "frequency": 400
+        "frequency": 0.0
       },
       "lowPass": {
-        "frequency": 10000
+        "frequency": 20000.0
       }
     },
     "normalize": {
-      "enabled": "True"
+      "enabled": true
     }
   },
   "environments": [],
-  "files": [],
+  "files": [
+    {
+      "duration_ms": 355079,
+      "id": "f0252ab9-cbf3-48c8-a108-5167495f354d",
+      "name": "Lil Jon Get low (dirty) version",
+      "original_filename": "Lil_Jon_Get_low_dirty_version",
+      "path": "/app/audio_processing/data/audio/f0252ab9-cbf3-48c8-a108-5167495f354d.mp3",
+      "peak_volume": 0.5897611379623413,
+      "usageCount": 0
+    }
+  ],
   "masterVolume": 1.0,
   "soundboard": []
 }
