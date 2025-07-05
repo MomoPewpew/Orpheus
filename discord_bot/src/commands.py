@@ -19,66 +19,73 @@ def register_commands(bot: discord.Client) -> None:
     async def join(interaction: discord.Interaction):
         """Join the voice channel you're currently in."""
         try:
-            # Send immediate response instead of deferring
+            # Send immediate response
             await interaction.response.send_message("Connecting to voice channel...", ephemeral=True)
-
+            
             logger.info(f"Join command received from {interaction.user} in {interaction.guild.name}")
-
+            
             # Check if user is in a voice channel
             if not interaction.user.voice:
                 logger.warning(f"User {interaction.user} is not in a voice channel")
                 await interaction.edit_original_response(
                     content="You need to be in a voice channel to use this command.")
                 return
-
+            
             # Get the voice channel
             channel = interaction.user.voice.channel
-
+            logger.info(f"Target voice channel: {channel.name} (ID: {channel.id})")
+            
             # Check if we're already in this voice channel
             if interaction.guild.voice_client and interaction.guild.voice_client.channel == channel:
                 logger.info(f"Already in channel {channel.name}")
                 await interaction.edit_original_response(content=f"Already in {channel.name}")
                 return
-
-            # If we're in a different channel, disconnect first
+            
+            # If connected to any voice channel, disconnect first
             if interaction.guild.voice_client:
-                logger.info("Disconnecting from current channel before joining new one")
-                await interaction.guild.voice_client.disconnect()
+                try:
+                    logger.info("Disconnecting from current channel")
+                    await interaction.guild.voice_client.disconnect(force=False)
+                    await asyncio.sleep(1)  # Brief wait for state to clear
+                except Exception as e:
+                    logger.warning(f"Error during disconnect: {e}")
 
             try:
-                logger.info(f"Joining channel {channel.name}")
-                # Set a reasonable timeout for the connection attempt
-                try:
-                    await asyncio.wait_for(channel.connect(), timeout=10.0)
-                    # Set the guild ID using the bot manager
-                    if hasattr(bot, '_bot_manager'):
-                        bot._bot_manager.set_guild_id(interaction.guild_id)
-                    else:
-                        # Fallback to just setting it in the bot
-                        bot.set_active_guild(interaction.guild_id)
-                        logger.warning("Bot manager not available, guild ID only set in bot")
-                    await interaction.edit_original_response(content=f"Joined {channel.name}")
-                except asyncio.TimeoutError:
-                    logger.error("Timed out while trying to join voice channel")
+                # Use the high-level connect with proper settings
+                voice_client = await channel.connect(
+                    timeout=10.0,  # Increased timeout
+                    self_deaf=True,
+                    reconnect=True  # Enable automatic reconnection
+                )
+                
+                if voice_client and voice_client.is_connected():
+                    logger.info(f"Successfully connected to {channel.name}")
+                    bot.set_active_guild(interaction.guild_id)
                     await interaction.edit_original_response(
-                        content="Connection timed out. Please try again or check if the bot has proper permissions.")
-                except Exception as e:
-                    logger.error(f"Error joining channel: {e}")
-                    await interaction.edit_original_response(
-                        content="Failed to join the voice channel. Please check if the bot has proper permissions.")
-            except Exception as e:
-                logger.error(f"Unexpected error in join command: {e}")
+                        content=f"Successfully joined {channel.name}")
+                else:
+                    raise Exception("Failed to establish voice connection")
+                    
+            except asyncio.TimeoutError:
+                logger.error("Connection timed out")
                 await interaction.edit_original_response(
-                    content="An unexpected error occurred. Please try again later.")
+                    content="Connection timed out. Please try again.")
+            except Exception as e:
+                logger.error(f"Failed to join voice channel: {e}")
+                await interaction.edit_original_response(
+                    content="Failed to join the voice channel. Please try again in a few moments.")
+                
         except Exception as e:
             logger.error(f"Failed to handle join command: {e}")
             # If we failed to send the initial response, try to respond with an error
             try:
-                if not interaction.response.isdone():
-                    await interaction.response.send_message("Failed to process command. Please try again.",
-                                                            ephemeral=True)
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        "Failed to process command. Please try again.",
+                        ephemeral=True
+                    )
             except:
-                pass  # If this fails too, we can't do much more
+                pass
 
     @bot.tree.command(name="leave", description="Leave the current voice channel")
     async def leave(interaction: discord.Interaction):
