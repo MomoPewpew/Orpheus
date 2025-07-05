@@ -5,7 +5,7 @@
 FROM alpine:latest AS downloader
 WORKDIR /download
 RUN apk add --no-cache curl unzip
-RUN curl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.2.1/Orpheus.v1.2.1.zip -o orpheus.zip
+RUN curl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.2.2/Orpheus.v1.2.2.zip -o orpheus.zip
 RUN unzip orpheus.zip -d /app
 RUN rm orpheus.zip
 
