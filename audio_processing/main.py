@@ -31,7 +31,7 @@ app.add_middleware(
 app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR)), name="audio")
 
 # Serve frontend static files - Create React App structure
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR / "static")), name="static")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 def load_config() -> Dict[str, Any]:

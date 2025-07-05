@@ -1,8 +1,5 @@
 import { Environment, SoundFile, Effects } from '../types/audio';
-
-// Get the API URL from environment or use default
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-const API_WORKSPACE = `${API_BASE}/workspace`;
+import { buildApiUrl, API_ENDPOINTS } from '../utils/api';
 
 // Helper function to convert JS booleans to Python-style booleans in JSON
 function convertToPythonBooleans(obj: any): any {
@@ -83,7 +80,7 @@ export async function saveWorkspace(state: WorkspaceState): Promise<void> {
     // Convert to JSON string with no whitespace
     const requestBody = JSON.stringify(pythonState);
     
-    const response = await fetch(API_WORKSPACE, {
+    const response = await fetch(buildApiUrl(API_ENDPOINTS.workspace), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -108,8 +105,8 @@ export async function saveWorkspace(state: WorkspaceState): Promise<void> {
  */
 export async function loadWorkspace(): Promise<WorkspaceState> {
   try {
-    console.debug('Loading workspace state from:', API_WORKSPACE);
-    const response = await fetch(API_WORKSPACE);
+    console.debug('Loading workspace state from:', buildApiUrl(API_ENDPOINTS.workspace));
+    const response = await fetch(buildApiUrl(API_ENDPOINTS.workspace));
     
     const responseText = await response.text();
     console.debug('Raw response from server:', responseText);

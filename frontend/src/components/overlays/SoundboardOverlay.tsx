@@ -19,11 +19,9 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { Environment, SoundFile } from '../../types/audio';
 import AddLayerDialog from '../AddLayerDialog';
 import { DragDropContext, Draggable, Droppable, DropResult } from '@hello-pangea/dnd';
+import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
 
 type Mode = 'play' | 'delete' | 'rearrange';
-
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-const API_SOUNDBOARD = `${API_BASE}/soundboard/play`;
 
 interface SoundboardOverlayProps {
   environment: Environment;
@@ -62,7 +60,7 @@ export const SoundboardOverlay: React.FC<SoundboardOverlayProps> = ({
     if (mode === 'play') {
       // Play the sound through the backend
       try {
-        await fetch(`${API_SOUNDBOARD}/${soundId}`, {
+        await fetch(buildApiUrl(`${API_ENDPOINTS.soundboard}/${soundId}`), {
           method: 'POST'
         });
       } catch (error) {
@@ -81,7 +79,7 @@ export const SoundboardOverlay: React.FC<SoundboardOverlayProps> = ({
     if (mode === 'play') {
       // Play the sound through the backend
       try {
-        await fetch(`${API_SOUNDBOARD}/${soundId}`, {
+        await fetch(buildApiUrl(`${API_ENDPOINTS.soundboard}/${soundId}`), {
           method: 'POST'
         });
       } catch (error) {

@@ -7,7 +7,7 @@ services:
     container_name: orpheus-app
     environment:
       - DISCORD_TOKEN=  # User must set this
-      - REACT_APP_API_URL=http://localhost:5000/api
+      - REACT_APP_API_URL=/api
       - PYTHONPATH=/app/audio_processing  # Add audio_processing to Python path
     ports:
       - "5000:5000"  # FastAPI port

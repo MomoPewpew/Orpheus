@@ -1,7 +1,5 @@
 import { SoundFile } from '../types/audio';
-
-const API_BASE = 'http://localhost:5000/api';
-const API_FILES = `${API_BASE}/files`;
+import { buildApiUrl, API_ENDPOINTS } from '../utils/api';
 
 /**
  * Upload a new audio file
@@ -14,7 +12,7 @@ export const uploadFile = async (file: File, name?: string): Promise<SoundFile> 
       formData.append('name', name);
     }
 
-    const response = await fetch(API_FILES, {
+    const response = await fetch(buildApiUrl(API_ENDPOINTS.files), {
       method: 'POST',
       body: formData,
     });
@@ -35,11 +33,9 @@ export const uploadFile = async (file: File, name?: string): Promise<SoundFile> 
  */
 export const listFiles = async (searchQuery?: string): Promise<SoundFile[]> => {
   try {
-    const url = new URL(API_FILES);
-    if (searchQuery) {
-      url.searchParams.append('search', searchQuery);
-    }
-    const response = await fetch(url.toString());
+    const url = buildApiUrl(API_ENDPOINTS.files, searchQuery ? { search: searchQuery } : undefined);
+    const response = await fetch(url);
+    
     if (!response.ok) {
       throw new Error('Failed to fetch files');
     }
@@ -54,11 +50,11 @@ export const listFiles = async (searchQuery?: string): Promise<SoundFile[]> => {
  * Get the URL for an audio file
  */
 export const getFileUrl = (fileId: string): string => {
-  return `${API_FILES}/${fileId}`;
+  return buildApiUrl(`${API_ENDPOINTS.files}/${fileId}`);
 };
 
 export const deleteFile = async (fileId: string): Promise<void> => {
-  const response = await fetch(`${API_FILES}/${fileId}`, {
+  const response = await fetch(buildApiUrl(`${API_ENDPOINTS.files}/${fileId}`), {
     method: 'DELETE'
   });
 
