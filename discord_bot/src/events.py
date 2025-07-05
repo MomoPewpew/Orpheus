@@ -18,23 +18,26 @@ def register_events(bot: discord.Client) -> None:
         logger.info(f'Bot Name: {bot.user.name}')
         logger.info(f'Bot Discriminator: {bot.user.discriminator}')
 
-        # List all guilds and their permissions
+        # Only sync commands globally
+        try:
+            logger.info("Attempting to sync commands globally...")
+            await bot.tree.sync()
+            global_commands = await bot.tree.fetch_commands()
+            logger.info(f"Global commands synced successfully. Available commands: {[cmd.name for cmd in global_commands]}")
+        except discord.Forbidden as e:
+            logger.error(f"Failed to sync commands globally - Missing Permissions: {e}")
+        except Exception as e:
+            logger.error(f"Failed to sync commands globally: {e}")
+
+        # Log guild information without syncing
         logger.info(f'Connected to {len(bot.guilds)} guilds:')
         for guild in bot.guilds:
             logger.info(f'- {guild.name} (id: {guild.id})')
-            # Get bot's permissions in this guild
             bot_member = guild.get_member(bot.user.id)
             if bot_member:
                 logger.info(f'  Bot permissions: {bot_member.guild_permissions}')
-                # Try to sync commands for each guild
-                try:
-                    await bot.tree.sync(guild=guild)
-                    logger.info(f"  Commands synced for guild {guild.name}")
-                    # List all commands
-                    commands = await bot.tree.fetch_commands(guild=guild)
-                    logger.info(f"  Available commands: {[cmd.name for cmd in commands]}")
-                except Exception as e:
-                    logger.error(f"  Error syncing commands for guild {guild.name}: {e}")
+                if not bot_member.guild_permissions.use_application_commands:
+                    logger.warning(f"  Missing 'use_application_commands' permission in guild {guild.name}")
             else:
                 logger.warning(f'  Bot not found in guild {guild.name}')
 
@@ -44,8 +47,8 @@ def register_events(bot: discord.Client) -> None:
         bot_member = guild.get_member(bot.user.id)
         if bot_member:
             logger.info(f'Bot permissions in new guild: {bot_member.guild_permissions}')
-        # Sync commands with the new guild
-        await bot.tree.sync(guild=guild)
+            if not bot_member.guild_permissions.use_application_commands:
+                logger.warning(f"Missing 'use_application_commands' permission in new guild {guild.name}")
 
     @bot.event
     async def on_voice_state_update(member, before, after):
