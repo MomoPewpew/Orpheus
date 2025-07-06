@@ -60,7 +60,13 @@ def register_commands(bot: discord.Client) -> None:
                 
                 if voice_client and voice_client.is_connected():
                     logger.info(f"Successfully connected to {channel.name}")
-                    bot.set_active_guild(interaction.guild_id)
+                    # Set the guild ID using the bot manager
+                    if hasattr(bot, '_bot_manager'):
+                        bot._bot_manager.set_guild_id(interaction.guild_id)
+                    else:
+                        # Fallback to just setting it in the bot
+                        bot.set_active_guild(interaction.guild_id)
+                        logger.warning("Bot manager not available, guild ID only set in bot")
                     await interaction.edit_original_response(
                         content=f"Successfully joined {channel.name}")
                 else:
