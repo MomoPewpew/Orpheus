@@ -4,6 +4,7 @@ from typing import List, Optional, Dict
 from enum import Enum
 import logging
 import numpy as np
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,9 @@ class SoundFile:
 
     def __post_init__(self):
         """Load audio data immediately after initialization"""
-        from audio_processing.models.mixer import mixer, AUDIO_DIR
+        from audio_processing.models.mixer import mixer
         try:
-            sound_path = AUDIO_DIR / f"{self.id}.mp3"
+            sound_path = Path(self.path)
             if not sound_path.exists():
                 logger.warning(f"Audio file not found during initialization: {sound_path}")
                 return
