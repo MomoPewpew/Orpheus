@@ -291,8 +291,8 @@ class AudioMixer:
             chunks_sent = 0
             
             # Pre-allocate mix buffers
-            main_mix = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.int32)
-            env_mix = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.int32)
+            main_mix = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.float32)
+            env_mix = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.float32)
 
             while self.is_running:
                 loop_start_ns = time.time_ns()
@@ -464,13 +464,16 @@ class AudioMixer:
                                 layer_sound.start_fade_out()
 
                             if should_play or layer_info.is_fading:
+                                # Convert chunk to float32 if it isn't already
+                                chunk_float = chunk.astype(np.float32) / 32768.0
+
                                 # Apply volume if needed
                                 current_volume = layer_info.volume
                                 if current_volume != 1.0:
-                                    chunk = (chunk.astype(np.float32) * current_volume).astype(np.int16)
+                                    chunk_float *= current_volume
 
-                                # Mix this layer into environment mix
-                                env_mix += chunk.astype(np.int32)
+                                # Mix this layer into environment mix (staying in float32)
+                                env_mix += chunk_float
                                 layer_info.has_played = True
 
                             layer_info.was_playing = should_play
@@ -479,12 +482,10 @@ class AudioMixer:
 
                         # If environment had active layers, apply fade volume and add to main mix
                         if env_active_layers > 0:
-                            # Convert to float32 for fade volume multiplication
-                            env_mix_float = env_mix.astype(np.float32) / 32768.0
-                            # Apply fade volume
-                            env_mix_float *= env_fade_volume
-                            # Convert back to int32 and add to main mix
-                            main_mix += (env_mix_float * 32768.0).astype(np.int32)
+                            # Apply fade volume (already in float32)
+                            env_mix *= env_fade_volume
+                            # Add to main mix (staying in float32)
+                            main_mix += env_mix
                             active_layers += env_active_layers
 
                     # Mix in soundboard sounds
@@ -500,38 +501,37 @@ class AudioMixer:
                         # Get layer sound for volume
                         layer_sound = layer_info.get_layer_sound()
                         if layer_sound:
-                            # Convert to float32 for volume multiplication
+                            # Keep everything in float32 throughout the mixing chain
                             chunk_float = chunk.astype(np.float32) / 32768.0
                             # Apply sound volume
                             chunk_float *= layer_sound.effective_volume
-                            # Convert back to int32 and add to main mix
-                            main_mix += (chunk_float * 32768.0).astype(np.int32)
+                            # Add to main mix (staying in float32)
+                            main_mix += chunk_float
                             active_layers += 1
 
                     if active_layers > 0:
                         chunks_processed += 1
 
-                        # Apply filters to the mixed chunk
+                        # Apply filters to the mixed chunk (still in float32)
                         main_mix = self._apply_filters(main_mix)
 
-                        # Convert to float32 for compression
-                        mixed_chunk_float = main_mix.astype(np.float32) / 32768.0
-
-                        # Apply compression
-                        mixed_chunk_float = self._apply_compressor(mixed_chunk_float)
+                        # Apply compression (already in float32)
+                        main_mix = self._apply_compressor(main_mix)
 
                         # Apply speech range dampening
-                        mixed_chunk_float = self._apply_speech_dampening(mixed_chunk_float)
+                        main_mix = self._apply_speech_dampening(main_mix)
 
                         # Apply master volume
                         if self.app_state:
-                            mixed_chunk_float *= self.app_state.master_volume
+                            main_mix *= self.app_state.master_volume
 
-                        # Convert back to int16 and clip
-                        mixed_chunk = np.clip(mixed_chunk_float * 32768.0, -32768, 32767).astype(np.int16)
+                        # Only convert to int16 at the final output stage
+                        # Add clipping protection here
+                        main_mix = np.clip(main_mix, -1.0, 1.0)
+                        output_chunk = (main_mix * 32768.0).astype(np.int16)
 
                         # Convert to bytes and send
-                        pcm_data = mixed_chunk.tobytes()
+                        pcm_data = output_chunk.tobytes()
                         if self._bot_manager and hasattr(self._bot_manager, 'audio_manager'):
                             success = self._bot_manager.audio_manager.queue_audio(self._guild_id, pcm_data)
                             if success:
