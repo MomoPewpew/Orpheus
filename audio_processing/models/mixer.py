@@ -525,9 +525,15 @@ class AudioMixer:
                         if self.app_state:
                             main_mix *= self.app_state.master_volume
 
-                        # Only convert to int16 at the final output stage
-                        # Add clipping protection here
-                        main_mix = np.clip(main_mix, -1.0, 1.0)
+                        # Auto-scale to prevent clipping while preserving dynamics
+                        max_amplitude = np.max(np.abs(main_mix))
+                        if max_amplitude > 1.0:
+                            # Scale down by just enough to prevent clipping
+                            main_mix /= max_amplitude
+                            if max_amplitude > 1.5:  # Only log if scaling was significant
+                                logger.debug(f"Auto-scaled output by {1/max_amplitude:.3f} to prevent clipping")
+
+                        # Convert to int16 for output
                         output_chunk = (main_mix * 32768.0).astype(np.int16)
 
                         # Convert to bytes and send
