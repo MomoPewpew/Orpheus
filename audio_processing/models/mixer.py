@@ -591,12 +591,14 @@ class AudioMixer:
         """Load an audio file and convert it to the correct format."""
         try:
             logger.info(f"Loading audio file: {file_path}")
-            audio = AudioSegment.from_file(str(file_path))
+            # Explicitly specify format based on file extension
+            format = file_path.suffix.lower()[1:]  # Remove the dot from extension
+            audio = AudioSegment.from_file(str(file_path), format=format)
 
             # Log audio file properties
             logger.info(
                 f"Audio properties - Duration: {len(audio)}ms, Channels: {audio.channels}," +
-                " Sample width: {audio.sample_width}, Frame rate: {audio.frame_rate}")
+                f" Sample width: {audio.sample_width}, Frame rate: {audio.frame_rate}")
 
             # Convert to proper format
             audio = audio.set_frame_rate(self.SAMPLE_RATE)
@@ -618,8 +620,9 @@ class AudioMixer:
             # Log final array properties
             logger.info(f"Final array shape: {samples.shape}, Max value: {np.max(np.abs(samples))}")
 
-            # Normalize to float32 [-1.0, 1.0]
-            samples = samples.astype(np.float32) / 32768.0
+            # Normalize based on the audio's sample width
+            max_value = float(2 ** (8 * audio.sample_width - 1))
+            samples = samples.astype(np.float32) / max_value
 
             return samples
 
