@@ -294,6 +294,9 @@ class AudioMixer:
             main_mix = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.float32)
             env_mix = np.zeros((self.chunk_samples, self.CHANNELS), dtype=np.float32)
 
+            # Track first chunk for fade-in
+            is_first_chunk = True
+
             while self.is_running:
                 loop_start_ns = time.time_ns()
 
@@ -532,6 +535,16 @@ class AudioMixer:
                             main_mix /= max_amplitude
                             if max_amplitude > 1.5:  # Only log if scaling was significant
                                 logger.debug(f"Auto-scaled output by {1/max_amplitude:.3f} to prevent clipping")
+
+                        # Apply smooth fade-in to first chunk to prevent popping
+                        if is_first_chunk:
+                            # Create a short fade-in curve (10ms)
+                            fade_samples = min(int(0.010 * self.SAMPLE_RATE), self.chunk_samples)  # 10ms fade or shorter
+                            fade_curve = np.linspace(0, 1, fade_samples)
+                            # Apply to both channels
+                            main_mix[:fade_samples] *= fade_curve[:, np.newaxis]
+                            is_first_chunk = False
+                            logger.debug(f"Applied {fade_samples/self.SAMPLE_RATE*1000:.1f}ms fade-in to first chunk")
 
                         # Convert to int16 for output
                         output_chunk = (main_mix * 32768.0).astype(np.int16)
