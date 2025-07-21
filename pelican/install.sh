@@ -5,7 +5,7 @@ echo "Installing Orpheus..."
 
 # Download and extract Orpheus
 echo "Downloading Orpheus..."
-curl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.2.2/Orpheus.v1.2.2-pelican.zip -o orpheus.zip
+curl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.2.3/Orpheus.v1.2.3-pelican.zip -o orpheus.zip
 unzip orpheus.zip
 rm orpheus.zip
 
