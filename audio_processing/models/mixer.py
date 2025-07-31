@@ -332,14 +332,9 @@ class AudioMixer:
                     # Check if voice client is still connected
                     if hasattr(self._bot_manager, 'is_voice_connected'):
                         if not self._bot_manager.is_voice_connected(self._guild_id):
-                            logger.warning("Voice client disconnected, attempting to reconnect")
-                            try:
-                                self._bot_manager.ensure_voice_client(self._guild_id)
-                                time.sleep(0.5)  # Wait for connection
-                            except Exception as e:
-                                logger.error(f"Failed to reconnect voice client: {e}")
-                                next_frame_time += frame_time_ns
-                                continue
+                            logger.warning("Voice client disconnected")
+                            next_frame_time += frame_time_ns
+                            continue
 
                     # Check Discord's buffer status
                     if hasattr(self._bot_manager, 'audio_manager'):
