@@ -34,31 +34,54 @@ def filelock():
         # Ensure the lock file's directory exists
         LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
         
-        # Create the lock file if it doesn't exist
-        if not LOCK_FILE.exists():
-            LOCK_FILE.touch()
-
-        # Open the lock file in append mode
+        # If lock file exists, check if it's stale
+        if LOCK_FILE.exists():
+            try:
+                # Try to remove the lock file - if it's locked by an active process, this will fail
+                LOCK_FILE.unlink()
+                logger.info("Removed stale lock file")
+            except (PermissionError, OSError):
+                # If we can't remove it, it might be actively held
+                logger.debug("Lock file is in use")
+        
+        # Create/open the lock file
+        LOCK_FILE.touch()
         lock_file = open(LOCK_FILE, 'a')
 
         # Try to acquire lock, wait up to 5 seconds
         start_time = time.time()
+        retry_count = 0
+        max_retries = 50  # 5 seconds with 0.1s sleep
+        
         while True:
             try:
                 # Try to acquire an exclusive lock
                 fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                logger.debug("Successfully acquired file lock")
                 break
-            except IOError:
-                if time.time() - start_time > 5:
+            except (IOError, BlockingIOError) as e:
+                retry_count += 1
+                if retry_count >= max_retries:
+                    logger.error(f"Failed to acquire lock after {retry_count} attempts: {e}")
                     raise TimeoutError("Could not acquire lock after 5 seconds")
                 time.sleep(0.1)
 
         yield
+    except Exception as e:
+        logger.error(f"Error in file lock: {e}")
+        raise
     finally:
         if lock_file:
-            # Release the lock and close the file
-            fcntl.flock(lock_file, fcntl.LOCK_UN)
-            lock_file.close()
+            try:
+                # Release the lock and close the file
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+                lock_file.close()
+                # Try to remove the lock file
+                if LOCK_FILE.exists():
+                    LOCK_FILE.unlink()
+            except Exception as e:
+                logger.error(f"Error cleaning up lock file: {e}")
+                # Don't raise here as we're in finally block
 
 
 def allowed_file(filename: str) -> bool:
