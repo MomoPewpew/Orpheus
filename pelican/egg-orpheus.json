@@ -4,7 +4,7 @@
         "version": "PLCN_v1",
         "update_url": null
     },
-    "exported_at": "2025-07-05T11:03:16+00:00",
+    "exported_at": "2025-08-15T18:36:15+00:00",
     "name": "Orpheus",
     "author": "marijntepas@gmail.com",
     "uuid": "1af8619d-db98-4b88-a351-199e86fb397b",
@@ -18,7 +18,7 @@
     "startup": "\/home\/container\/start.sh",
     "config": {
         "files": "{}",
-        "startup": "{}",
+        "startup": "{\n    \"done\": \"Bot permissions: <Permissions value=\"\n}",
         "logs": "{}",
         "stop": "pkill -9 -f \"python app.py|uvicorn\""
     },
