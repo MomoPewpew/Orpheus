@@ -57,4 +57,4 @@ echo "All applications started successfully"
 
 # Keep container running and show logs
 echo "Tailing application logs..."
-tail -f /home/container/flask.log /home/container/fastapi.log
+sleep infinity
