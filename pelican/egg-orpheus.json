@@ -1,10 +1,10 @@
 {
     "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PANEL",
     "meta": {
-        "version": "PLCN_v1",
+        "version": "PLCN_v2",
         "update_url": null
     },
-    "exported_at": "2025-08-15T18:36:15+00:00",
+    "exported_at": "2025-08-16T07:42:42+00:00",
     "name": "Orpheus",
     "author": "marijntepas@gmail.com",
     "uuid": "1af8619d-db98-4b88-a351-199e86fb397b",
@@ -12,21 +12,21 @@
     "tags": [],
     "features": [],
     "docker_images": {
-        "momopewpew\/orpheus": "momopewpew\/orpheus:v1.2.4-pelican"
+        "momopewpew/orpheus": "momopewpew/orpheus:v1.2.4-pelican"
     },
     "file_denylist": [],
-    "startup": "\/home\/container\/start.sh",
+    "startup": "/home/container/start.sh",
     "config": {
         "files": "{}",
         "startup": "{\n    \"done\": \"Bot permissions: <Permissions value=\"\n}",
         "logs": "{}",
-        "stop": "pkill -9 -f \"python app.py|uvicorn\""
+        "stop": "^C"
     },
     "scripts": {
         "installation": {
-            "script": "#!\/bin\/bash\r\ncd \/mnt\/server\r\n\r\necho \"Installing Orpheus...\"\r\n\r\n# Download and extract Orpheus\r\necho \"Downloading Orpheus...\"\r\ncurl -L https:\/\/github.com\/MomoPewpew\/Orpheus\/releases\/download\/v1.2.4\/Orpheus.v1.2.4-pelican.zip -o orpheus.zip\r\nunzip orpheus.zip\r\nrm orpheus.zip\r\n\r\n# Fix paths in start.sh\r\necho \"Fixing paths in start.sh...\"\r\nsed -i 's|\/app|\/home\/container|g' \/mnt\/server\/start.sh\r\n# Add PYTHONPATH to start.sh after virtual environment activation\r\nsed -i '\/source \\\/opt\\\/venv\\\/bin\\\/activate\/a export PYTHONPATH=\/home\/container:$PYTHONPATH' \/mnt\/server\/start.sh\r\ndos2unix \/mnt\/server\/start.sh\r\nchmod +x \/mnt\/server\/start.sh\r\n\r\n# Ensure proper permissions\r\necho \"Setting permissions...\"\r\nchmod -R 755 \/mnt\/server\r\n\r\n# Create necessary directories\r\necho \"Creating data directory...\"\r\nmkdir -p \/mnt\/server\/audio_processing\/data\r\nchmod -R 777 \/mnt\/server\/audio_processing\/data\r\n\r\n# Verify critical files\r\nif [ ! -f \/mnt\/server\/start.sh ]; then\r\n    echo \"ERROR: Critical file start.sh not found!\"\r\n    exit 1\r\nfi\r\n\r\necho \"Installation complete! You can now start the server.\"\r\nexit 0 ",
-            "container": "ghcr.io\/pelican-eggs\/installers:debian",
-            "entrypoint": "\/bin\/bash"
+            "script": "#!/bin/bash\r\ncd /mnt/server\r\n\r\necho \"Installing Orpheus...\"\r\n\r\n# Download and extract Orpheus\r\necho \"Downloading Orpheus...\"\r\ncurl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.2.4/Orpheus.v1.2.4-pelican.zip -o orpheus.zip\r\nunzip -o orpheus.zip\r\nrm orpheus.zip\r\n\r\n# Fix paths in start.sh\r\necho \"Fixing paths in start.sh...\"\r\nsed -i 's|/app|/home/container|g' /mnt/server/start.sh\r\n# Add PYTHONPATH to start.sh after virtual environment activation\r\nsed -i '/source \\/opt\\/venv\\/bin\\/activate/a export PYTHONPATH=/home/container:$PYTHONPATH' /mnt/server/start.sh\r\ndos2unix /mnt/server/start.sh\r\nchmod +x /mnt/server/start.sh\r\n\r\n# Ensure proper permissions\r\necho \"Setting permissions...\"\r\nchmod -R 755 /mnt/server\r\n\r\n# Create necessary directories\r\necho \"Creating data directory...\"\r\nmkdir -p /mnt/server/audio_processing/data\r\nchmod -R 777 /mnt/server/audio_processing/data\r\n\r\n# Verify critical files\r\nif [ ! -f /mnt/server/start.sh ]; then\r\n    echo \"ERROR: Critical file start.sh not found!\"\r\n    exit 1\r\nfi\r\n\r\necho \"Installation complete! You can now start the server.\"\r\nexit 0 ",
+            "container": "ghcr.io/pelican-eggs/installers:debian",
+            "entrypoint": "/bin/bash"
         }
     },
     "variables": [
