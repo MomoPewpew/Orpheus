@@ -125,14 +125,14 @@ Powershell:
 docker run -e DISCORD_TOKEN=YOUR_TOKEN_HERE `
   -p 5000:5000 -p 8080:80 `
   --mount type=bind,src=${PWD}\data,dst=/app/audio_processing/data `
-  momopewpew/orpheus:v1.2.4-selfcontained
+  momopewpew/orpheus:v1.3.0-selfcontained
 ```
 Linux:
 ```bash
 docker run -e DISCORD_TOKEN=YOUR_TOKEN_HERE \
   -p 5000:5000 -p 8080:80 \
   --mount type=bind,src="$(pwd)/data",dst=/app/audio_processing/data \
-  momopewpew/orpheus:v1.2.4-selfcontained
+  momopewpew/orpheus:v1.3.0-selfcontained
 ```
 
 Then access the web interface at `http://localhost:8080`

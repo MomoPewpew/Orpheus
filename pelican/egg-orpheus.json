@@ -12,7 +12,7 @@
     "tags": [],
     "features": [],
     "docker_images": {
-        "momopewpew/orpheus": "momopewpew/orpheus:v1.2.4-pelican"
+        "momopewpew/orpheus": "momopewpew/orpheus:v1.3.0-pelican"
     },
     "file_denylist": [],
     "startup": "/home/container/start.sh",
@@ -24,7 +24,7 @@
     },
     "scripts": {
         "installation": {
-            "script": "#!/bin/bash\r\ncd /mnt/server\r\n\r\necho \"Installing Orpheus...\"\r\n\r\n# Download and extract Orpheus\r\necho \"Downloading Orpheus...\"\r\ncurl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.2.4/Orpheus.v1.2.4-pelican.zip -o orpheus.zip\r\nunzip -o orpheus.zip\r\nrm orpheus.zip\r\n\r\n# Fix paths in start.sh\r\necho \"Fixing paths in start.sh...\"\r\nsed -i 's|/app|/home/container|g' /mnt/server/start.sh\r\n# Add PYTHONPATH to start.sh after virtual environment activation\r\nsed -i '/source \\/opt\\/venv\\/bin\\/activate/a export PYTHONPATH=/home/container:$PYTHONPATH' /mnt/server/start.sh\r\ndos2unix /mnt/server/start.sh\r\nchmod +x /mnt/server/start.sh\r\n\r\n# Ensure proper permissions\r\necho \"Setting permissions...\"\r\nchmod -R 755 /mnt/server\r\n\r\n# Create necessary directories\r\necho \"Creating data directory...\"\r\nmkdir -p /mnt/server/audio_processing/data\r\nchmod -R 777 /mnt/server/audio_processing/data\r\n\r\n# Verify critical files\r\nif [ ! -f /mnt/server/start.sh ]; then\r\n    echo \"ERROR: Critical file start.sh not found!\"\r\n    exit 1\r\nfi\r\n\r\necho \"Installation complete! You can now start the server.\"\r\nexit 0 ",
+            "script": "#!/bin/bash\r\ncd /mnt/server\r\n\r\necho \"Installing Orpheus...\"\r\n\r\n# Download and extract Orpheus\r\necho \"Downloading Orpheus...\"\r\ncurl -L https://github.com/MomoPewpew/Orpheus/releases/download/v1.3.0/Orpheus.v1.3.0-pelican.zip -o orpheus.zip\r\nunzip -o orpheus.zip\r\nrm orpheus.zip\r\n\r\n# Fix paths in start.sh\r\necho \"Fixing paths in start.sh...\"\r\nsed -i 's|/app|/home/container|g' /mnt/server/start.sh\r\n# Add PYTHONPATH to start.sh after virtual environment activation\r\nsed -i '/source \\/opt\\/venv\\/bin\\/activate/a export PYTHONPATH=/home/container:$PYTHONPATH' /mnt/server/start.sh\r\ndos2unix /mnt/server/start.sh\r\nchmod +x /mnt/server/start.sh\r\n\r\n# Ensure proper permissions\r\necho \"Setting permissions...\"\r\nchmod -R 755 /mnt/server\r\n\r\n# Create necessary directories\r\necho \"Creating data directory...\"\r\nmkdir -p /mnt/server/audio_processing/data\r\nchmod -R 777 /mnt/server/audio_processing/data\r\n\r\n# Verify critical files\r\nif [ ! -f /mnt/server/start.sh ]; then\r\n    echo \"ERROR: Critical file start.sh not found!\"\r\n    exit 1\r\nfi\r\n\r\necho \"Installation complete! You can now start the server.\"\r\nexit 0 ",
             "container": "ghcr.io/pelican-eggs/installers:debian",
             "entrypoint": "/bin/bash"
         }
