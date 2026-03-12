@@ -52,7 +52,7 @@ RUN mkdir -p static && \
 # Install Python packages with verbose output
 RUN pip install --verbose -r requirements.txt
 WORKDIR /app/discord_bot
-RUN pip install --verbose -r requirements.txt
+RUN pip install --verbose -r requirements.txt davey
 WORKDIR /app/audio_processing
 
 # Set environment variables for better debugging
