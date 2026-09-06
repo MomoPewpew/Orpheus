@@ -328,14 +328,6 @@ const ConfigOverlay: React.FC<ConfigOverlayProps> = ({
       // Update workspace-level effects
       onEffectsUpdate(effects);
 
-      // Update the environment WITHOUT the effects
-      if (environments.length > 0) {
-        const { effects: oldEffects, ...envWithoutEffects } = environments[0];
-        await onEnvironmentUpdate({
-          ...envWithoutEffects
-        });
-      }
-      
       onClose();
     } catch (error) {
       console.error('Failed to save config:', error);
