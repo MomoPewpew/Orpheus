@@ -1,5 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
+from audio_processing.logging_config import configure_logging
 from audio_processing.routes.workspace import workspace_bp, reset_play_states_on_startup, load_workspace
 from audio_processing.routes.files import files_bp
 from audio_processing.models.bot_manager import BotManager, DiscordBotManager
@@ -8,12 +9,10 @@ import os
 import logging
 import threading
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure console + daily error file logging
+_error_log_path = configure_logging()
 logger = logging.getLogger(__name__)
+logger.info(f"Error log file: {_error_log_path}")
 
 
 def is_main_process():
