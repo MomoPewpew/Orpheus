@@ -4,7 +4,15 @@ from pathlib import Path
 import logging
 from audio_processing.models.audio import AppState, PlayState, Effects
 from audio_processing.models.mixer import mixer
-from audio_processing.routes.files import filelock, get_default_config, atomic_write_json
+from audio_processing.routes.files import (
+    filelock,
+    get_default_config,
+    atomic_write_json,
+    config_file_is_readable,
+    rebuild_files_from_audio_dir,
+    AUDIO_DIR,
+    ALLOWED_EXTENSIONS,
+)
 import random
 
 # Configure logging
@@ -23,7 +31,7 @@ def load_workspace() -> AppState:
     try:
         with filelock():
             DATA_DIR.mkdir(parents=True, exist_ok=True)
-            if not CONFIG_FILE.exists():
+            if not config_file_is_readable():
                 logger.debug("Config file not found, creating default")
                 default_config = get_default_config()
                 atomic_write_json(CONFIG_FILE, default_config, sort_keys=True)
@@ -41,6 +49,20 @@ def load_workspace() -> AppState:
 
             try:
                 config = json.loads(content)
+
+                # Recover files registry if it was wiped but audio still exists
+                files = config.get('files') or []
+                audio_files = [
+                    p for p in AUDIO_DIR.iterdir()
+                    if p.is_file() and p.suffix.lower().lstrip('.') in ALLOWED_EXTENSIONS
+                ] if AUDIO_DIR.exists() else []
+                if not files and audio_files:
+                    logger.warning(
+                        "Config has no files but %d audio files on disk; rebuilding registry",
+                        len(audio_files),
+                    )
+                    config['files'] = rebuild_files_from_audio_dir(files)
+                    atomic_write_json(CONFIG_FILE, config, sort_keys=True)
 
                 # Create AppState
                 app_state = AppState.from_dict(config)
@@ -80,7 +102,7 @@ def save_workspace(app_state: AppState):
 
             # Load existing config to merge files
             current_config = {}
-            if CONFIG_FILE.exists():
+            if config_file_is_readable():
                 with open(CONFIG_FILE, 'r') as f:
                     content = f.read().strip()
                     if content:
@@ -90,16 +112,31 @@ def save_workspace(app_state: AppState):
                             logger.error(f"Error reading existing config: {e}")
                             current_config = {}
 
-            # Merge files lists, keeping new files and preserving existing ones
             current_files = current_config.get('files', [])
             new_files = new_config.get('files', [])
+            current_envs = current_config.get('environments', [])
+            new_envs = new_config.get('environments', [])
 
-            # Create a map of file IDs to files from both lists
-            files_map = {f['id']: f for f in current_files}
-            files_map.update({f['id']: f for f in new_files})
+            # Guard against empty-default wipes (the failure mode that erased this workspace)
+            if (
+                not new_files and not new_envs and not new_config.get('soundboard')
+                and (current_files or current_envs)
+            ):
+                raise ValueError(
+                    "Refusing to overwrite a non-empty workspace with an empty config payload"
+                )
 
-            # Use the merged map values as our files list
-            new_config['files'] = list(files_map.values())
+            # Never replace a populated files registry with an empty one
+            if current_files and not new_files:
+                logger.warning(
+                    "Incoming workspace has no files; preserving %d files from disk",
+                    len(current_files),
+                )
+                new_config['files'] = current_files
+            else:
+                files_map = {f['id']: f for f in current_files}
+                files_map.update({f['id']: f for f in new_files})
+                new_config['files'] = list(files_map.values())
 
             atomic_write_json(CONFIG_FILE, new_config, sort_keys=True)
 
@@ -114,9 +151,26 @@ def ensure_workspace_dir():
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         with filelock():
             DATA_DIR.mkdir(parents=True, exist_ok=True)
-            if not CONFIG_FILE.exists():
+            if not config_file_is_readable():
                 logger.debug("Config file not found, creating default")
                 atomic_write_json(CONFIG_FILE, get_default_config(), sort_keys=True)
+                return
+
+            with open(CONFIG_FILE, 'r') as f:
+                content = f.read().strip()
+            config = json.loads(content) if content else get_default_config()
+            files = config.get('files') or []
+            audio_files = [
+                p for p in AUDIO_DIR.iterdir()
+                if p.is_file() and p.suffix.lower().lstrip('.') in ALLOWED_EXTENSIONS
+            ] if AUDIO_DIR.exists() else []
+            if not files and audio_files:
+                logger.warning(
+                    "Config has no files but %d audio files on disk; rebuilding registry",
+                    len(audio_files),
+                )
+                config['files'] = rebuild_files_from_audio_dir(files)
+                atomic_write_json(CONFIG_FILE, config, sort_keys=True)
     except Exception as e:
         logger.error(f"Error ensuring workspace directory: {e}", exc_info=True)
 
@@ -126,7 +180,7 @@ def reset_play_states_on_startup():
     try:
         ensure_workspace_dir()
         with filelock():
-            if not CONFIG_FILE.exists():
+            if not config_file_is_readable():
                 return
 
             with open(CONFIG_FILE, 'r') as f:

@@ -3,7 +3,7 @@ from werkzeug.utils import secure_filename
 import os
 from pathlib import Path
 from models.sound_file import SoundFile
-from typing import List
+from typing import List, Optional
 import json
 import logging
 import fcntl
@@ -24,6 +24,22 @@ LOCK_FILE = DATA_DIR / 'config.lock'
 
 # Allowed audio file extensions
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg'}
+
+
+def config_file_is_readable() -> bool:
+    """Return True only if config.json can actually be opened for reading.
+
+    Path.exists() is unreliable on broken Docker/NFS dentries and was the
+    trigger for overwriting a real config with an empty default.
+    """
+    try:
+        with open(CONFIG_FILE, 'r'):
+            return True
+    except FileNotFoundError:
+        return False
+    except OSError as e:
+        logger.warning(f"Config file present but unreadable ({e})")
+        return False
 
 
 def _open_lock_file():
@@ -66,6 +82,45 @@ def atomic_write_json(path: Path, data: dict, *, sort_keys: bool = False) -> Non
             except OSError:
                 pass
         _write()
+
+
+def rebuild_files_from_audio_dir(existing_files: Optional[List[dict]] = None) -> List[dict]:
+    """Rebuild the files registry from audio/ on disk, preserving known metadata."""
+    existing_by_id = {f['id']: f for f in (existing_files or []) if f.get('id')}
+    rebuilt: List[dict] = []
+
+    if not AUDIO_DIR.exists():
+        return list(existing_by_id.values())
+
+    for audio_path in sorted(AUDIO_DIR.iterdir()):
+        if not audio_path.is_file():
+            continue
+        if audio_path.suffix.lower().lstrip('.') not in ALLOWED_EXTENSIONS:
+            continue
+
+        file_id = audio_path.stem
+        existing = existing_by_id.pop(file_id, None)
+        if existing:
+            # Keep metadata; refresh path in case the mount prefix changed
+            existing = dict(existing)
+            existing['path'] = str(audio_path)
+            rebuilt.append(existing)
+            continue
+
+        # Best-effort entry; peak/duration can be refined on next upload/analyze
+        rebuilt.append({
+            'id': file_id,
+            'name': file_id,
+            'path': str(audio_path),
+            'peak_volume': 1.0,
+            'duration_ms': 0,
+            'original_filename': file_id,
+            'usageCount': 0,
+        })
+
+    # Keep any config entries whose files are temporarily missing from disk
+    rebuilt.extend(existing_by_id.values())
+    return rebuilt
 
 
 @contextmanager
@@ -142,7 +197,7 @@ def load_config() -> dict:
     """Load the config file with file locking."""
     try:
         with filelock():
-            if not CONFIG_FILE.exists():
+            if not config_file_is_readable():
                 logger.debug("Config file not found, creating default")
                 default_config = get_default_config()
                 # Write the default config to file
@@ -174,6 +229,19 @@ def load_config() -> dict:
                 config.setdefault("masterVolume", 1.0)
                 config.setdefault("soundboard", [])
                 config.setdefault("effects", get_default_config()["effects"])
+
+                # Recover wiped files registry from audio on disk
+                audio_files = [
+                    p for p in AUDIO_DIR.iterdir()
+                    if p.is_file() and p.suffix.lower().lstrip('.') in ALLOWED_EXTENSIONS
+                ] if AUDIO_DIR.exists() else []
+                if not config.get("files") and audio_files:
+                    logger.warning(
+                        "Config has no files but %d audio files on disk; rebuilding registry",
+                        len(audio_files),
+                    )
+                    config["files"] = rebuild_files_from_audio_dir(config.get("files"))
+                    atomic_write_json(CONFIG_FILE, config)
 
                 return config
 
@@ -232,12 +300,28 @@ def ensure_directories():
 
         # Now use the lock to create/update the config file
         with filelock():
-            # Create default config if it doesn't exist
-            if not CONFIG_FILE.exists():
+            # Only create a default when the file is truly unreadable — never
+            # trust Path.exists() alone on bind mounts.
+            if not config_file_is_readable():
                 logger.debug(f"Creating default config file at {CONFIG_FILE}")
-                # Write the default config directly here instead of calling save_config
-                # to avoid potential recursive lock acquisition
                 atomic_write_json(CONFIG_FILE, get_default_config())
+            else:
+                # If the registry was wiped but audio files remain, rebuild it
+                with open(CONFIG_FILE, 'r') as f:
+                    content = f.read().strip()
+                config = json.loads(content) if content else get_default_config()
+                files = config.get('files') or []
+                audio_files = [
+                    p for p in AUDIO_DIR.iterdir()
+                    if p.is_file() and p.suffix.lower().lstrip('.') in ALLOWED_EXTENSIONS
+                ] if AUDIO_DIR.exists() else []
+                if not files and audio_files:
+                    logger.warning(
+                        "Config has no files but %d audio files on disk; rebuilding registry",
+                        len(audio_files),
+                    )
+                    config['files'] = rebuild_files_from_audio_dir(files)
+                    atomic_write_json(CONFIG_FILE, config)
     except Exception as e:
         logger.error(f"Error ensuring directories: {e}", exc_info=True)
         raise
