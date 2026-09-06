@@ -4,8 +4,7 @@ from pathlib import Path
 import logging
 from audio_processing.models.audio import AppState, PlayState, Effects
 from audio_processing.models.mixer import mixer
-from audio_processing.routes.files import filelock, get_default_config
-import os
+from audio_processing.routes.files import filelock, get_default_config, atomic_write_json
 import random
 
 # Configure logging
@@ -23,11 +22,11 @@ def load_workspace() -> AppState:
     """Load the workspace configuration."""
     try:
         with filelock():
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
             if not CONFIG_FILE.exists():
                 logger.debug("Config file not found, creating default")
                 default_config = get_default_config()
-                with open(CONFIG_FILE, 'w') as f:
-                    json.dump(default_config, f, indent=2)
+                atomic_write_json(CONFIG_FILE, default_config, sort_keys=True)
                 return AppState.from_dict(default_config)
 
             # Read the file content first to check if it's empty
@@ -37,8 +36,7 @@ def load_workspace() -> AppState:
             if not content:
                 logger.debug("Config file empty, creating default")
                 default_config = get_default_config()
-                with open(CONFIG_FILE, 'w') as f:
-                    json.dump(default_config, f, indent=2)
+                atomic_write_json(CONFIG_FILE, default_config, sort_keys=True)
                 return AppState.from_dict(default_config)
 
             try:
@@ -56,13 +54,15 @@ def load_workspace() -> AppState:
                 import time
                 backup_path = CONFIG_FILE.with_suffix(f'.bak.{int(time.time())}')
                 logger.warning(f"Backing up corrupted config to {backup_path}")
-                with open(backup_path, 'w') as f:
-                    f.write(content)
+                try:
+                    with open(backup_path, 'w') as f:
+                        f.write(content)
+                except OSError as backup_error:
+                    logger.error(f"Failed to backup corrupted config: {backup_error}")
 
                 # Create new default config
                 default_config = get_default_config()
-                with open(CONFIG_FILE, 'w') as f:
-                    json.dump(default_config, f, indent=2)
+                atomic_write_json(CONFIG_FILE, default_config, sort_keys=True)
                 return AppState.from_dict(default_config)
 
     except Exception as e:
@@ -74,6 +74,7 @@ def save_workspace(app_state: AppState):
     """Save the workspace configuration."""
     try:
         with filelock():
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
             # Convert AppState to dict
             new_config = app_state.to_dict()
 
@@ -100,14 +101,7 @@ def save_workspace(app_state: AppState):
             # Use the merged map values as our files list
             new_config['files'] = list(files_map.values())
 
-            # Write atomically using a temp file
-            temp_file = CONFIG_FILE.with_suffix('.tmp')
-            with open(temp_file, 'w') as f:
-                json_str = json.dumps(new_config, indent=2, sort_keys=True)
-                f.write(json_str)
-
-            # Atomic rename
-            os.replace(temp_file, CONFIG_FILE)
+            atomic_write_json(CONFIG_FILE, new_config, sort_keys=True)
 
     except Exception as e:
         logger.error(f"Error saving config: {e}", exc_info=True)
@@ -115,48 +109,46 @@ def save_workspace(app_state: AppState):
 
 
 def ensure_workspace_dir():
-    """Create necessary directories and files if they don't exist."""
+    """Ensure data directory and config.json exist. Safe to call on every request."""
     try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
         with filelock():
             DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-            # Reset all environment playStates to STOPPED on server startup
-            if CONFIG_FILE.exists():
-                # Load current config directly to preserve all data
-                with open(CONFIG_FILE, 'r') as f:
-                    content = f.read().strip()
-                    if not content:
-                        config = get_default_config()
-                    else:
-                        try:
-                            config = json.loads(content)
-                        except json.JSONDecodeError:
-                            logger.error("Error reading config, using default")
-                            config = get_default_config()
-
-                # Only update play states in the config, being careful to preserve presets
-                for env in config.get('environments', []):
-                    # Update play state
-                    env['playState'] = 'STOPPED'
-
-                # Write the updated config back atomically
-                temp_file = CONFIG_FILE.with_suffix('.tmp')
-                with open(temp_file, 'w') as f:
-                    json_str = json.dumps(config, indent=2, sort_keys=True)
-                    f.write(json_str)
-
-                # Atomic rename
-                os.replace(temp_file, CONFIG_FILE)
-            else:
-                # Create default config if it doesn't exist
-                with open(CONFIG_FILE, 'w') as f:
-                    json.dump(get_default_config(), f, indent=2)
-
+            if not CONFIG_FILE.exists():
+                logger.debug("Config file not found, creating default")
+                atomic_write_json(CONFIG_FILE, get_default_config(), sort_keys=True)
     except Exception as e:
         logger.error(f"Error ensuring workspace directory: {e}", exc_info=True)
 
 
-# Call this when the blueprint is created
+def reset_play_states_on_startup():
+    """Reset all environment playStates to STOPPED. Call only at server start."""
+    try:
+        ensure_workspace_dir()
+        with filelock():
+            if not CONFIG_FILE.exists():
+                return
+
+            with open(CONFIG_FILE, 'r') as f:
+                content = f.read().strip()
+                if not content:
+                    config = get_default_config()
+                else:
+                    try:
+                        config = json.loads(content)
+                    except json.JSONDecodeError:
+                        logger.error("Error reading config, using default")
+                        config = get_default_config()
+
+            for env in config.get('environments', []):
+                env['playState'] = 'STOPPED'
+
+            atomic_write_json(CONFIG_FILE, config, sort_keys=True)
+    except Exception as e:
+        logger.error(f"Error resetting play states on startup: {e}", exc_info=True)
+
+
+# Ensure dirs/config exist when the blueprint is imported (do not reset play states here)
 ensure_workspace_dir()
 
 
@@ -257,6 +249,7 @@ def update_workspace():
                     }), 400
 
             # Load current state to preserve presets if needed
+            config_state = None
             if CONFIG_FILE.exists():
                 with open(CONFIG_FILE, 'r') as f:
                     current_config = json.load(f)

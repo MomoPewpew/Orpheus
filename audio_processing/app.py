@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
-from audio_processing.routes.workspace import workspace_bp, ensure_workspace_dir, load_workspace
+from audio_processing.routes.workspace import workspace_bp, reset_play_states_on_startup, load_workspace
 from audio_processing.routes.files import files_bp
 from audio_processing.models.bot_manager import BotManager, DiscordBotManager
 from audio_processing.models.mixer import mixer
@@ -60,7 +60,7 @@ def create_app() -> Flask:
         application.bot_manager = None
 
     # Reset play state on server startup
-    ensure_workspace_dir()
+    reset_play_states_on_startup()
 
     # Pre-load workspace
     logger.info("Pre-loading workspace...")

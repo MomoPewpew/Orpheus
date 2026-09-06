@@ -26,36 +26,66 @@ LOCK_FILE = DATA_DIR / 'config.lock'
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg'}
 
 
+def _open_lock_file():
+    """Open the lock file, recreating it if the dentry is broken (common on bind mounts)."""
+    LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        return open(LOCK_FILE, 'a+')
+    except OSError as e:
+        # Broken/stale lock entries show up as ???????? in ls and fail open/touch with ENOENT
+        logger.warning(f"Could not open lock file ({e}); recreating")
+        try:
+            LOCK_FILE.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return open(LOCK_FILE, 'a+')
+
+
+def atomic_write_json(path: Path, data: dict, *, sort_keys: bool = False) -> None:
+    """Write JSON atomically, recovering from broken bind-mount dentries (ENOENT on open)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_file = path.with_suffix(path.suffix + '.tmp')
+
+    def _write() -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(temp_file, 'w') as f:
+            json.dump(data, f, indent=2, sort_keys=sort_keys)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_file, path)
+
+    try:
+        _write()
+    except FileNotFoundError as e:
+        logger.warning(f"Atomic write to {path} failed ({e}); recreating path")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        for candidate in (path, temp_file):
+            try:
+                candidate.unlink(missing_ok=True)
+            except OSError:
+                pass
+        _write()
+
+
 @contextmanager
 def filelock():
-    """Context manager for file locking to prevent race conditions."""
+    """Context manager for file locking to prevent race conditions.
+
+    Keeps a stable lock file and uses fcntl flock on it. The file is not
+    deleted on release — unlink/recreate races are what produce broken
+    config.lock dentries on Docker/NFS volumes.
+    """
     lock_file = None
     try:
-        # Ensure the lock file's directory exists
-        LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
-        
-        # If lock file exists, check if it's stale
-        if LOCK_FILE.exists():
-            try:
-                # Try to remove the lock file - if it's locked by an active process, this will fail
-                LOCK_FILE.unlink()
-                logger.info("Removed stale lock file")
-            except (PermissionError, OSError):
-                # If we can't remove it, it might be actively held
-                logger.debug("Lock file is in use")
-        
-        # Create/open the lock file
-        LOCK_FILE.touch()
-        lock_file = open(LOCK_FILE, 'a')
+        lock_file = _open_lock_file()
 
         # Try to acquire lock, wait up to 5 seconds
-        start_time = time.time()
         retry_count = 0
         max_retries = 50  # 5 seconds with 0.1s sleep
-        
+
         while True:
             try:
-                # Try to acquire an exclusive lock
                 fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 logger.debug("Successfully acquired file lock")
                 break
@@ -73,14 +103,10 @@ def filelock():
     finally:
         if lock_file:
             try:
-                # Release the lock and close the file
                 fcntl.flock(lock_file, fcntl.LOCK_UN)
                 lock_file.close()
-                # Try to remove the lock file
-                if LOCK_FILE.exists():
-                    LOCK_FILE.unlink()
             except Exception as e:
-                logger.error(f"Error cleaning up lock file: {e}")
+                logger.error(f"Error releasing lock file: {e}")
                 # Don't raise here as we're in finally block
 
 
@@ -120,8 +146,7 @@ def load_config() -> dict:
                 logger.debug("Config file not found, creating default")
                 default_config = get_default_config()
                 # Write the default config to file
-                with open(CONFIG_FILE, 'w') as f:
-                    json.dump(default_config, f, indent=2)
+                atomic_write_json(CONFIG_FILE, default_config)
                 return default_config
 
             # Read the file content first to check if it's empty
@@ -132,8 +157,7 @@ def load_config() -> dict:
                 logger.warning("Config file exists but is empty, creating default")
                 default_config = get_default_config()
                 # Write the default config to file
-                with open(CONFIG_FILE, 'w') as f:
-                    json.dump(default_config, f, indent=2)
+                atomic_write_json(CONFIG_FILE, default_config)
                 return default_config
 
             try:
@@ -165,8 +189,7 @@ def load_config() -> dict:
 
                 # Return default config and write it
                 default_config = get_default_config()
-                with open(CONFIG_FILE, 'w') as f:
-                    json.dump(default_config, f, indent=2)
+                atomic_write_json(CONFIG_FILE, default_config)
                 return default_config
 
     except Exception as e:
@@ -193,13 +216,7 @@ def save_config(config: dict):
             # Update only the fields that were passed in, preserve the rest
             merged_config = {**current_config, **config}
 
-            # Write atomically by writing to temp file first
-            temp_file = CONFIG_FILE.with_suffix('.tmp')
-            with open(temp_file, 'w') as f:
-                json.dump(merged_config, f, indent=2)
-
-            # Rename temp file to actual config file (atomic operation)
-            os.replace(temp_file, CONFIG_FILE)
+            atomic_write_json(CONFIG_FILE, merged_config)
 
     except Exception as e:
         logger.error(f"Error saving config: {e}", exc_info=True)
@@ -220,8 +237,7 @@ def ensure_directories():
                 logger.debug(f"Creating default config file at {CONFIG_FILE}")
                 # Write the default config directly here instead of calling save_config
                 # to avoid potential recursive lock acquisition
-                with open(CONFIG_FILE, 'w') as f:
-                    json.dump(get_default_config(), f, indent=2)
+                atomic_write_json(CONFIG_FILE, get_default_config())
     except Exception as e:
         logger.error(f"Error ensuring directories: {e}", exc_info=True)
         raise
