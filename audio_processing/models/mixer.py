@@ -46,10 +46,10 @@ class AudioMixer:
         """Apply high-pass and low-pass filters to the audio chunk.
         
         Args:
-            chunk: Audio chunk as int32 numpy array
+            chunk: Audio chunk as float32 numpy array in range [-1.0, 1.0]
             
         Returns:
-            Filtered audio chunk as int32 numpy array
+            Filtered audio chunk as float32 numpy array in range [-1.0, 1.0]
         """
         if not self.app_state:
             return chunk
@@ -61,8 +61,8 @@ class AudioMixer:
         if high_pass_freq == 0.0 and low_pass_freq == 20000.0:
             return chunk
 
-        # Convert to float32 for filter processing
-        chunk_float = chunk.astype(np.float32) / 32768.0
+        # Stay in float32 [-1, 1] — the mixer chain is float throughout
+        chunk_float = np.asarray(chunk, dtype=np.float32)
 
         nyquist = self.SAMPLE_RATE / 2
 
@@ -105,8 +105,7 @@ class AudioMixer:
                 filtered[:, channel] = filtered_signal
             chunk_float = filtered
 
-        # Convert back to int32
-        return (chunk_float * 32768.0).astype(np.int32)
+        return chunk_float.astype(np.float32, copy=False)
 
     def _apply_compressor(self, chunk: np.ndarray) -> np.ndarray:
         """Apply dynamic range compression to the audio chunk.
