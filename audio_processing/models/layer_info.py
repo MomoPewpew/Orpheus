@@ -27,6 +27,9 @@ class LayerInfo:
         self._position = 0  # Position within the loop
         self._audio_position = 0  # Position within the audio data
         self.has_played = False
+        # Overlapping release voices: remainder of a file after a short loop cuts
+        self._tails: list[dict] = []
+        self._mixed_tail_this_chunk = False
         # Initialize active_sound_index to the selected sound index
         self._active_sound_index = layer.selected_sound_index
         # Initialize chance roll
@@ -147,12 +150,23 @@ class LayerInfo:
         """Reset the playback position to the start of the audio."""
         self._position = 0
         self._audio_position = 0
+        self._tails = []
         self._active_sound_index = self.layer.selected_sound_index
         self._cooldown_cycles_elapsed = 0
         self._chance_roll = random.random()
         self.was_playing = True
         self.should_play_cached = False
         self.previous_volume = self.get_layer_sound().effective_volume
+
+    @property
+    def has_active_tails(self) -> bool:
+        """Whether any overlapping release voices are still playing."""
+        return bool(self._tails)
+
+    @property
+    def mixed_tail_this_chunk(self) -> bool:
+        """Whether the last get_next_chunk mixed any release-tail audio."""
+        return self._mixed_tail_this_chunk
 
     @property
     def should_play(self) -> bool:
@@ -168,6 +182,28 @@ class LayerInfo:
             return False
 
         return sound.is_fading
+
+    def _mix_tails_into_chunk(self, chunk: np.ndarray, chunk_size: int) -> None:
+        """Sum active tail voices into chunk and drop any that reach EOF."""
+        if not self._tails:
+            return
+
+        still_active = []
+        for tail in self._tails:
+            audio_data = tail["audio_data"]
+            pos = tail["position"]
+            audio_length = len(audio_data)
+            if pos >= audio_length:
+                continue
+
+            samples = min(chunk_size, audio_length - pos)
+            chunk[:samples] += audio_data[pos:pos + samples]
+            self._mixed_tail_this_chunk = True
+            pos += samples
+            if pos < audio_length:
+                still_active.append({"audio_data": audio_data, "position": pos})
+
+        self._tails = still_active
 
     @property
     def _free_weight(self) -> float:
@@ -189,11 +225,13 @@ class LayerInfo:
 
         return max_weight - used_weight
 
-    def get_next_chunk(self, chunk_size: int) -> Optional[np.ndarray]:
+    def get_next_chunk(self, chunk_size: int, include_main: bool = True) -> Optional[np.ndarray]:
         """Get the next chunk of audio data.
         
         Args:
             chunk_size: Number of samples to return
+            include_main: If False, advance the main loop without writing its samples
+                (used when the cycle should not be heard but release tails may still play)
             
         Returns:
             Numpy array of audio samples for this chunk, or None if the sound is finished
@@ -262,12 +300,33 @@ class LayerInfo:
             audio_length = len(audio_data)
 
             chunk = np.zeros((chunk_size, self.CHANNELS), dtype=np.float32)
+            self._mixed_tail_this_chunk = False
+            # Mix tails from previous cycles across the full chunk first
+            self._mix_tails_into_chunk(chunk, chunk_size)
+
             samples_remaining = chunk_size
             chunk_offset = 0
+            write_main = include_main
 
             while samples_remaining > 0:
                 # Check if we've reached the loop point
                 if self._position >= self.loop_length_samples:
+                    # Hand off remainder of the current file as an overlapping release voice
+                    # before resetting, so SEQUENCE/SHUFFLE still finish the previous decay.
+                    if write_main and self._audio_position < audio_length:
+                        remaining_in_chunk = chunk_size - chunk_offset
+                        audio_left = audio_length - self._audio_position
+                        first = min(remaining_in_chunk, audio_left)
+                        if first > 0:
+                            chunk[chunk_offset:chunk_offset + first] += \
+                                audio_data[self._audio_position:self._audio_position + first]
+                            self._mixed_tail_this_chunk = True
+                        new_pos = self._audio_position + first
+                        if new_pos < audio_length:
+                            self._tails.append({
+                                "audio_data": audio_data,
+                                "position": new_pos,
+                            })
                     self.end_of_loop()
                     # After end_of_loop, we need to get the new sound data
                     layer_sound = self.get_layer_sound()
@@ -282,32 +341,34 @@ class LayerInfo:
                     # Keep new audio data in float32 format
                     audio_data = sound_file.audio_data
                     audio_length = len(audio_data)
+                    # New cycle: only write main if this cycle should play
+                    write_main = include_main and self.should_play
 
                 # Get samples for this chunk
                 samples_to_get = min(samples_remaining, self.loop_length_samples - self._position)
 
-                # Always copy audio data if we have it
+                # Always advance audio position; only copy into the chunk when writing main
                 if self._audio_position < audio_length:
                     # Get as many samples as we can from current audio position
                     audio_samples = min(samples_to_get, audio_length - self._audio_position)
 
-                    # Get the samples from audio data
-                    chunk[chunk_offset:chunk_offset + audio_samples] = \
-                        audio_data[self._audio_position:self._audio_position + audio_samples]
+                    if write_main:
+                        chunk[chunk_offset:chunk_offset + audio_samples] += \
+                            audio_data[self._audio_position:self._audio_position + audio_samples]
 
                     # Update audio position
                     self._audio_position += audio_samples
-                    chunk_offset += audio_samples
                 else:
                     # Reset audio position if we've reached the end
                     self._audio_position = 0
 
-                # Always update position
+                # Advance chunk offset by full loop segment so later main writes stay time-aligned
+                chunk_offset += samples_to_get
                 self._position += samples_to_get
                 samples_remaining -= samples_to_get
 
-            # Convert to int16 at the end
-            return (chunk * 32767.0).astype(np.int16)
+            # Keep float32 so overlapping main+tail can sum above unity before the mixer
+            return chunk
 
         except Exception as e:
             logger.error(f"Error getting next chunk: {e}", exc_info=True)

@@ -444,8 +444,10 @@ class AudioMixer:
                             # Handle layer-level fading
                             layer_sound = layer_info.get_layer_sound()
 
-                            # Get the next chunk - this may trigger a loop point and update active_sound_index
-                            chunk = layer_info.get_next_chunk(self.chunk_samples)
+                            # Gate main voice before advancing; tails may still be mixed when muted
+                            include_main = layer_info.should_play or layer_info.is_fading
+                            had_tails = layer_info.has_active_tails
+                            chunk = layer_info.get_next_chunk(self.chunk_samples, include_main=include_main)
                             if chunk is None:
                                 continue
 
@@ -461,9 +463,14 @@ class AudioMixer:
                                   layer_info.has_played and not layer_info.is_fading):
                                 layer_sound.start_fade_out()
 
-                            if should_play or layer_info.is_fading:
-                                # Convert chunk to float32 if it isn't already
-                                chunk_float = chunk.astype(np.float32) / 32768.0
+                            if (should_play or layer_info.is_fading or had_tails
+                                    or layer_info.has_active_tails
+                                    or layer_info.mixed_tail_this_chunk):
+                                # int16 soundboard chunks need scaling; layer chunks stay float32
+                                if np.issubdtype(chunk.dtype, np.integer):
+                                    chunk_float = chunk.astype(np.float32) / 32768.0
+                                else:
+                                    chunk_float = chunk.astype(np.float32, copy=False)
 
                                 # Apply volume if needed
                                 current_volume = layer_info.volume
@@ -472,7 +479,8 @@ class AudioMixer:
 
                                 # Mix this layer into environment mix (staying in float32)
                                 env_mix += chunk_float
-                                layer_info.has_played = True
+                                if should_play or layer_info.is_fading:
+                                    layer_info.has_played = True
 
                             layer_info.was_playing = should_play
                             layer_info.previous_volume = layer_sound.effective_volume
